@@ -1,0 +1,148 @@
+"""
+These tests check the engine against the EXACT figures already computed by
+the user's own 'ITF12C 2025' sheet, cell by cell (rows 6-39), so a pass here
+means the Python engine reproduces the workbook's real output, not just its
+formulas in the abstract.
+
+Source figures (from the workbook):
+  USD sales: 12000, ZIG sales: 0
+  USD salaries: 3000, USD other expenses: 8900, everything else: 0
+  Exchange rate: 26.8
+  -> Adjusted income USD 6000 / ZIG 160800
+  -> Adjusted deductions USD 5950 / ZIG 159460
+  -> Taxable profit USD 50 / ZIG 1340
+  -> Tax payable USD 12.5 / ZIG 335, AIDS levy USD 0.375 / ZIG 10.05
+  -> Total tax USD 12.875 / ZIG 345.05
+  -> Q1 (10%) USD 1.2875 / ZIG 34.505
+"""
+
+import pytest
+
+from zimra_qpd.calculator import (
+    CurrencyExpenses,
+    QpdInput,
+    apply_payments,
+    calculate_qpd,
+    project_annual_from_quarter,
+)
+
+
+@pytest.fixture
+def workbook_example() -> QpdInput:
+    return QpdInput(
+        usd_sales=12000,
+        zig_sales=0,
+        usd_expenses=CurrencyExpenses(salaries=3000, other_expenses=8900),
+        zig_expenses=CurrencyExpenses(),
+        exchange_rate=26.8,
+        tax_rate=0.25,
+        aids_levy_rate=0.03,
+    )
+
+
+def test_currency_ratio_and_cap(workbook_example):
+    result = calculate_qpd(workbook_example)
+    # 100% USD trade -> USD dominant -> capped at 50/50
+    assert result.usd_ratio == pytest.approx(1.0)
+    assert result.zig_ratio == pytest.approx(0.0)
+    assert result.payment_ratio_usd == pytest.approx(0.5)
+    assert result.payment_ratio_zig == pytest.approx(0.5)
+
+
+def test_adjusted_income_matches_workbook(workbook_example):
+    result = calculate_qpd(workbook_example)
+    assert result.adjusted_income_usd == pytest.approx(6000)
+    assert result.adjusted_income_zig == pytest.approx(160800)
+
+
+def test_adjusted_deductions_matches_workbook(workbook_example):
+    result = calculate_qpd(workbook_example)
+    assert result.adjusted_deductions_usd == pytest.approx(5950)
+    assert result.adjusted_deductions_zig == pytest.approx(159460)
+
+
+def test_taxable_profit_matches_workbook(workbook_example):
+    result = calculate_qpd(workbook_example)
+    assert result.taxable_profit_usd == pytest.approx(50)
+    assert result.taxable_profit_zig == pytest.approx(1340)
+
+
+def test_tax_and_aids_levy_matches_workbook(workbook_example):
+    result = calculate_qpd(workbook_example)
+    assert result.tax_payable_usd == pytest.approx(12.5)
+    assert result.tax_payable_zig == pytest.approx(335)
+    assert result.aids_levy_usd == pytest.approx(0.375)
+    assert result.aids_levy_zig == pytest.approx(10.05)
+    assert result.total_tax_usd == pytest.approx(12.875)
+    assert result.total_tax_zig == pytest.approx(345.05)
+
+
+def test_qpd_schedule_matches_workbook(workbook_example):
+    result = calculate_qpd(workbook_example)
+    q1, q2, q3, q4 = result.schedule
+
+    assert q1.usd == pytest.approx(1.29, abs=0.01)
+    assert q1.zig == pytest.approx(34.51, abs=0.01)
+    assert q2.usd == pytest.approx(3.22, abs=0.01)
+    assert q3.usd == pytest.approx(3.86, abs=0.01)
+    assert q4.usd == pytest.approx(4.51, abs=0.01)
+
+    # Instalments must sum back to total tax
+    assert sum(i.usd for i in result.schedule) == pytest.approx(result.total_tax_usd, abs=0.01)
+    assert sum(i.zig for i in result.schedule) == pytest.approx(result.total_tax_zig, abs=0.01)
+
+
+def test_zig_dominant_uses_uncapped_ratio():
+    """When ZIG trade dominates, the 50/50 cap should NOT apply."""
+    data = QpdInput(
+        usd_sales=1000,
+        zig_sales=80400,  # 3000 USD-equivalent at rate 26.8 -> ZIG is 75% of trade
+        exchange_rate=26.8,
+    )
+    result = calculate_qpd(data)
+    assert result.usd_ratio < result.zig_ratio
+    assert result.payment_ratio_usd == pytest.approx(result.usd_ratio)
+    assert result.payment_ratio_zig == pytest.approx(result.zig_ratio)
+    assert result.payment_ratio_usd != 0.5
+
+
+def test_zero_exchange_rate_rejected():
+    with pytest.raises(ValueError):
+        calculate_qpd(QpdInput(usd_sales=100, zig_sales=0, exchange_rate=0))
+
+
+def test_negative_sales_rejected():
+    with pytest.raises(ValueError):
+        calculate_qpd(QpdInput(usd_sales=-1, zig_sales=0, exchange_rate=26.8))
+
+
+def test_no_income_no_crash():
+    """Zero income must not raise a division-by-zero error."""
+    result = calculate_qpd(QpdInput(usd_sales=0, zig_sales=0, exchange_rate=26.8))
+    assert result.total_tax_usd == 0
+    assert result.total_tax_zig == 0
+
+
+def test_apply_payments_replaces_broken_tracking(workbook_example):
+    """
+    The original workbook's payment-tracking rows referenced blank cells and
+    never worked. This confirms the replacement actually computes balances.
+    """
+    result = calculate_qpd(workbook_example)
+    schedule = apply_payments(
+        result.schedule,
+        usd_paid=[1.29, 0, 0, 0],
+        zig_paid=[34.51, 0, 0, 0],
+    )
+    assert schedule[0].usd_balance == pytest.approx(0.0, abs=0.01)
+    assert schedule[1].usd_balance == pytest.approx(3.22, abs=0.01)
+
+
+def test_project_annual_from_quarter1():
+    # Matches the workbook's own annualisation shortcut: Q1 x 4
+    assert project_annual_from_quarter(3000, quarters_elapsed=1) == pytest.approx(12000)
+
+
+def test_project_annual_rejects_zero_quarters():
+    with pytest.raises(ValueError):
+        project_annual_from_quarter(1000, quarters_elapsed=0)

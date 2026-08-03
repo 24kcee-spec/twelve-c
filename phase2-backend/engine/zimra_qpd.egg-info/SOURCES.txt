@@ -1,0 +1,7 @@
+pyproject.toml
+zimra_qpd/__init__.py
+zimra_qpd/calculator.py
+zimra_qpd.egg-info/PKG-INFO
+zimra_qpd.egg-info/SOURCES.txt
+zimra_qpd.egg-info/dependency_links.txt
+zimra_qpd.egg-info/top_level.txt

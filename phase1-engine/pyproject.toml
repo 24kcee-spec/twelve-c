@@ -1,0 +1,8 @@
+[project]
+name = "zimra-qpd"
+version = "0.1.0"
+description = "ZIMRA quarterly provisional tax (QPD) calculation engine"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]

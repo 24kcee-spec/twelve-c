@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: #f5f6f0;
+  color: #16241c;
+}
+
+::selection {
+  background-color: #b87f27;
+  color: #f5f6f0;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hairline rule used throughout instead of drop shadows */
+.rule {
+  border-color: #dcd9c9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus ring: visible, on-brand, never suppressed */
+:focus-visible {
+  outline: 2px solid #1f6f54;
+  outline-offset: 2px;
+}
