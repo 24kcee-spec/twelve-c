@@ -11,16 +11,26 @@ the way:
 2. The "QPD Payments Made" section (rows 41-46) referenced blank cells the
    same way and never actually tracked payments. `apply_payments()` below
    is a working replacement.
+3. Zero-income-with-real-expenses: when both currencies show $0 sales but
+   real expenses were entered, the raw ratio math defaults to 0.0/0.0
+   (which is not >, so it silently fell into the uncapped branch as 0/0),
+   zeroing out "adjusted deductions" even though real numbers were
+   entered. Fixed with an explicit total_income_usd==0 branch below. Final
+   tax owed is unaffected (taxable profit clamps at 0 regardless) - this
+   only fixes a misleading intermediate figure.
 
 Every formula below is commented with the ITF12C cell it replicates, so the
 logic can be checked line-by-line against the original workbook.
 
-Current ZIMRA rates (verified against ZIMRA/Trading Economics/Chambers Global
-Practice Guide, effective 1 January 2024): corporate tax 25%, AIDS levy 3% of
-the tax payable (not of income) -> 25.75% effective. Both are exposed as
-parameters, not hardcoded, since Zimbabwean tax rates and thresholds change
-via annual budget/public notices and this engine should never need a code
-change to stay correct.
+Current ZIMRA rates: corporate tax 25%, AIDS levy 3% of the tax payable
+(not of income) -> 25.75% effective. CONFIRMED against ZIMRA's own official
+site (zimra.co.zw/domestic-taxes/corporate/tax-rates, "Income of company or
+trust: 25%" + "Aids Levy: Rate is based on tax chargeable: 3%") as of
+August 2026 - this resolves an earlier discrepancy against some third-party
+sites quoting a stale 24%+3%=24.72% figure. Re-verify on ZIMRA's site (or
+the TaRMS portal) at the start of each tax year, since rates change via
+annual budget/public notice. Both rates are exposed as parameters, not
+hardcoded, so a rate change is a one-line default update, not a rebuild.
 """
 
 from __future__ import annotations
@@ -116,7 +126,24 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
     # Cap applies ONLY when USD is the dominant trading currency
     # (D9: =IF(D8>F8, 0.5, D8)  /  F9: =IF(D8>F8, 0.5, F8)).
     # If ZIG is dominant or equal, tax uses the real currency-of-trade ratio, uncapped.
-    if usd_ratio > zig_ratio:
+    #
+    # Zero-income edge case (fix, not present in the raw workbook - the raw
+    # sheet would show #DIV/0! here since D8/F8 = D7/H7 with H7=0): when a
+    # business has $0 sales in BOTH currencies but has real entered expenses
+    # (e.g. a new business's first quarter, spent before selling anything),
+    # usd_ratio and zig_ratio both default to 0.0, and 0.0 > 0.0 is False,
+    # so without this branch the code would fall into the "else" and set
+    # payment_ratio_usd/zig to 0.0 as well - silently zeroing out
+    # adjusted_deductions even though real expenses were entered. The final
+    # tax is 0 either way (taxable profit is clamped at 0 below regardless
+    # of how the ratio splits), but the *displayed* "Adjusted deductions"
+    # figure would misleadingly show $0, which looks like data loss to the
+    # user. Defaulting to 50/50 here keeps that figure honest without
+    # changing the tax outcome.
+    if total_income_usd == 0:
+        payment_ratio_usd = 0.5
+        payment_ratio_zig = 0.5
+    elif usd_ratio > zig_ratio:
         payment_ratio_usd = 0.5
         payment_ratio_zig = 0.5
     else:
