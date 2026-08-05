@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -7,6 +7,7 @@ import { TopBar } from "@/components/TopBar";
 import { CurrencyPairInput } from "@/components/CurrencyPairInput";
 import { ResultsPanel } from "@/components/ResultsPanel";
 import { PaymentTracker } from "@/components/PaymentTracker";
+import { NextPaymentDue } from "@/components/NextPaymentDue";
 import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
@@ -92,7 +93,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
         <TopBar />
         <div className="mx-auto max-w-5xl px-6 py-12">
           <ErrorNote>{error}</ErrorNote>
-          {!error && <p className="text-sm text-ink-faint">Loading…</p>}
+          {!error && <p className="text-sm text-ink-faint">Loadingâ€¦</p>}
         </div>
       </main>
     );
@@ -105,7 +106,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
         <Eyebrow>Business</Eyebrow>
         <h1 className="mt-1 font-display text-3xl text-ink">{business.name}</h1>
         <p className="mt-1 text-sm text-ink-faint">
-          Default rate ZiG {business.default_exchange_rate} / USD · {(business.default_tax_rate * 100).toFixed(0)}% tax
+          Default rate ZiG {business.default_exchange_rate} / USD Â· {(business.default_tax_rate * 100).toFixed(0)}% tax
           + {(business.default_aids_levy_rate * 100).toFixed(0)}% AIDS levy
         </p>
 
@@ -186,7 +187,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
 
                 <ErrorNote>{error}</ErrorNote>
                 <Button type="submit" variant="primary" disabled={calculating}>
-                  {calculating ? "Calculating…" : "Calculate QPD"}
+                  {calculating ? "Calculatingâ€¦" : "Calculate QPD"}
                 </Button>
               </form>
             </Card>
@@ -206,7 +207,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                       }`}
                     >
                       <span>
-                        {c.tax_year} · {c.quarter_label}
+                        {c.tax_year} Â· {c.quarter_label}
                       </span>
                       <span className="font-mono tabular-nums">
                         {money(c.result_json.total_tax_usd, "USD")}
@@ -221,6 +222,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
           <div className="space-y-6">
             {selected ? (
               <>
+                <NextPaymentDue calculation={selected} />
                 <ResultsPanel result={selected.result_json} />
                 <PaymentTracker calculation={selected} onSubmit={onSavePayments} />
               </>
