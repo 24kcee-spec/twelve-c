@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { QuarterlyRhythm } from "@/components/QuarterlyRhythm";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 
@@ -26,8 +26,8 @@ export default function LandingPage() {
           <p className="mt-5 max-w-md text-ink-soft">
             ZIMRA&apos;s QPD schedule front-loads almost nothing and back-loads
             65% of the year&apos;s tax into September and December. Twelve C
-            calculates the split correctly — across USD and ZIG, with the
-            Public Notice 71 capping rule applied properly — so the number
+            calculates the split correctly â€” across USD and ZIG, with the
+            Public Notice 71 capping rule applied properly â€” so the number
             you see is the number you owe.
           </p>
           <div className="mt-8 flex gap-3">
@@ -47,7 +47,7 @@ export default function LandingPage() {
               <QuarterlyRhythm />
             </div>
             <p className="mt-4 text-sm text-ink-faint">
-              10 / 25 / 30 / 35 — most businesses only notice how uneven this
+              10 / 25 / 30 / 35 â€” most businesses only notice how uneven this
               is when Q3 arrives and the bill is triple what Q1 was.
             </p>
           </Card>
@@ -57,26 +57,35 @@ export default function LandingPage() {
       <section className="border-t border-line bg-surface py-20">
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 md:grid-cols-3">
           <Feature
-            eyebrow="01 · Dual currency"
+            eyebrow="01 Â· Dual currency"
             title="USD and ZIG, one calculation"
-            body="Enter sales and expenses in whichever currency they actually traded in. Twelve C applies the Public Notice 71 50/50 cap correctly — only when USD is the dominant currency, uncapped when ZIG dominates — instead of guessing."
+            body="Enter sales and expenses in whichever currency they actually traded in. Twelve C applies the Public Notice 71 50/50 cap correctly â€” only when USD is the dominant currency, uncapped when ZIG dominates â€” instead of guessing."
           />
           <Feature
-            eyebrow="02 · Built for the deadline"
+            eyebrow="02 Â· Built for the deadline"
             title="A schedule you can act on"
-            body="25 March, 25 June, 25 September, 20 December. Each instalment shows what's owed, what's paid, and what's still outstanding — no dead cell references, no silent zeroes."
+            body="25 March, 25 June, 25 September, 20 December. Each instalment shows what's owed, what's paid, and what's still outstanding â€” no dead cell references, no silent zeroes."
           />
           <Feature
-            eyebrow="03 · One business or several"
+            eyebrow="03 Â· One business or several"
             title="Every entity, one login"
             body="Run more than one business through the same account, each with its own exchange rate and rate defaults, each calculation kept on record for when ZIMRA asks how you got the number."
           />
         </div>
       </section>
 
-      <footer className="mx-auto max-w-6xl px-6 py-10 text-xs text-ink-faint">
-        Twelve C is an independent calculator and is not affiliated with the
-        Zimbabwe Revenue Authority. Verify figures before filing.
+      <footer className="border-t border-line px-6 py-10">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-xs text-ink-faint">
+            Twelve C is an independent calculator and is not affiliated with
+            the Zimbabwe Revenue Authority. Verify figures before filing.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-4 text-xs text-ink-soft">
+            <Link href="/legal/disclaimer" className="hover:text-ink">Disclaimer</Link>
+            <Link href="/legal/privacy-policy" className="hover:text-ink">Privacy Policy</Link>
+            <Link href="/legal/terms-of-service" className="hover:text-ink">Terms of Service</Link>
+          </div>
+        </div>
       </footer>
     </main>
   );
