@@ -106,7 +106,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
         <Eyebrow>Business</Eyebrow>
         <h1 className="mt-1 font-display text-3xl text-ink">{business.name}</h1>
         <p className="mt-1 text-sm text-ink-faint">
-          Default rate ZiG {business.default_exchange_rate} / USD Â· {(business.default_tax_rate * 100).toFixed(0)}% tax
+          Default rate ZiG {business.default_exchange_rate} / USD · {(business.default_tax_rate * 100).toFixed(0)}% tax
           + {(business.default_aids_levy_rate * 100).toFixed(0)}% AIDS levy
         </p>
 
@@ -207,7 +207,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                       }`}
                     >
                       <span>
-                        {c.tax_year} Â· {c.quarter_label}
+                        {c.tax_year} · {c.quarter_label}
                       </span>
                       <span className="font-mono tabular-nums">
                         {money(c.result_json.total_tax_usd, "USD")}
