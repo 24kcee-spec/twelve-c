@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { QuarterlyRhythm } from "@/components/QuarterlyRhythm";
@@ -7,6 +7,16 @@ import { money, percent } from "@/lib/format";
 import { QpdResultJson } from "@/lib/types";
 
 const DATES = ["25 Mar", "25 Jun", "25 Sep", "20 Dec"];
+const QUARTER_DATES = [
+  { month: 2, day: 25 },
+  { month: 5, day: 25 },
+  { month: 8, day: 25 },
+  { month: 11, day: 20 },
+];
+
+function startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
 
 function Row({ label, usd, zig }: { label: string; usd: number; zig: number }) {
   return (
@@ -20,7 +30,7 @@ function Row({ label, usd, zig }: { label: string; usd: number; zig: number }) {
   );
 }
 
-export function ResultsPanel({ result }: { result: QpdResultJson }) {
+export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYear: number }) {
   const [currency, setCurrency] = useState<"USD" | "ZIG">("USD");
 
   const segments = result.schedule.map((inst, i) => ({
@@ -30,6 +40,21 @@ export function ResultsPanel({ result }: { result: QpdResultJson }) {
     amountUsd: inst.usd,
     amountZig: inst.zig,
   }));
+
+  const today = startOfDay(new Date());
+  const withDates = result.schedule.map((inst, i) => {
+    const { month, day } = QUARTER_DATES[i];
+    return {
+      idx: i,
+      date: new Date(taxYear, month, day),
+      paid: inst.usd_balance <= 0.01 && inst.zig_balance <= 0.01,
+    };
+  });
+  const overdue = withDates.find((i) => !i.paid && i.date < today);
+  const upcoming = withDates
+    .filter((i) => !i.paid && i.date >= today)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  const activeIndex = overdue ? overdue.idx : upcoming.length > 0 ? upcoming[0].idx : undefined;
 
   return (
     <div className="space-y-6">
@@ -84,7 +109,7 @@ export function ResultsPanel({ result }: { result: QpdResultJson }) {
           </div>
         </div>
         <div className="mt-4">
-          <QuarterlyRhythm segments={segments} currency={currency} showAmounts />
+          <QuarterlyRhythm segments={segments} currency={currency} showAmounts activeIndex={activeIndex} />
         </div>
       </Card>
     </div>

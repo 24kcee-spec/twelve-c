@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { money } from "@/lib/format";
 
@@ -25,33 +25,40 @@ export function QuarterlyRhythm({
   currency = "USD",
   showAmounts = false,
   animate = true,
+  activeIndex,
 }: {
   segments?: RhythmSegment[];
   currency?: "USD" | "ZIG";
   showAmounts?: boolean;
   animate?: boolean;
+  activeIndex?: number;
 }) {
   return (
     <div className="w-full">
       <div className="flex h-20 w-full overflow-hidden rounded-md border border-line">
-        {segments.map((seg, i) => (
-          <div
-            key={seg.label}
-            className={`${TINTS[i % TINTS.length]} flex flex-col justify-center border-r border-paper/40 px-3 py-2 last:border-r-0`}
-            style={{
-              flexGrow: seg.percentage,
-              flexBasis: 0,
-              transition: animate ? "flex-grow 700ms ease-out" : undefined,
-            }}
-          >
-            <span className={`font-mono text-[11px] uppercase tracking-wide ${TEXT_ON[i % TEXT_ON.length]} opacity-80`}>
-              {seg.label} · {seg.date}
-            </span>
-            <span className={`font-display text-lg leading-tight ${TEXT_ON[i % TEXT_ON.length]}`}>
-              {(seg.percentage * 100).toFixed(0)}%
-            </span>
-          </div>
-        ))}
+        {segments.map((seg, i) => {
+          const isActive = i === activeIndex;
+          return (
+            <div
+              key={seg.label}
+              className={`${TINTS[i % TINTS.length]} flex flex-col justify-center border-r border-paper/40 px-3 py-2 last:border-r-0 ${
+                isActive ? "ring-2 ring-inset ring-ink" : ""
+              }`}
+              style={{
+                flexGrow: seg.percentage,
+                flexBasis: 0,
+                transition: animate ? "flex-grow 700ms ease-out" : undefined,
+              }}
+            >
+              <span className={`font-mono text-[11px] uppercase tracking-wide ${TEXT_ON[i % TEXT_ON.length]} opacity-80`}>
+                {seg.label} · {seg.date}{isActive ? " · Next" : ""}
+              </span>
+              <span className={`font-display text-lg leading-tight ${TEXT_ON[i % TEXT_ON.length]}`}>
+                {(seg.percentage * 100).toFixed(0)}%
+              </span>
+            </div>
+          );
+        })}
       </div>
       {showAmounts && (
         <div className="mt-2 flex w-full">
@@ -64,10 +71,10 @@ export function QuarterlyRhythm({
               {currency === "USD"
                 ? seg.amountUsd !== undefined
                   ? money(seg.amountUsd, "USD")
-                  : "—"
+                  : "-"
                 : seg.amountZig !== undefined
                 ? money(seg.amountZig, "ZIG")
-                : "—"}
+                : "-"}
             </div>
           ))}
         </div>

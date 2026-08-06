@@ -223,7 +223,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
             {selected ? (
               <>
                 <NextPaymentDue calculation={selected} />
-                <ResultsPanel result={selected.result_json} />
+                <ResultsPanel result={selected.result_json} taxYear={selected.tax_year} />
                 <PaymentTracker calculation={selected} onSubmit={onSavePayments} />
               </>
             ) : (
