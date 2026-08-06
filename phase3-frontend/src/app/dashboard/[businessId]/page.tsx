@@ -309,7 +309,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
             {selected ? (
               <>
                 <div className="flex justify-end">
-                  <Button variant="secondary" type="button" onClick={() => window.print()}>
+                  <Button variant="secondary" type="button" onClick={() => printTaxSummary(business, calculation)}>
                     Download PDF summary
                   </Button>
                 </div>
@@ -342,3 +342,4 @@ export default function BusinessPage() {
     </AuthGuard>
   );
 }
+
