@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Button, Card, ErrorNote, Eyebrow } from "@/components/ui";
@@ -6,6 +6,16 @@ import { money } from "@/lib/format";
 import { QpdCalculationOut } from "@/lib/types";
 
 const DATES = ["25 Mar", "25 Jun", "25 Sep", "20 Dec"];
+
+function balanceInfo(balance: number, currency: "USD" | "ZIG") {
+  if (balance > 0.005) {
+    return { text: `Owes ${money(balance, currency)}`, className: "text-danger" };
+  }
+  if (balance < -0.005) {
+    return { text: `Overpaid by ${money(Math.abs(balance), currency)}`, className: "text-usd" };
+  }
+  return { text: "Paid in full", className: "text-usd" };
+}
 
 export function PaymentTracker({
   calculation,
@@ -49,11 +59,13 @@ export function PaymentTracker({
         {schedule.map((inst, i) => {
           const usdBalance = inst.usd - usdPaid[i];
           const zigBalance = inst.zig - zigPaid[i];
+          const usdInfo = balanceInfo(usdBalance, "USD");
+          const zigInfo = balanceInfo(zigBalance, "ZIG");
           return (
             <div key={inst.label} className="rounded border border-line p-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium text-ink">
-                  Q{i + 1} · {DATES[i] ?? inst.label}
+                  Q{i + 1} - {DATES[i] ?? inst.label}
                 </span>
                 <span className="text-ink-faint">
                   Owed {money(inst.usd, "USD")} / {money(inst.zig, "ZIG")}
@@ -83,10 +95,9 @@ export function PaymentTracker({
                   />
                 </label>
               </div>
-              <div className="mt-2 text-xs">
-                <span className={usdBalance > 0.005 ? "text-danger" : "text-usd"}>
-                  Balance: {money(usdBalance, "USD")} / {money(zigBalance, "ZIG")}
-                </span>
+              <div className="mt-2 flex gap-4 text-xs">
+                <span className={usdInfo.className}>USD: {usdInfo.text}</span>
+                <span className={zigInfo.className}>ZiG: {zigInfo.text}</span>
               </div>
             </div>
           );
@@ -94,7 +105,7 @@ export function PaymentTracker({
       </div>
       <ErrorNote>{error}</ErrorNote>
       <Button variant="primary" className="mt-4" onClick={save} disabled={saving}>
-        {saving ? "Saving…" : "Save payments"}
+        {saving ? "Saving..." : "Save payments"}
       </Button>
     </Card>
   );

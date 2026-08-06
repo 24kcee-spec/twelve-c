@@ -197,24 +197,39 @@ function BusinessContent({ businessId }: { businessId: string }) {
               {calculations.length === 0 && (
                 <p className="mt-2 text-sm text-ink-faint">No calculations yet.</p>
               )}
-              <ul className="mt-3 divide-y divide-line">
-                {calculations.map((c) => (
-                  <li key={c.id}>
-                    <button
-                      onClick={() => setSelected(c)}
-                      className={`flex w-full items-center justify-between py-2 text-left text-sm ${
-                        selected?.id === c.id ? "text-usd" : "text-ink-soft hover:text-ink"
-                      }`}
-                    >
-                      <span>
-                        {c.tax_year} · {c.quarter_label}
-                      </span>
-                      <span className="font-mono tabular-nums">
-                        {money(c.result_json.total_tax_usd, "USD")}
-                      </span>
-                    </button>
-                  </li>
-                ))}
+              <ul className="mt-3 space-y-1">
+                {calculations.map((c, idx) => {
+                  const isSelected = selected?.id === c.id;
+                  return (
+                    <li key={c.id}>
+                      <button
+                        onClick={() => setSelected(c)}
+                        className={`flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm transition ${
+                          isSelected
+                            ? "bg-usd-soft text-usd"
+                            : "text-ink-soft hover:bg-paper hover:text-ink"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          {c.tax_year} · {c.quarter_label}
+                          {idx === 0 && (
+                            <span className="rounded-full bg-ink px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-paper">
+                              Latest
+                            </span>
+                          )}
+                          {isSelected && (
+                            <span className="rounded-full border border-usd px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-usd">
+                              Viewing
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-mono tabular-nums">
+                          {money(c.result_json.total_tax_usd, "USD")}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
           </div>
