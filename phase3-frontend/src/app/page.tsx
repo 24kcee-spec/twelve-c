@@ -2,19 +2,6 @@
 import { QuarterlyRhythm } from "@/components/QuarterlyRhythm";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 
-const DEMO_SEGMENTS = [
-  { label: "Q1", date: "25 Mar", percentage: 0.1, amountUsd: 2000 },
-  { label: "Q2", date: "25 Jun", percentage: 0.25, amountUsd: 5000 },
-  { label: "Q3", date: "25 Sep", percentage: 0.3, amountUsd: 6000 },
-  { label: "Q4", date: "20 Dec", percentage: 0.35, amountUsd: 7000 },
-];
-
-const TRUST_ITEMS = [
-  "Corporate tax 25% + AIDS levy 3%",
-  "Public Notice 71 capping applied correctly",
-  "Validated against 134 automated tests",
-];
-
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-paper">
@@ -30,10 +17,9 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      <section className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 pb-16 pt-8 md:grid-cols-2 md:gap-8">
+      <section className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 pb-24 pt-8 md:grid-cols-2 md:gap-8">
         <div className="flex flex-col justify-center">
-          <Eyebrow>ITF12C, rebuilt</Eyebrow>
-          <h1 className="mt-4 font-display text-4xl leading-[1.05] text-ink md:text-5xl">
+          <h1 className="font-display text-4xl leading-[1.05] text-ink md:text-5xl">
             Your provisional tax isn&apos;t due in four equal chunks.
           </h1>
           <p className="mt-5 max-w-md text-ink-soft">
@@ -51,23 +37,13 @@ export default function LandingPage() {
               <Button variant="secondary">I already have an account</Button>
             </Link>
           </div>
-          <div className="mt-8 flex flex-wrap gap-x-4 gap-y-2">
-            {TRUST_ITEMS.map((item) => (
-              <span
-                key={item}
-                className="font-mono text-xs text-ink-faint before:mr-2 before:content-['·'] first:before:content-none"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
         </div>
 
         <div className="flex flex-col justify-center">
           <Card>
-            <Eyebrow>An example: USD 20,000 in tax owed</Eyebrow>
+            <Eyebrow>The actual schedule</Eyebrow>
             <div className="mt-4">
-              <QuarterlyRhythm segments={DEMO_SEGMENTS} currency="USD" showAmounts />
+              <QuarterlyRhythm />
             </div>
             <p className="mt-4 text-sm text-ink-faint">
               10 / 25 / 30 / 35 — most businesses only notice how uneven this
