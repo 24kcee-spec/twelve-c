@@ -1,3 +1,10 @@
 .env 
 phase2-backend/.env 
 phase3-frontend/.env 
+venv/ 
+phase2-backend/venv/ 
+phase1-engine/venv/ 
+node_modules/ 
+.next/ 
+__pycache__/ 
+*.pyc 
