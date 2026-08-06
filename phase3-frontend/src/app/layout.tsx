@@ -1,4 +1,5 @@
 ﻿import type { Metadata } from "next";
+import Script from "next/script";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
@@ -52,6 +53,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
       <body className="font-body antialiased">
+        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

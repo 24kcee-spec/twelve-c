@@ -32,6 +32,20 @@ class Settings(BaseSettings):
     environment: str = "development"
     cors_origins: str = "http://localhost:3000"
 
+    # Frontend base URL - used to build the link inside verification emails,
+    # e.g. https://twelvec.vercel.app or http://localhost:3000
+    frontend_url: str = "http://localhost:3000"
+
+    # Email verification token lifetime
+    email_verification_expire_hours: int = 24
+
+    # Resend (transactional email) - https://resend.com
+    resend_api_key: str | None = None
+    resend_from_email: str = "Twelve C <onboarding@resend.dev>"
+
+    # Google Sign-In (OAuth) - https://console.cloud.google.com/apis/credentials
+    google_client_id: str | None = None
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

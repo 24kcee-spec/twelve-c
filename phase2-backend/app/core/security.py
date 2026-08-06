@@ -28,6 +28,7 @@ class TokenType(StrEnum):
     ACCESS = "access"
     REFRESH = "refresh"
     MFA_PENDING = "mfa_pending"  # short-lived token issued after password check, before TOTP
+    EMAIL_VERIFY = "email_verify"  # emailed to the user after registration
 
 
 def _create_token(subject: str, token_type: TokenType, expires_delta: timedelta) -> str:
@@ -59,6 +60,12 @@ def create_mfa_pending_token(user_id: uuid.UUID) -> str:
     return _create_token(str(user_id), TokenType.MFA_PENDING, timedelta(minutes=5))
 
 
+def create_email_verification_token(user_id: uuid.UUID) -> str:
+    return _create_token(
+        str(user_id), TokenType.EMAIL_VERIFY, timedelta(hours=settings.email_verification_expire_hours)
+    )
+
+
 def decode_token(token: str) -> dict:
     """Raises jose.JWTError (or subclasses) if invalid/expired - caller handles it."""
     return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
@@ -78,6 +85,7 @@ __all__ = [
     "create_access_token",
     "create_refresh_token",
     "create_mfa_pending_token",
+    "create_email_verification_token",
     "decode_token",
     "hash_refresh_token",
 ]

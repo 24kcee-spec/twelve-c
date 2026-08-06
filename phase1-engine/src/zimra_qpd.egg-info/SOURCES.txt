@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+src/zimra_qpd/__init__.py
+src/zimra_qpd/calculator.py
+src/zimra_qpd.egg-info/PKG-INFO
+src/zimra_qpd.egg-info/SOURCES.txt
+src/zimra_qpd.egg-info/dependency_links.txt
+src/zimra_qpd.egg-info/top_level.txt
+tests/test_calculator.py
+tests/test_stress_100.py

@@ -14,7 +14,12 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Nullable because Google sign-in accounts never set a password.
+    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Set once a user signs in with Google. Accounts created this way are
+    # auto-verified, since Google has already confirmed the email address.
+    google_id: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

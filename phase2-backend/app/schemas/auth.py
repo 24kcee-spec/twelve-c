@@ -68,3 +68,21 @@ class MfaSetupResponse(BaseModel):
 
 class MfaVerifyRequest(BaseModel):
     totp_code: str
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class GoogleAuthRequest(BaseModel):
+    # The ID token returned by Google Identity Services on the frontend
+    # (google.accounts.id.callback response.credential), NOT an access token.
+    id_token: str

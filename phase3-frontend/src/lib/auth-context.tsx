@@ -8,6 +8,7 @@ interface AuthContextValue {
   user: UserOut | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ mfaRequired: boolean; pendingToken?: string }>;
+  googleLogin: (idToken: string) => Promise<{ mfaRequired: boolean; pendingToken?: string }>;
   completeMfaLogin: (pendingToken: string, code: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -52,6 +53,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { mfaRequired: false };
   }, [refreshUser]);
 
+  const googleLogin = useCallback(async (idToken: string) => {
+    const result = await api.googleLogin(idToken);
+    if ("mfa_required" in result) {
+      return { mfaRequired: true, pendingToken: result.mfa_pending_token };
+    }
+    storeTokens(result);
+    await refreshUser();
+    return { mfaRequired: false };
+  }, [refreshUser]);
+
   const completeMfaLogin = useCallback(async (pendingToken: string, code: string) => {
     const tokens = await api.mfaLogin(pendingToken, code);
     storeTokens(tokens);
@@ -77,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, completeMfaLogin, register, logout, refreshUser }}
+      value={{ user, loading, login, googleLogin, completeMfaLogin, register, logout, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

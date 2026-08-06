@@ -1,9 +1,13 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.core.deps import get_current_user
+from app.core.email import send_verification_email
 from app.core.limiter import limiter
 from app.core.mfa import (
     generate_qr_code_data_uri,
@@ -15,6 +19,7 @@ from app.core.security import (
     JWTError,
     TokenType,
     create_access_token,
+    create_email_verification_token,
     create_mfa_pending_token,
     decode_token,
     verify_password,
@@ -25,22 +30,40 @@ from app.crud.refresh_token import (
     revoke_all_for_user,
     revoke_refresh_token,
 )
-from app.crud.user import create_user, get_user_by_email, get_user_by_id
+from app.crud.user import (
+    create_google_user,
+    create_user,
+    get_user_by_email,
+    get_user_by_google_id,
+    get_user_by_id,
+    link_google_id,
+    mark_verified,
+)
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
+    GoogleAuthRequest,
     LoginRequest,
+    MessageResponse,
     MfaLoginRequest,
     MfaRequiredResponse,
     MfaSetupResponse,
     MfaVerifyRequest,
     RefreshRequest,
+    ResendVerificationRequest,
     TokenPair,
     UserOut,
     UserRegister,
+    VerifyEmailRequest,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+settings = get_settings()
+
+
+async def _send_verification(user: User) -> None:
+    token = create_email_verification_token(user.id)
+    await send_verification_email(user.email, token)
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -50,7 +73,89 @@ async def register(request: Request, payload: UserRegister, db: AsyncSession = D
     if existing is not None:
         # Deliberately vague to avoid leaking which emails are registered.
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Registration failed")
-    return await create_user(db, payload.email, payload.password)
+    user = await create_user(db, payload.email, payload.password)
+    await _send_verification(user)
+    return user
+
+
+@router.post("/verify-email", response_model=UserOut)
+@limiter.limit("10/hour")
+async def verify_email(request: Request, payload: VerifyEmailRequest, db: AsyncSession = Depends(get_db)) -> User:
+    invalid = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, detail="This verification link is invalid or has expired"
+    )
+    try:
+        token_payload = decode_token(payload.token)
+    except JWTError:
+        raise invalid
+    if token_payload.get("type") != TokenType.EMAIL_VERIFY.value:
+        raise invalid
+
+    try:
+        user = await get_user_by_id(db, uuid.UUID(token_payload["sub"]))
+    except (KeyError, ValueError):
+        raise invalid
+    if user is None:
+        raise invalid
+
+    if not user.is_verified:
+        user = await mark_verified(db, user)
+    return user
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+@limiter.limit("3/hour")
+async def resend_verification(
+    request: Request, payload: ResendVerificationRequest, db: AsyncSession = Depends(get_db)
+) -> MessageResponse:
+    # Always return the same generic message, whether or not the account
+    # exists or is already verified, so this endpoint can't be used to probe
+    # which emails are registered.
+    generic = MessageResponse(message="If that account exists and isn't verified yet, a new link has been sent.")
+
+    user = await get_user_by_email(db, payload.email)
+    if user is not None and not user.is_verified:
+        await _send_verification(user)
+    return generic
+
+
+@router.post("/google", response_model=TokenPair | MfaRequiredResponse)
+@limiter.limit("10/minute")
+async def google_auth(request: Request, payload: GoogleAuthRequest, db: AsyncSession = Depends(get_db)):
+    if not settings.google_client_id:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Google sign-in is not configured")
+
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            payload.id_token, google_requests.Request(), settings.google_client_id
+        )
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google credential")
+
+    if not claims.get("email_verified", False):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google email is not verified")
+
+    google_id = claims["sub"]
+    email = claims["email"]
+
+    user = await get_user_by_google_id(db, google_id)
+    if user is None:
+        # No account linked to this Google ID yet - check if there's an
+        # existing password account with the same email and link it instead
+        # of creating a duplicate.
+        user = await get_user_by_email(db, email)
+        if user is not None:
+            user = await link_google_id(db, user, google_id)
+        else:
+            user = await create_google_user(db, email, google_id)
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+
+    if user.mfa_enabled:
+        return MfaRequiredResponse(mfa_pending_token=create_mfa_pending_token(user.id))
+
+    return await _issue_token_pair(db, user)
 
 
 async def _issue_token_pair(db: AsyncSession, user: User) -> TokenPair:
@@ -65,10 +170,15 @@ async def login(request: Request, payload: LoginRequest, db: AsyncSession = Depe
     user = await get_user_by_email(db, payload.email)
     invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
-    if user is None or not verify_password(payload.password, user.hashed_password):
+    if user is None or user.hashed_password is None or not verify_password(payload.password, user.hashed_password):
         raise invalid
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before logging in. Check your inbox, or use resend-verification.",
+        )
 
     if user.mfa_enabled:
         return MfaRequiredResponse(mfa_pending_token=create_mfa_pending_token(user.id))

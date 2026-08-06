@@ -146,3 +146,27 @@ def test_project_annual_from_quarter1():
 def test_project_annual_rejects_zero_quarters():
     with pytest.raises(ValueError):
         project_annual_from_quarter(1000, quarters_elapsed=0)
+
+
+def test_zero_income_with_real_expenses_does_not_zero_out_deductions():
+    """
+    Regression test for the handover bug: a brand-new business with $0
+    sales but real entered expenses (e.g. spent money before making any
+    sales) must NOT show 'Adjusted deductions' as silently $0. Without the
+    total_income_usd==0 guard, usd_ratio/zig_ratio both default to 0.0
+    (0.0 > 0.0 is False), so payment_ratio would also default to 0.0/0.0
+    and multiply every real expense down to nothing. Final tax is
+    correctly 0 either way (taxable profit clamps at 0), but the
+    intermediate figure must stay honest.
+    """
+    result = calculate_qpd(QpdInput(
+        usd_sales=0, zig_sales=0, exchange_rate=26.8,
+        usd_expenses=CurrencyExpenses(salaries=1200, other_expenses=800),
+    ))
+    assert result.payment_ratio_usd == pytest.approx(0.5)
+    assert result.payment_ratio_zig == pytest.approx(0.5)
+    assert result.adjusted_deductions_usd == pytest.approx(1000.0)  # 0.5 * 2000
+    assert result.adjusted_deductions_zig == pytest.approx(0.5 * 2000 * 26.8)
+    # Tax owed is still correctly zero - there's no income to tax.
+    assert result.total_tax_usd == pytest.approx(0.0)
+    assert result.total_tax_zig == pytest.approx(0.0)

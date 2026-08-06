@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/types";
 import { Button, Card, ErrorNote, Field, Logo } from "@/components/ui";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(email, password);
-      router.push("/login?registered=1");
+      router.push(`/register/check-email?email=${encodeURIComponent(email)}`);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(
@@ -48,7 +49,17 @@ export default function RegisterPage() {
         <Card>
           <h1 className="font-display text-2xl text-ink">Create your account</h1>
           <p className="mt-1 text-sm text-ink-soft">One login, every business you run.</p>
-          <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+
+          <div className="mt-6">
+            <GoogleSignInButton onError={setError} />
+          </div>
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-line" />
+            <span className="font-mono text-xs uppercase tracking-[0.15em] text-ink-faint">or</span>
+            <div className="h-px flex-1 bg-line" />
+          </div>
+
+          <form className="space-y-4" onSubmit={onSubmit}>
             <Field
               label="Email"
               type="email"

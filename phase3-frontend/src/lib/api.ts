@@ -116,6 +116,30 @@ export const api = {
     );
   },
 
+  async verifyEmail(token: string): Promise<UserOut> {
+    return raw<UserOut>(
+      "/auth/verify-email",
+      { method: "POST", body: JSON.stringify({ token }) },
+      { auth: false }
+    );
+  },
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    return raw<{ message: string }>(
+      "/auth/resend-verification",
+      { method: "POST", body: JSON.stringify({ email }) },
+      { auth: false }
+    );
+  },
+
+  async googleLogin(id_token: string): Promise<TokenPair | MfaRequiredResponse> {
+    return raw<TokenPair | MfaRequiredResponse>(
+      "/auth/google",
+      { method: "POST", body: JSON.stringify({ id_token }) },
+      { auth: false }
+    );
+  },
+
   async me(): Promise<UserOut> {
     return raw<UserOut>("/auth/me");
   },

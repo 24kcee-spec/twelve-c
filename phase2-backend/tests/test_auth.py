@@ -3,6 +3,8 @@ from __future__ import annotations
 import pyotp
 import pytest
 
+from app.core.security import create_email_verification_token
+
 pytestmark = pytest.mark.asyncio
 
 VALID_PASSWORD = "Str0ngPassw0rd!"
@@ -11,9 +13,18 @@ VALID_PASSWORD = "Str0ngPassw0rd!"
 async def _register_and_login(client, email="user@example.com", password=VALID_PASSWORD):
     r = await client.post("/auth/register", json={"email": email, "password": password})
     assert r.status_code == 201, r.text
+    await _verify(client, r.json()["id"])
     r = await client.post("/auth/login", json={"email": email, "password": password})
     assert r.status_code == 200, r.text
     return r.json()
+
+
+async def _verify(client, user_id: str):
+    # In production this token is emailed via Resend; tests mint it directly
+    # since no real inbox exists here.
+    token = create_email_verification_token(user_id)
+    r = await client.post("/auth/verify-email", json={"token": token})
+    assert r.status_code == 200, r.text
 
 
 async def test_register_rejects_weak_password(client):
@@ -27,8 +38,16 @@ async def test_register_and_login_returns_token_pair(client):
     assert "refresh_token" in tokens
 
 
+async def test_unverified_user_cannot_login(client):
+    r = await client.post("/auth/register", json={"email": "unverified@example.com", "password": VALID_PASSWORD})
+    assert r.status_code == 201
+    r = await client.post("/auth/login", json={"email": "unverified@example.com", "password": VALID_PASSWORD})
+    assert r.status_code == 403
+
+
 async def test_login_wrong_password_rejected(client):
-    await client.post("/auth/register", json={"email": "a@example.com", "password": VALID_PASSWORD})
+    r = await client.post("/auth/register", json={"email": "a@example.com", "password": VALID_PASSWORD})
+    await _verify(client, r.json()["id"])
     r = await client.post("/auth/login", json={"email": "a@example.com", "password": "WrongPassword1"})
     assert r.status_code == 401
 
