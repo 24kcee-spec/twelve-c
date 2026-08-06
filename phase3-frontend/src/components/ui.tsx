@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { InputHTMLAttributes, ButtonHTMLAttributes } from "react";
@@ -14,14 +14,27 @@ export function Logo({ className = "" }: { className?: string }) {
 export function Field({
   label,
   hint,
+  emptyIfZero,
+  value,
+  placeholder,
   ...props
-}: { label: string; hint?: string } & InputHTMLAttributes<HTMLInputElement>) {
+}: {
+  label: string;
+  hint?: string;
+  /** For currency-style number fields: show a blank box with a "0.00" placeholder
+   *  instead of a literal "0" sitting in the field. Purely cosmetic - the bound
+   *  value is still 0 underneath, so calculations are unaffected. */
+  emptyIfZero?: boolean;
+} & InputHTMLAttributes<HTMLInputElement>) {
+  const displayValue = emptyIfZero && (value === 0 || value === "0") ? "" : value;
   return (
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-ink-soft">{label}</span>
       <input
         {...props}
-        className={`w-full rounded border border-line bg-surface px-3 py-2 font-mono text-sm text-ink outline-none transition focus:border-usd ${props.className ?? ""}`}
+        value={displayValue}
+        placeholder={emptyIfZero ? "0.00" : placeholder}
+        className={`w-full rounded border border-line bg-surface px-3 py-2 font-mono text-sm text-ink outline-none transition focus:border-usd placeholder:text-ink-faint/50 ${props.className ?? ""}`}
       />
       {hint && <span className="mt-1 block text-xs text-ink-faint">{hint}</span>}
     </label>

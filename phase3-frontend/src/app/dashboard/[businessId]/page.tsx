@@ -27,6 +27,13 @@ function BusinessContent({ businessId }: { businessId: string }) {
   const [zigExpenses, setZigExpenses] = useState<CurrencyExpensesIn>(emptyExpenses());
   const [calculating, setCalculating] = useState(false);
 
+  // Rate overrides - default to the business's saved rates, but editable per
+  // calculation since ZIMRA rates and the exchange rate both change during the year.
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+  const [taxRatePct, setTaxRatePct] = useState<number | null>(null);
+  const [aidsLevyPct, setAidsLevyPct] = useState<number | null>(null);
+  const [showRateSettings, setShowRateSettings] = useState(false);
+
   async function loadAll() {
     try {
       const [b, calcs] = await Promise.all([
@@ -34,6 +41,9 @@ function BusinessContent({ businessId }: { businessId: string }) {
         api.listCalculations(businessId),
       ]);
       setBusiness(b);
+      setExchangeRate(b.default_exchange_rate);
+      setTaxRatePct(b.default_tax_rate * 100);
+      setAidsLevyPct(b.default_aids_levy_rate * 100);
       setCalculations(calcs);
       if (calcs.length > 0) setSelected(calcs[0]);
     } catch {
@@ -67,6 +77,9 @@ function BusinessContent({ businessId }: { businessId: string }) {
         zig_sales: zigSales,
         usd_expenses: usdExpenses,
         zig_expenses: zigExpenses,
+        exchange_rate: exchangeRate,
+        tax_rate: taxRatePct !== null ? taxRatePct / 100 : null,
+        aids_levy_rate: aidsLevyPct !== null ? aidsLevyPct / 100 : null,
       });
       setCalculations((prev) => [result, ...prev]);
       setSelected(result);
@@ -93,7 +106,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
         <TopBar />
         <div className="mx-auto max-w-5xl px-6 py-12">
           <ErrorNote>{error}</ErrorNote>
-          {!error && <p className="text-sm text-ink-faint">Loadingâ€¦</p>}
+          {!error && <p className="text-sm text-ink-faint">Loading...</p>}
         </div>
       </main>
     );
@@ -138,6 +151,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                     type="number"
                     step="0.01"
                     min={0}
+                    emptyIfZero
                     value={usdSales}
                     onChange={(e) => setUsdSales(parseFloat(e.target.value) || 0)}
                   />
@@ -146,6 +160,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                     type="number"
                     step="0.01"
                     min={0}
+                    emptyIfZero
                     value={zigSales}
                     onChange={(e) => setZigSales(parseFloat(e.target.value) || 0)}
                   />
@@ -185,9 +200,64 @@ function BusinessContent({ businessId }: { businessId: string }) {
                   </div>
                 </div>
 
+                <div className="rounded border border-line px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowRateSettings((s) => !s)}
+                    className="flex w-full items-center justify-between text-left text-sm font-medium text-ink-soft"
+                  >
+                    <span>
+                      Rate settings
+                      <span className="ml-2 font-mono text-xs font-normal text-ink-faint">
+                        ZiG {exchangeRate ?? "-"}/USD - {taxRatePct ?? "-"}% tax + {aidsLevyPct ?? "-"}% AIDS levy
+                      </span>
+                    </span>
+                    <span className="text-ink-faint">{showRateSettings ? "Hide" : "Edit"}</span>
+                  </button>
+
+                  {showRateSettings && (
+                    <div className="mt-3 grid grid-cols-3 gap-3 border-t border-line pt-3">
+                      <Field
+                        label="Exchange rate"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        hint="ZiG per USD"
+                        value={exchangeRate ?? ""}
+                        onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
+                      />
+                      <Field
+                        label="Tax rate"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        max={100}
+                        hint="% of taxable profit"
+                        value={taxRatePct ?? ""}
+                        onChange={(e) => setTaxRatePct(parseFloat(e.target.value) || 0)}
+                      />
+                      <Field
+                        label="AIDS levy"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        max={100}
+                        hint="% of tax payable"
+                        value={aidsLevyPct ?? ""}
+                        onChange={(e) => setAidsLevyPct(parseFloat(e.target.value) || 0)}
+                      />
+                      <p className="col-span-3 text-xs text-ink-faint">
+                        These carry over from this business&apos;s saved defaults. Change them here for a
+                        one-off recalculation (e.g. a new ZIMRA budget rate) without editing the business
+                        itself.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <ErrorNote>{error}</ErrorNote>
                 <Button type="submit" variant="primary" disabled={calculating}>
-                  {calculating ? "Calculatingâ€¦" : "Calculate QPD"}
+                  {calculating ? "Calculating..." : "Calculate QPD"}
                 </Button>
               </form>
             </Card>

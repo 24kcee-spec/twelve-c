@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -40,4 +40,15 @@ body {
 :focus-visible {
   outline: 2px solid #1f6f54;
   outline-offset: 2px;
+}
+
+/* Remove native spinner arrows from number inputs across the whole app -
+   they read as clunky/default-browser rather than a designed product. */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
