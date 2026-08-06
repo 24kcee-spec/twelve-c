@@ -1,80 +1,94 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import { ApiError } from "@/lib/types";
+import React, { useEffect, useRef } from "react";
 
 declare global {
   interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: { client_id: string; callback: (resp: { credential: string }) => void }) => void;
-          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
-        };
-      };
-    };
+    google?: any;
   }
 }
 
-/**
- * Renders Google's own "Continue with Google" button. Does nothing (renders
- * nothing) if NEXT_PUBLIC_GOOGLE_CLIENT_ID isn't set, so the app still works
- * fine before Google sign-in is configured.
- */
-export function GoogleSignInButton({ onError }: { onError?: (message: string) => void }) {
+interface GoogleSignInButtonProps {
+  onSuccess?: (credential: string) => void;
+  onError?: (error: any) => void;
+  text?: "signin_with" | "signup_with" | "continue_with" | "signin";
+}
+
+export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
+  onSuccess,
+  onError,
+  text = "continue_with",
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
-  const { googleLogin } = useAuth();
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
   useEffect(() => {
-    if (!clientId) return;
-    let cancelled = false;
-    let poll: ReturnType<typeof setInterval> | undefined;
+    if (!clientId || !containerRef.current) return;
 
-    async function handleCredential(response: { credential: string }) {
-      try {
-        const result = await googleLogin(response.credential);
-        if (result.mfaRequired && result.pendingToken) {
-          window.sessionStorage.setItem("twelvec_mfa_pending", result.pendingToken);
-          router.push("/mfa");
-        } else {
-          router.push("/dashboard");
+    let cancelled = false;
+
+    const handleCredential = (response: any) => {
+      if (response?.credential) {
+        if (onSuccess) {
+          onSuccess(response.credential);
         }
-      } catch (err) {
-        onError?.(
-          err instanceof ApiError && typeof err.detail === "string" ? err.detail : "Google sign-in failed."
-        );
+      } else if (onError) {
+        onError(new Error("No credential returned from Google Sign-In"));
       }
-    }
+    };
 
     function tryInit() {
-      if (cancelled || !window.google || !containerRef.current) return false;
-      window.google.accounts.id.initialize({ client_id: clientId, callback: handleCredential });
+      if (
+        cancelled ||
+        !window.google?.accounts?.id ||
+        !containerRef.current ||
+        !clientId
+      ) {
+        return false;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleCredential,
+      });
+
       window.google.accounts.id.renderButton(containerRef.current, {
         theme: "outline",
         size: "large",
-        width: 320,
-        text: "continue_with",
+        text,
+        width: "100%",
       });
+
       return true;
     }
 
     if (!tryInit()) {
-      poll = setInterval(() => {
-        if (tryInit() && poll) clearInterval(poll);
-      }, 200);
+      const interval = setInterval(() => {
+        if (tryInit()) {
+          clearInterval(interval);
+        }
+      }, 300);
+
+      return () => {
+        cancelled = true;
+        clearInterval(interval);
+      };
     }
 
     return () => {
       cancelled = true;
-      if (poll) clearInterval(poll);
     };
-  }, [clientId, googleLogin, router, onError]);
+  }, [clientId, onSuccess, onError, text]);
 
-  if (!clientId) return null;
+  if (!clientId) {
+    return (
+      <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 p-2 rounded text-center">
+        Google Sign-In disabled (NEXT_PUBLIC_GOOGLE_CLIENT_ID missing).
+      </div>
+    );
+  }
 
-  return <div ref={containerRef} className="flex justify-center" />;
-}
+  return <div ref={containerRef} className="w-full min-h-[40px] flex justify-center" />;
+};
+
+export default GoogleSignInButton;
