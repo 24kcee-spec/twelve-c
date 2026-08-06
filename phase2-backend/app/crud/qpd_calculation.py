@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import dataclasses
 import uuid
@@ -9,7 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.business import Business
 from app.models.qpd_calculation import QpdCalculation
 from app.schemas.qpd_calculation import ApplyPaymentsRequest, QpdCalculationCreate
-from zimra_qpd.calculator import CurrencyExpenses, QpdInput, apply_payments, calculate_qpd
+from zimra_qpd.calculator import (
+    CurrencyExpenses,
+    QpdInput,
+    QpdInstalment,
+    QpdResult,
+    apply_payments,
+    calculate_qpd,
+)
 
 
 def _build_engine_input(business: Business, data: QpdCalculationCreate) -> QpdInput:
@@ -26,6 +33,35 @@ def _build_engine_input(business: Business, data: QpdCalculationCreate) -> QpdIn
     )
 
 
+def _schedule_to_dicts(schedule: list[QpdInstalment]) -> list[dict]:
+    """
+    Serializes QpdInstalment objects by hand, including usd_balance/zig_balance.
+    dataclasses.asdict() drops those - they're @property, computed from
+    usd/usd_paid, not real dataclass fields. Every caller that turns a
+    schedule into result_json MUST go through this, or the balance fields
+    silently disappear and the frontend sums undefined -> NaN.
+    """
+    return [
+        {
+            "label": i.label,
+            "percentage": i.percentage,
+            "usd": i.usd,
+            "zig": i.zig,
+            "usd_paid": i.usd_paid,
+            "zig_paid": i.zig_paid,
+            "usd_balance": i.usd_balance,
+            "zig_balance": i.zig_balance,
+        }
+        for i in schedule
+    ]
+
+
+def _result_to_dict(result: QpdResult) -> dict:
+    data = dataclasses.asdict(result)
+    data["schedule"] = _schedule_to_dicts(result.schedule)
+    return data
+
+
 async def create_calculation(
     db: AsyncSession, business: Business, data: QpdCalculationCreate
 ) -> QpdCalculation:
@@ -37,7 +73,7 @@ async def create_calculation(
         tax_year=data.tax_year,
         quarter_label=data.quarter_label,
         input_json=dataclasses.asdict(engine_input),
-        result_json=dataclasses.asdict(result),
+        result_json=_result_to_dict(result),
     )
     db.add(record)
     await db.commit()
@@ -69,11 +105,8 @@ async def apply_payments_to_calculation(
     """
     Re-derives QpdInstalment objects from the stored schedule, applies
     payments via the engine's apply_payments(), then persists the updated
-    schedule back into result_json. This is the working replacement for the
-    workbook's broken "QPD Payments Made" section (see engine docstring).
+    schedule back into result_json.
     """
-    from zimra_qpd.calculator import QpdInstalment
-
     schedule = [
         QpdInstalment(
             label=item["label"],
@@ -88,19 +121,7 @@ async def apply_payments_to_calculation(
     updated_schedule = apply_payments(schedule, data.usd_paid, data.zig_paid)
 
     new_result_json = dict(record.result_json)
-    new_result_json["schedule"] = [
-        {
-            "label": i.label,
-            "percentage": i.percentage,
-            "usd": i.usd,
-            "zig": i.zig,
-            "usd_paid": i.usd_paid,
-            "zig_paid": i.zig_paid,
-            "usd_balance": i.usd_balance,
-            "zig_balance": i.zig_balance,
-        }
-        for i in updated_schedule
-    ]
+    new_result_json["schedule"] = _schedule_to_dicts(updated_schedule)
     record.result_json = new_result_json
     await db.commit()
     await db.refresh(record)
