@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
@@ -27,7 +27,21 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Twelve C | ZIMRA provisional tax, calculated properly",
   description:
-    "Calculate, file, and track your ZIMRA Quarterly Payment Date provisional tax across USD and ZIG in one place — named for the ITF12C form it replaces.",
+    "Calculate, file, and track your ZIMRA Quarterly Payment Date provisional tax across USD and ZIG in one place, named for the ITF12C form it replaces.",
+  openGraph: {
+    title: "Twelve C | ZIMRA provisional tax, calculated properly",
+    description:
+      "Calculate, file, and track your ZIMRA Quarterly Payment Date provisional tax across USD and ZIG in one place.",
+    siteName: "Twelve C",
+    locale: "en_ZW",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Twelve C | ZIMRA provisional tax, calculated properly",
+    description:
+      "Calculate, file, and track your ZIMRA Quarterly Payment Date provisional tax across USD and ZIG in one place.",
+  },
 };
 
 export default function RootLayout({

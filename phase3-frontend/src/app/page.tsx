@@ -2,6 +2,19 @@
 import { QuarterlyRhythm } from "@/components/QuarterlyRhythm";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 
+const DEMO_SEGMENTS = [
+  { label: "Q1", date: "25 Mar", percentage: 0.1, amountUsd: 2000 },
+  { label: "Q2", date: "25 Jun", percentage: 0.25, amountUsd: 5000 },
+  { label: "Q3", date: "25 Sep", percentage: 0.3, amountUsd: 6000 },
+  { label: "Q4", date: "20 Dec", percentage: 0.35, amountUsd: 7000 },
+];
+
+const TRUST_ITEMS = [
+  "Corporate tax 25% + AIDS levy 3%",
+  "Public Notice 71 capping applied correctly",
+  "Validated against 134 automated tests",
+];
+
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-paper">
@@ -17,7 +30,7 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      <section className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 pb-24 pt-8 md:grid-cols-2 md:gap-8">
+      <section className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 pb-16 pt-8 md:grid-cols-2 md:gap-8">
         <div className="flex flex-col justify-center">
           <Eyebrow>ITF12C, rebuilt</Eyebrow>
           <h1 className="mt-4 font-display text-4xl leading-[1.05] text-ink md:text-5xl">
@@ -26,8 +39,8 @@ export default function LandingPage() {
           <p className="mt-5 max-w-md text-ink-soft">
             ZIMRA&apos;s QPD schedule front-loads almost nothing and back-loads
             65% of the year&apos;s tax into September and December. Twelve C
-            calculates the split correctly â€” across USD and ZIG, with the
-            Public Notice 71 capping rule applied properly â€” so the number
+            calculates the split correctly — across USD and ZIG, with the
+            Public Notice 71 capping rule applied properly — so the number
             you see is the number you owe.
           </p>
           <div className="mt-8 flex gap-3">
@@ -38,16 +51,26 @@ export default function LandingPage() {
               <Button variant="secondary">I already have an account</Button>
             </Link>
           </div>
+          <div className="mt-8 flex flex-wrap gap-x-4 gap-y-2">
+            {TRUST_ITEMS.map((item) => (
+              <span
+                key={item}
+                className="font-mono text-xs text-ink-faint before:mr-2 before:content-['·'] first:before:content-none"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-col justify-center">
           <Card>
-            <Eyebrow>The actual schedule</Eyebrow>
+            <Eyebrow>An example: USD 20,000 in tax owed</Eyebrow>
             <div className="mt-4">
-              <QuarterlyRhythm />
+              <QuarterlyRhythm segments={DEMO_SEGMENTS} currency="USD" showAmounts />
             </div>
             <p className="mt-4 text-sm text-ink-faint">
-              10 / 25 / 30 / 35 â€” most businesses only notice how uneven this
+              10 / 25 / 30 / 35 — most businesses only notice how uneven this
               is when Q3 arrives and the bill is triple what Q1 was.
             </p>
           </Card>
@@ -57,17 +80,20 @@ export default function LandingPage() {
       <section className="border-t border-line bg-surface py-20">
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 md:grid-cols-3">
           <Feature
-            eyebrow="01 Â· Dual currency"
+            icon={<CurrencyIcon />}
+            eyebrow="01 · Dual currency"
             title="USD and ZIG, one calculation"
-            body="Enter sales and expenses in whichever currency they actually traded in. Twelve C applies the Public Notice 71 50/50 cap correctly â€” only when USD is the dominant currency, uncapped when ZIG dominates â€” instead of guessing."
+            body="Enter sales and expenses in whichever currency they actually traded in. Twelve C applies the Public Notice 71 50/50 cap correctly — only when USD is the dominant currency, uncapped when ZIG dominates — instead of guessing."
           />
           <Feature
-            eyebrow="02 Â· Built for the deadline"
+            icon={<CalendarIcon />}
+            eyebrow="02 · Built for the deadline"
             title="A schedule you can act on"
-            body="25 March, 25 June, 25 September, 20 December. Each instalment shows what's owed, what's paid, and what's still outstanding â€” no dead cell references, no silent zeroes."
+            body="25 March, 25 June, 25 September, 20 December. Each instalment shows what's owed, what's paid, and what's still outstanding — no dead cell references, no silent zeroes."
           />
           <Feature
-            eyebrow="03 Â· One business or several"
+            icon={<BuildingsIcon />}
+            eyebrow="03 · One business or several"
             title="Every entity, one login"
             body="Run more than one business through the same account, each with its own exchange rate and rate defaults, each calculation kept on record for when ZIMRA asks how you got the number."
           />
@@ -91,12 +117,58 @@ export default function LandingPage() {
   );
 }
 
-function Feature({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
+function Feature({
+  icon,
+  eyebrow,
+  title,
+  body,
+}: {
+  icon: React.ReactNode;
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
   return (
     <div className="border-t-2 border-ink pt-4">
+      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-usd-soft text-usd">
+        {icon}
+      </div>
       <Eyebrow>{eyebrow}</Eyebrow>
       <h3 className="mt-2 font-display text-xl text-ink">{title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-ink-soft">{body}</p>
     </div>
+  );
+}
+
+function CurrencyIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h13l-3.5-3.5" />
+      <path d="M4 7l3.5 3.5" />
+      <path d="M20 17H7l3.5-3.5" />
+      <path d="M20 17l-3.5 3.5" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="15" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M8 3v4" />
+      <path d="M16 3v4" />
+      <circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function BuildingsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="10" width="6" height="10" />
+      <rect x="14" y="4" width="6" height="16" />
+      <path d="M6.5 13h1M6.5 16h1M16.5 7h1M16.5 10h1M16.5 13h1M16.5 16h1" />
+    </svg>
   );
 }
