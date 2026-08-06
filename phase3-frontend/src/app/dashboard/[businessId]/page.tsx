@@ -8,6 +8,7 @@ import { CurrencyPairInput } from "@/components/CurrencyPairInput";
 import { ResultsPanel } from "@/components/ResultsPanel";
 import { PaymentTracker } from "@/components/PaymentTracker";
 import { NextPaymentDue } from "@/components/NextPaymentDue";
+import { TaxSummaryPrint } from "@/components/TaxSummaryPrint";
 import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
@@ -113,7 +114,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
   }
 
   return (
-    <main className="min-h-screen bg-paper">
+    <main className="min-h-screen bg-paper print:hidden">
       <TopBar />
       <div className="mx-auto max-w-5xl px-6 py-12">
         <Eyebrow>Business</Eyebrow>
@@ -307,9 +308,15 @@ function BusinessContent({ businessId }: { businessId: string }) {
           <div className="space-y-6">
             {selected ? (
               <>
+                <div className="flex justify-end">
+                  <Button variant="secondary" type="button" onClick={() => window.print()}>
+                    Download PDF summary
+                  </Button>
+                </div>
                 <NextPaymentDue calculation={selected} />
                 <ResultsPanel result={selected.result_json} taxYear={selected.tax_year} />
                 <PaymentTracker calculation={selected} onSubmit={onSavePayments} />
+                <TaxSummaryPrint business={business} calculation={selected} />
               </>
             ) : (
               <Card>

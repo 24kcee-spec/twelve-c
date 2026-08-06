@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -12,6 +12,8 @@ function DashboardContent() {
   const [businesses, setBusinesses] = useState<Business[] | null>(null);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [rate, setRate] = useState("26.8");
@@ -31,6 +33,20 @@ function DashboardContent() {
   useEffect(() => {
     load();
   }, []);
+
+  async function onDelete(id: string) {
+    setDeletingId(id);
+    setError("");
+    try {
+      await api.deleteBusiness(id);
+      setBusinesses((prev) => prev?.filter((b) => b.id !== id) ?? null);
+      setConfirmingDeleteId(null);
+    } catch {
+      setError("Couldn't delete that business. Try again in a moment.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -104,7 +120,7 @@ function DashboardContent() {
               />
               <div className="md:col-span-2">
                 <Button type="submit" variant="primary" disabled={submitting}>
-                  {submitting ? "Creating…" : "Create business"}
+                  {submitting ? "Creating..." : "Create business"}
                 </Button>
               </div>
             </form>
@@ -112,7 +128,7 @@ function DashboardContent() {
         )}
 
         <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-          {businesses === null && <p className="text-sm text-ink-faint">Loading businesses…</p>}
+          {businesses === null && <p className="text-sm text-ink-faint">Loading businesses...</p>}
           {businesses?.length === 0 && (
             <Card className="md:col-span-2">
               <p className="text-sm text-ink-soft">
@@ -121,8 +137,8 @@ function DashboardContent() {
             </Card>
           )}
           {businesses?.map((b) => (
-            <Link key={b.id} href={`/dashboard/${b.id}`}>
-              <Card className="h-full transition hover:border-usd">
+            <Card key={b.id} className="h-full transition hover:border-usd">
+              <Link href={`/dashboard/${b.id}`}>
                 <h3 className="font-display text-lg text-ink">{b.name}</h3>
                 <dl className="mt-3 space-y-1 text-sm text-ink-soft">
                   <div className="flex justify-between">
@@ -138,8 +154,40 @@ function DashboardContent() {
                     <dd className="font-mono tabular-nums">{(b.default_aids_levy_rate * 100).toFixed(0)}%</dd>
                   </div>
                 </dl>
-              </Card>
-            </Link>
+              </Link>
+
+              <div className="mt-4 border-t border-line pt-3">
+                {confirmingDeleteId === b.id ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-danger">
+                      {`Delete "${b.name}" and all its calculations? This can't be undone.`}
+                    </span>
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        onClick={() => onDelete(b.id)}
+                        disabled={deletingId === b.id}
+                        className="rounded bg-danger px-2 py-1 text-xs font-semibold text-paper disabled:opacity-50"
+                      >
+                        {deletingId === b.id ? "Deleting..." : "Yes, delete"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmingDeleteId(null)}
+                        className="rounded border border-line px-2 py-1 text-xs text-ink-soft"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingDeleteId(b.id)}
+                    className="text-xs text-ink-faint transition hover:text-danger"
+                  >
+                    Delete business
+                  </button>
+                )}
+              </div>
+            </Card>
           ))}
         </div>
       </div>

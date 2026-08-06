@@ -1,4 +1,4 @@
-import {
+﻿import {
   ApiError,
   ApplyPaymentsRequest,
   Business,
@@ -164,6 +164,10 @@ export const api = {
 
   async getBusiness(id: string): Promise<Business> {
     return raw<Business>(`/businesses/${id}`);
+  },
+
+  async deleteBusiness(id: string): Promise<void> {
+    await raw<void>(`/businesses/${id}`, { method: "DELETE" });
   },
 
   async listCalculations(businessId: string): Promise<QpdCalculationOut[]> {
