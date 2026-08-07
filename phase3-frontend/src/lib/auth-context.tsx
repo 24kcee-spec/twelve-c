@@ -1,112 +1,92 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { api } from "./api";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { api, setTokens, hasAccessToken } from "./api";
+import { UserOut, TokenPair, MfaRequiredResponse } from "./types";
 
-interface User {
-  id?: string;
-  email: string;
-  full_name?: string;
-  is_verified?: boolean;
+const MFA_PENDING_KEY = "twelvec_mfa_pending";
+
+function isMfaRequired(res: TokenPair | MfaRequiredResponse): res is MfaRequiredResponse {
+  return (res as MfaRequiredResponse).mfa_required === true;
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: UserOut | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<void>;
-  loginWithGoogle: (credential: string) => Promise<void>;
-  logout: () => void;
+  register: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ mfaRequired: boolean }>;
+  loginWithGoogle: (idToken: string) => Promise<{ mfaRequired: boolean }>;
+  completeMfaLogin: (pendingToken: string, code: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserOut | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchUser = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
+  const refreshUser = useCallback(async () => {
     try {
-      let res;
-      try {
-        res = await api.get("/api/auth/me");
-      } catch (e: any) {
-        if (e?.response?.status === 404) {
-          res = await api.get("/auth/me");
-        } else {
-          throw e;
-        }
-      }
-      setUser(res.data);
+      const me = await api.me();
+      setUser(me);
     } catch {
-      localStorage.removeItem("token");
       setUser(null);
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUser();
   }, []);
 
-  const login = async (email: string, pass: string) => {
-    const formData = new URLSearchParams();
-    formData.append("username", email);
-    formData.append("password", pass);
-
-    let res;
-    try {
-      res = await api.post("/api/auth/login", formData, {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      });
-    } catch (e: any) {
-      if (e?.response?.status === 404) {
-        res = await api.post("/auth/login", formData, {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        });
-      } else {
-        throw e;
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      if (hasAccessToken()) {
+        await refreshUser();
       }
-    }
+      setLoading(false);
+    })();
+  }, [refreshUser]);
 
-    if (res.data.access_token) {
-      localStorage.setItem("token", res.data.access_token);
-      await fetchUser();
-    }
+  const register = async (email: string, password: string) => {
+    await api.register(email, password);
   };
 
-  const loginWithGoogle = async (credential: string) => {
-    let res;
-    try {
-      res = await api.post("/api/auth/google", { credential });
-    } catch (e: any) {
-      if (e?.response?.status === 404) {
-        res = await api.post("/auth/google", { credential });
-      } else {
-        throw e;
+  const handleAuthResult = async (result: TokenPair | MfaRequiredResponse): Promise<{ mfaRequired: boolean }> => {
+    if (isMfaRequired(result)) {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(MFA_PENDING_KEY, result.mfa_pending_token);
       }
+      return { mfaRequired: true };
     }
-
-    if (res.data.access_token) {
-      localStorage.setItem("token", res.data.access_token);
-      await fetchUser();
-    }
+    setTokens(result);
+    await refreshUser();
+    return { mfaRequired: false };
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
+  const login = async (email: string, password: string) => {
+    const result = await api.login(email, password);
+    return handleAuthResult(result);
+  };
+
+  const loginWithGoogle = async (idToken: string) => {
+    const result = await api.googleAuth(idToken);
+    return handleAuthResult(result);
+  };
+
+  const completeMfaLogin = async (pendingToken: string, code: string) => {
+    const tokens = await api.mfaLogin(pendingToken, code);
+    setTokens(tokens);
+    await refreshUser();
+  };
+
+  const logout = async () => {
+    await api.logout();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, register, login, loginWithGoogle, completeMfaLogin, logout, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

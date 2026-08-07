@@ -20,6 +20,7 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from app.core.limiter import limiter  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
+from app import models  # noqa: E402,F401  (registers all tables on Base.metadata)
 
 
 @pytest_asyncio.fixture(autouse=True)

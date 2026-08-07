@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { ApiError } from "@/lib/types";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 export default function LoginPage() {
@@ -14,17 +15,28 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const errorMessage = (err: unknown, fallback: string) => {
+    if (err instanceof ApiError) {
+      if (typeof err.detail === "string") return err.detail;
+      if (Array.isArray(err.detail)) return err.detail.map((d: { msg?: string }) => d.msg).join(" ");
+    }
+    return fallback;
+  };
+
+  const goAfterAuth = (mfaRequired: boolean) => {
+    router.push(mfaRequired ? "/mfa" : "/dashboard");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
-      await login(email, password);
-      router.push("/dashboard");
-    } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || "Failed to log in.";
-      setError(msg);
+      const { mfaRequired } = await login(email, password);
+      goAfterAuth(mfaRequired);
+    } catch (err) {
+      setError(errorMessage(err, "Failed to log in."));
     } finally {
       setLoading(false);
     }
@@ -34,11 +46,10 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await loginWithGoogle(credential);
-      router.push("/dashboard");
-    } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || "Google Sign-In failed on server.";
-      setError(msg);
+      const { mfaRequired } = await loginWithGoogle(credential);
+      goAfterAuth(mfaRequired);
+    } catch (err) {
+      setError(errorMessage(err, "Google Sign-In failed on server."));
     } finally {
       setLoading(false);
     }

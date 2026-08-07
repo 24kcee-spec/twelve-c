@@ -1,111 +1,301 @@
-import base64
-import json
-import secrets
-from typing import Optional
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from sqlalchemy import select
-from pydantic import BaseModel
-import jwt
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
+from app.core.deps import get_current_user
+from app.core.email import send_verification_email
+from app.core.limiter import limiter
+from app.core.mfa import (
+    generate_qr_code_data_uri,
+    generate_totp_secret,
+    get_provisioning_uri,
+    verify_totp_code,
+)
+from app.core.security import (
+    JWTError,
+    TokenType,
+    create_access_token,
+    create_email_verification_token,
+    create_mfa_pending_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
+from app.crud.refresh_token import (
+    get_valid_refresh_token,
+    issue_refresh_token,
+    revoke_refresh_token,
+)
+from app.crud.user import get_user_by_email
 from app.database import get_db
 from app.models.user import User
-from app.core.security import verify_password, get_password_hash, create_access_token, SECRET_KEY, ALGORITHM
+from app.schemas.auth import (
+    GoogleAuthRequest,
+    LoginRequest,
+    MessageResponse,
+    MfaLoginRequest,
+    MfaRequiredResponse,
+    MfaSetupResponse,
+    MfaVerifyRequest,
+    RefreshRequest,
+    ResendVerificationRequest,
+    TokenPair,
+    UserOut,
+    UserRegister,
+    VerifyEmailRequest,
+)
 
 router = APIRouter()
+settings = get_settings()
 
-class GoogleLoginRequest(BaseModel):
-    credential: str
 
-@router.get("/me")
-@router.get("/auth/me")
-async def get_me(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-):
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+async def _issue_token_pair(db: AsyncSession, user: User) -> TokenPair:
+    access_token = create_access_token(user.id)
+    refresh_token = await issue_refresh_token(db, user.id)
+    return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
-    token = auth_header.split(" ")[1]
+
+def _decode_or_401(token: str, expected_type: TokenType, detail: str) -> uuid.UUID:
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if not email:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        data = decode_token(token)
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+    if data.get("type") != expected_type.value:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+    try:
+        return uuid.UUID(data["sub"])
+    except (KeyError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalars().first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return {
-        "id": str(getattr(user, "id", "1")),
-        "email": user.email,
-        "full_name": getattr(user, "full_name", ""),
-        "is_verified": True
-    }
+# ---------------------------------------------------------------------------
+# Registration & email verification
+# ---------------------------------------------------------------------------
+
+
+@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
+    existing = await get_user_by_email(db, payload.email)
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+
+    user = User(
+        email=payload.email,
+        hashed_password=hash_password(payload.password),
+        is_active=True,
+        is_verified=False,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    token = create_email_verification_token(user.id)
+    await send_verification_email(user.email, token)
+
+    return user
+
+
+@router.post("/verify-email", response_model=MessageResponse)
+async def verify_email(payload: VerifyEmailRequest, db: AsyncSession = Depends(get_db)):
+    user_id = _decode_or_401(payload.token, TokenType.EMAIL_VERIFY, "Invalid or expired link")
+
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired link")
+
+    user.is_verified = True
+    await db.commit()
+    return MessageResponse(message="Email verified. You can log in now.")
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+async def resend_verification(payload: ResendVerificationRequest, db: AsyncSession = Depends(get_db)):
+    user = await get_user_by_email(db, payload.email)
+    # Always return the same message, whether or not the account exists -
+    # avoids leaking which emails are registered.
+    if user is not None and not user.is_verified:
+        token = create_email_verification_token(user.id)
+        await send_verification_email(user.email, token)
+    return MessageResponse(message="If that account exists and isn't verified yet, a new link is on its way.")
+
+
+# ---------------------------------------------------------------------------
+# Login (password, MFA, refresh, logout)
+# ---------------------------------------------------------------------------
+
 
 @router.post("/login")
-@router.post("/auth/login")
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db)
-):
-    result = await db.execute(select(User).where(User.email == form_data.username))
-    user = result.scalars().first()
-
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-        )
+@limiter.limit("10/minute")
+async def login(request: Request, payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+    user = await get_user_by_email(db, payload.email)
+    if user is None or not user.hashed_password or not verify_password(payload.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
 
     if not user.is_verified:
-        user.is_verified = True
-        await db.commit()
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Please verify your email before logging in")
 
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    if user.mfa_enabled:
+        pending_token = create_mfa_pending_token(user.id)
+        return MfaRequiredResponse(mfa_pending_token=pending_token)
+
+    return await _issue_token_pair(db, user)
+
+
+@router.post("/mfa/login", response_model=TokenPair)
+@limiter.limit("10/minute")
+async def mfa_login(request: Request, payload: MfaLoginRequest, db: AsyncSession = Depends(get_db)):
+    user_id = _decode_or_401(
+        payload.mfa_pending_token, TokenType.MFA_PENDING, "That code has expired, please log in again"
+    )
+
+    user = await db.get(User, user_id)
+    if user is None or not user.mfa_enabled or not user.mfa_secret:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="That code has expired, please log in again")
+
+    if not verify_totp_code(user.mfa_secret, payload.totp_code):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
+
+    return await _issue_token_pair(db, user)
+
+
+@router.post("/refresh", response_model=TokenPair)
+async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    record = await get_valid_refresh_token(db, payload.refresh_token)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired, please log in again")
+
+    user = await db.get(User, record.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired, please log in again")
+
+    # Rotation: the old refresh token dies the moment a new one is issued.
+    await revoke_refresh_token(db, record)
+    return await _issue_token_pair(db, user)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    record = await get_valid_refresh_token(db, payload.refresh_token)
+    if record is not None:
+        await revoke_refresh_token(db, record)
+    return None
+
+
+@router.get("/me", response_model=UserOut)
+async def get_me(user: User = Depends(get_current_user)):
+    return user
+
+
+# ---------------------------------------------------------------------------
+# Google Sign-In
+# ---------------------------------------------------------------------------
+
 
 @router.post("/google")
-@router.post("/auth/google")
-async def google_login(
-    data: GoogleLoginRequest,
-    db: AsyncSession = Depends(get_db)
-):
+@limiter.limit("10/minute")
+async def google_login(request: Request, payload: GoogleAuthRequest, db: AsyncSession = Depends(get_db)):
+    if not settings.google_client_id:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Google Sign-In is not configured on the server")
+
     try:
-        payload_b64 = data.credential.split(".")[1]
-        payload_b64 += "=" * (-len(payload_b64) % 4)
-        decoded_bytes = base64.b64decode(payload_b64)
-        google_data = json.loads(decoded_bytes)
-        email = google_data.get("email")
-        full_name = google_data.get("name", "")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid Google token format")
+        claims = google_id_token.verify_oauth2_token(
+            payload.id_token, google_requests.Request(), settings.google_client_id
+        )
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired Google credential")
 
-    if not email:
-        raise HTTPException(status_code=400, detail="Email not provided by Google")
+    if claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google credential")
 
-    result = await db.execute(select(User).where(User.email == email))
+    email = claims.get("email")
+    if not email or not claims.get("email_verified", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google did not provide a verified email")
+
+    google_sub = claims["sub"]
+
+    result = await db.execute(select(User).where(User.google_id == google_sub))
     user = result.scalars().first()
 
-    if not user:
-        random_pass = secrets.token_hex(16)
+    if user is None:
+        user = await get_user_by_email(db, email)
+
+    if user is None:
         user = User(
             email=email,
-            hashed_password=get_password_hash(random_pass),
-            full_name=full_name,
+            hashed_password=None,
+            google_id=google_sub,
             is_active=True,
             is_verified=True,
         )
         db.add(user)
         await db.commit()
         await db.refresh(user)
+    elif user.google_id is None:
+        # Existing password account signing in with Google for the first time - link it.
+        user.google_id = google_sub
+        user.is_verified = True
+        await db.commit()
 
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    if user.mfa_enabled:
+        pending_token = create_mfa_pending_token(user.id)
+        return MfaRequiredResponse(mfa_pending_token=pending_token)
+
+    return await _issue_token_pair(db, user)
+
+
+# ---------------------------------------------------------------------------
+# MFA management (requires an authenticated session)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/mfa/setup", response_model=MfaSetupResponse)
+async def mfa_setup(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    secret = generate_totp_secret()
+    user.mfa_secret_pending = secret
+    await db.commit()
+
+    provisioning_uri = get_provisioning_uri(secret, user.email)
+    qr_code_data_uri = generate_qr_code_data_uri(provisioning_uri)
+    return MfaSetupResponse(provisioning_uri=provisioning_uri, qr_code_data_uri=qr_code_data_uri)
+
+
+@router.post("/mfa/verify")
+async def mfa_verify(
+    payload: MfaVerifyRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not user.mfa_secret_pending:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Start MFA setup first")
+
+    if not verify_totp_code(user.mfa_secret_pending, payload.totp_code):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
+
+    user.mfa_secret = user.mfa_secret_pending
+    user.mfa_secret_pending = None
+    user.mfa_enabled = True
+    await db.commit()
+    return {"mfa_enabled": True}
+
+
+@router.post("/mfa/disable")
+async def mfa_disable(
+    payload: MfaVerifyRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not user.mfa_enabled or not user.mfa_secret:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA is not enabled")
+
+    if not verify_totp_code(user.mfa_secret, payload.totp_code):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
+
+    user.mfa_enabled = False
+    user.mfa_secret = None
+    await db.commit()
+    return {"mfa_enabled": False}

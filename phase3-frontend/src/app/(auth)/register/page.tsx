@@ -10,11 +10,28 @@ import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  async function onGoogleSuccess(credential: string) {
+    setError("");
+    setSubmitting(true);
+    try {
+      const { mfaRequired } = await loginWithGoogle(credential);
+      router.push(mfaRequired ? "/mfa" : "/dashboard");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(typeof err.detail === "string" ? err.detail : "Google sign-up failed");
+      } else {
+        setError("Google sign-up failed. Try again.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,7 +68,7 @@ export default function RegisterPage() {
           <p className="mt-1 text-sm text-ink-soft">One login, every business you run.</p>
 
           <div className="mt-6">
-            <GoogleSignInButton onError={setError} />
+            <GoogleSignInButton onSuccess={onGoogleSuccess} onError={setError} />
           </div>
           <div className="my-6 flex items-center gap-3">
             <div className="h-px flex-1 bg-line" />

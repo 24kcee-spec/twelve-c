@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # App
     environment: str = "development"
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000,https://twelve-c.vercel.app"
 
     # Frontend base URL - used to build the link inside verification emails,
     # e.g. https://twelvec.vercel.app or http://localhost:3000

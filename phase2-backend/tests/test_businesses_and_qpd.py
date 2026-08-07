@@ -7,8 +7,12 @@ pytestmark = pytest.mark.asyncio
 VALID_PASSWORD = "Str0ngPassw0rd!"
 
 
+from app.core.security import create_email_verification_token
+
 async def _auth_headers(client, email="biz@example.com"):
-    await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    r = await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    token = create_email_verification_token(r.json()["id"])
+    await client.post("/auth/verify-email", json={"token": token})
     r = await client.post("/auth/login", json={"email": email, "password": VALID_PASSWORD})
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
