@@ -33,7 +33,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      // Try /api/auth/me first, fallback to /auth/me
       let res;
       try {
         res = await api.get("/api/auth/me");
@@ -46,7 +45,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setUser(res.data);
     } catch (err) {
-      console.error("Session check failed:", err);
       localStorage.removeItem("token");
       setUser(null);
     } finally {
