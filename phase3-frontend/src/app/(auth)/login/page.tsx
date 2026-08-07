@@ -1,18 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/types";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const justVerified = searchParams.get("verified") === "1";
   const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const errorMessage = (err: unknown, fallback: string) => {
@@ -30,12 +33,16 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNeedsVerification(false);
     setLoading(true);
 
     try {
       const { mfaRequired } = await login(email, password);
       goAfterAuth(mfaRequired);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setNeedsVerification(true);
+      }
       setError(errorMessage(err, "Failed to log in."));
     } finally {
       setLoading(false);
@@ -61,9 +68,26 @@ export default function LoginPage() {
         <h1 className="text-2xl font-semibold text-center text-neutral-900 mb-2">Welcome back</h1>
         <p className="text-sm text-neutral-500 text-center mb-6">Log in to your businesses.</p>
 
+        {justVerified && !error && (
+          <div className="mb-4 p-3 rounded text-sm text-emerald-700 bg-emerald-50 border border-emerald-200">
+            Email verified. You can log in now.
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 p-3 rounded text-sm text-red-600 bg-red-50 border border-red-200">
             {error}
+            {needsVerification && (
+              <>
+                {" "}
+                <Link
+                  href={`/register/check-email?email=${encodeURIComponent(email)}`}
+                  className="font-medium underline"
+                >
+                  Enter your verification code
+                </Link>
+              </>
+            )}
           </div>
         )}
 
@@ -120,5 +144,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -163,8 +163,12 @@ export const api = {
 
   me: () => request<UserOut>("/auth/me"),
 
-  verifyEmail: (token: string) =>
-    rawRequest<{ message: string }>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }, true),
+  verifyEmail: (email: string, code: string) =>
+    rawRequest<{ message: string }>(
+      "/auth/verify-email",
+      { method: "POST", body: JSON.stringify({ email, code }) },
+      true
+    ),
 
   resendVerification: (email: string) =>
     rawRequest<{ message: string }>(
