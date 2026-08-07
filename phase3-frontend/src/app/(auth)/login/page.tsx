@@ -34,23 +34,10 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      if (loginWithGoogle) {
-        await loginWithGoogle(credential);
-      } else {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/google`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Google authentication failed.");
-        if (data.access_token) {
-          localStorage.setItem("token", data.access_token);
-        }
-      }
+      await loginWithGoogle(credential);
       router.push("/dashboard");
     } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || "Google Sign-In failed.";
+      const msg = err.response?.data?.detail || err.message || "Google Sign-In failed on server.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -72,7 +59,7 @@ export default function LoginPage() {
         <div className="mb-6">
           <GoogleSignInButton
             onSuccess={handleGoogleSuccess}
-            onError={(err) => setError("Google Sign-In failed to connect.")}
+            onError={() => setError("Google Sign-In failed to connect.")}
           />
         </div>
 

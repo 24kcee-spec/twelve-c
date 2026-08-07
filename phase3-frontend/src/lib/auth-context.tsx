@@ -1,102 +1,121 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { api, clearTokens, getStoredTokens, storeTokens } from "./api";
-import { UserOut } from "./types";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { api } from "./api";
 
-interface AuthContextValue {
-  user: UserOut | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<{ mfaRequired: boolean; pendingToken?: string }>;
-  googleLogin: (idToken: string) => Promise<{ mfaRequired: boolean; pendingToken?: string }>;
-  completeMfaLogin: (pendingToken: string, code: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+interface User {
+  id?: string;
+  email: string;
+  full_name?: string;
+  is_verified?: boolean;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  login: (email: string, pass: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
+  logout: () => void;
+}
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserOut | null>(null);
-  const [loading, setLoading] = useState(true);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-  const refreshUser = useCallback(async () => {
-    const { access } = getStoredTokens();
-    if (!access) {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  const fetchUser = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
       setUser(null);
       setLoading(false);
       return;
     }
+
     try {
-      const me = await api.me();
-      setUser(me);
-    } catch {
+      // Try /api/auth/me first, fallback to /auth/me
+      let res;
+      try {
+        res = await api.get("/api/auth/me");
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          res = await api.get("/auth/me");
+        } else {
+          throw err;
+        }
+      }
+      setUser(res.data);
+    } catch (err) {
+      console.error("Session check failed:", err);
+      localStorage.removeItem("token");
       setUser(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    refreshUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchUser();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await api.login(email, password);
-    if ("mfa_required" in result) {
-      return { mfaRequired: true, pendingToken: result.mfa_pending_token };
-    }
-    storeTokens(result);
-    await refreshUser();
-    return { mfaRequired: false };
-  }, [refreshUser]);
+  const login = async (email: string, pass: string) => {
+    const formData = new URLSearchParams();
+    formData.append("username", email);
+    formData.append("password", pass);
 
-  const googleLogin = useCallback(async (idToken: string) => {
-    const result = await api.googleLogin(idToken);
-    if ("mfa_required" in result) {
-      return { mfaRequired: true, pendingToken: result.mfa_pending_token };
-    }
-    storeTokens(result);
-    await refreshUser();
-    return { mfaRequired: false };
-  }, [refreshUser]);
-
-  const completeMfaLogin = useCallback(async (pendingToken: string, code: string) => {
-    const tokens = await api.mfaLogin(pendingToken, code);
-    storeTokens(tokens);
-    await refreshUser();
-  }, [refreshUser]);
-
-  const register = useCallback(async (email: string, password: string) => {
-    await api.register(email, password);
-  }, []);
-
-  const logout = useCallback(async () => {
-    const { refresh } = getStoredTokens();
-    if (refresh) {
-      try {
-        await api.logout(refresh);
-      } catch {
-        // best effort — clear local state regardless
+    let res;
+    try {
+      res = await api.post("/api/auth/login", formData, {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        res = await api.post("/auth/login", formData, {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        });
+      } else {
+        throw err;
       }
     }
-    clearTokens();
+
+    if (res.data.access_token) {
+      localStorage.setItem("token", res.data.access_token);
+      await fetchUser();
+    }
+  };
+
+  const loginWithGoogle = async (credential: string) => {
+    let res;
+    try {
+      res = await api.post("/api/auth/google", { credential });
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        res = await api.post("/auth/google", { credential });
+      } else {
+        throw err;
+      }
+    }
+
+    if (res.data.access_token) {
+      localStorage.setItem("token", res.data.access_token);
+      await fetchUser();
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem("token");
     setUser(null);
-  }, []);
+  };
 
   return (
-    <AuthContext.Provider
-      value={{ user, loading, login, googleLogin, completeMfaLogin, register, logout, refreshUser }}
-    >
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within an AuthProvider");
-  return ctx;
-}
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
+  return context;
+};
