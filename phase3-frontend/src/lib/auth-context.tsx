@@ -36,15 +36,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let res;
       try {
         res = await api.get("/api/auth/me");
-      } catch (err: any) {
-        if (err.response?.status === 404) {
+      } catch (e: any) {
+        if (e?.response?.status === 404) {
           res = await api.get("/auth/me");
         } else {
-          throw err;
+          throw e;
         }
       }
       setUser(res.data);
-    } catch (err) {
+    } catch {
       localStorage.removeItem("token");
       setUser(null);
     } finally {
@@ -66,13 +66,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       res = await api.post("/api/auth/login", formData, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
-    } catch (err: any) {
-      if (err.response?.status === 404) {
+    } catch (e: any) {
+      if (e?.response?.status === 404) {
         res = await api.post("/auth/login", formData, {
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
         });
       } else {
-        throw err;
+        throw e;
       }
     }
 
@@ -86,11 +86,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let res;
     try {
       res = await api.post("/api/auth/google", { credential });
-    } catch (err: any) {
-      if (err.response?.status === 404) {
+    } catch (e: any) {
+      if (e?.response?.status === 404) {
         res = await api.post("/auth/google", { credential });
       } else {
-        throw err;
+        throw e;
       }
     }
 
