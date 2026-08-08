@@ -64,3 +64,14 @@ input[type="number"]::-webkit-inner-spin-button {
     background: white;
   }
 }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up {
+  animation: fadeInUp 400ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-up { animation: none; }
+}

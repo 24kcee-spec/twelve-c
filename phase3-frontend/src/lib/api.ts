@@ -191,6 +191,16 @@ export const api = {
   getBusiness: (id: string) => request<Business>(`/businesses/${id}`),
   deleteBusiness: (id: string) => request<void>(`/businesses/${id}`, { method: "DELETE" }),
 
+  updateBusiness: (
+    id: string,
+    payload: Partial<{
+      name: string;
+      default_exchange_rate: number;
+      default_tax_rate: number;
+      default_aids_levy_rate: number;
+    }>
+  ) => request<Business>(`/businesses/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
   // --- QPD calculations ---
   listCalculations: (businessId: string) =>
     request<QpdCalculationOut[]>(`/businesses/${businessId}/qpd-calculations`),

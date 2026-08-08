@@ -1,3 +1,4 @@
+﻿import { LogoMark } from "@/components/LogoMark";
 "use client";
 
 import Link from "next/link";
@@ -5,7 +6,8 @@ import { InputHTMLAttributes, ButtonHTMLAttributes, ReactNode, useEffect, useRef
 
 export function Logo({ className = "" }: { className?: string }) {
   return (
-    <span className={`font-display text-xl tracking-tight text-ink ${className}`}>
+    <span className={`flex items-center gap-2 font-display text-xl tracking-tight text-ink ${className}`}>
+      <LogoMark size={22} />
       Twelve<span className="text-usd">C</span>
     </span>
   );
@@ -57,7 +59,7 @@ export function Button({
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-md border border-line bg-surface p-6 shadow-card ${className}`}>
+    <div className={`fade-in-up rounded-md border border-line bg-surface p-6 shadow-card ${className}`}>
       {children}
     </div>
   );
