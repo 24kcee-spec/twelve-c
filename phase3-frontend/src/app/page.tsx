@@ -8,6 +8,9 @@ export default function LandingPage() {
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <Logo />
         <nav className="flex items-center gap-6">
+          <Link href="/tutorial" className="text-sm text-ink-soft hover:text-ink">
+            How it works
+          </Link>
           <Link href="/login" className="text-sm text-ink-soft hover:text-ink">
             Log in
           </Link>
