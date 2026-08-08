@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { AuthGuard } from "@/components/AuthGuard";
 import { TopBar } from "@/components/TopBar";
@@ -9,9 +9,9 @@ import { ResultsPanel } from "@/components/ResultsPanel";
 import { PaymentTracker } from "@/components/PaymentTracker";
 import { NextPaymentDue } from "@/components/NextPaymentDue";
 import { TaxSummaryPrint } from "@/components/TaxSummaryPrint";
-import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
+import { Badge, Button, Card, ChevronDown, ErrorNote, Eyebrow, Field, TrashIcon } from "@/components/ui";
 import { api } from "@/lib/api";
-import { money } from "@/lib/format";
+import { formatDateTime, money } from "@/lib/format";
 import { Business, emptyExpenses, QpdCalculationOut, CurrencyExpensesIn } from "@/lib/types";
 
 function BusinessContent({ businessId }: { businessId: string }) {
@@ -19,6 +19,13 @@ function BusinessContent({ businessId }: { businessId: string }) {
   const [calculations, setCalculations] = useState<QpdCalculationOut[]>([]);
   const [selected, setSelected] = useState<QpdCalculationOut | null>(null);
   const [error, setError] = useState("");
+
+  // History grouping/delete state. Years start collapsed except the most
+  // recent one, which is expanded the first time calculations load.
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+  const yearsInitialized = useRef(false);
+  const [confirmingDeleteCalcId, setConfirmingDeleteCalcId] = useState<string | null>(null);
+  const [deletingCalcId, setDeletingCalcId] = useState<string | null>(null);
 
   const [taxYear, setTaxYear] = useState(new Date().getFullYear());
   const [quarterLabel, setQuarterLabel] = useState("Annual estimate");
@@ -47,15 +54,69 @@ function BusinessContent({ businessId }: { businessId: string }) {
       setAidsLevyPct(b.default_aids_levy_rate * 100);
       setCalculations(calcs);
       if (calcs.length > 0) setSelected(calcs[0]);
+      if (!yearsInitialized.current && calcs.length > 0) {
+        setExpandedYears(new Set([calcs[0].tax_year]));
+        yearsInitialized.current = true;
+      }
     } catch {
       setError("Couldn't load this business.");
     }
   }
 
   useEffect(() => {
+    // Next.js reuses this component instance when navigating between
+    // businesses via the switcher (only the [businessId] param changes,
+    // no remount) - reset per-business UI state explicitly or it would
+    // leak across businesses.
+    yearsInitialized.current = false;
+    setExpandedYears(new Set());
+    setConfirmingDeleteCalcId(null);
+    setDeletingCalcId(null);
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId]);
+
+  // Calculations are already ordered by the API (tax_year desc, created_at
+  // desc), so same-year entries are contiguous - safe to fold into groups
+  // in a single pass without re-sorting on the client.
+  const groupedCalculations = useMemo(() => {
+    const groups: { year: number; items: QpdCalculationOut[] }[] = [];
+    for (const c of calculations) {
+      const current = groups[groups.length - 1];
+      if (current && current.year === c.tax_year) current.items.push(c);
+      else groups.push({ year: c.tax_year, items: [c] });
+    }
+    return groups;
+  }, [calculations]);
+
+  const latestCalculationId = calculations[0]?.id ?? null;
+
+  function toggleYear(year: number) {
+    setExpandedYears((prev) => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  }
+
+  async function onDeleteCalculation(calc: QpdCalculationOut) {
+    setDeletingCalcId(calc.id);
+    setError("");
+    try {
+      await api.deleteCalculation(businessId, calc.id);
+      setCalculations((prev) => {
+        const next = prev.filter((c) => c.id !== calc.id);
+        if (selected?.id === calc.id) setSelected(next[0] ?? null);
+        return next;
+      });
+      setConfirmingDeleteCalcId(null);
+    } catch {
+      setError("Couldn't delete that calculation. Try again in a moment.");
+    } finally {
+      setDeletingCalcId(null);
+    }
+  }
 
   function updateExpense(
     which: "usd" | "zig",
@@ -82,8 +143,14 @@ function BusinessContent({ businessId }: { businessId: string }) {
         tax_rate: taxRatePct !== null ? taxRatePct / 100 : null,
         aids_levy_rate: aidsLevyPct !== null ? aidsLevyPct / 100 : null,
       });
-      setCalculations((prev) => [result, ...prev]);
+      // Re-fetch rather than prepend locally: the list must stay ordered by
+      // (tax_year desc, created_at desc) for the year-grouping above to
+      // stay correct, and a blind prepend would break that if the user
+      // calculates for an earlier tax year than what's already showing.
+      const refreshed = await api.listCalculations(businessId);
+      setCalculations(refreshed);
       setSelected(result);
+      setExpandedYears((prev) => new Set(prev).add(result.tax_year));
     } catch {
       setError("Couldn't run that calculation. Check the figures and try again.");
     } finally {
@@ -264,44 +331,121 @@ function BusinessContent({ businessId }: { businessId: string }) {
             </Card>
 
             <Card>
-              <Eyebrow>History</Eyebrow>
+              <div className="flex items-center justify-between">
+                <Eyebrow>History</Eyebrow>
+                {calculations.length > 0 && (
+                  <span className="font-mono text-xs text-ink-faint">
+                    {calculations.length} {calculations.length === 1 ? "entry" : "entries"}
+                  </span>
+                )}
+              </div>
+
               {calculations.length === 0 && (
                 <p className="mt-2 text-sm text-ink-faint">No calculations yet.</p>
               )}
-              <ul className="mt-3 space-y-1">
-                {calculations.map((c, idx) => {
-                  const isSelected = selected?.id === c.id;
+
+              <div className="mt-3 space-y-2">
+                {groupedCalculations.map((group) => {
+                  const isExpanded = expandedYears.has(group.year);
                   return (
-                    <li key={c.id}>
+                    <div key={group.year} className="overflow-hidden rounded border border-line">
                       <button
-                        onClick={() => setSelected(c)}
-                        className={`flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm transition ${
-                          isSelected
-                            ? "bg-usd-soft text-usd"
-                            : "text-ink-soft hover:bg-paper hover:text-ink"
+                        type="button"
+                        onClick={() => toggleYear(group.year)}
+                        aria-expanded={isExpanded}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-left transition ${
+                          isExpanded ? "bg-paper" : "bg-surface hover:bg-paper"
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          {c.tax_year} · {c.quarter_label}
-                          {idx === 0 && (
-                            <span className="rounded-full bg-ink px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-paper">
-                              Latest
-                            </span>
-                          )}
-                          {isSelected && (
-                            <span className="rounded-full border border-usd px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-usd">
-                              Viewing
-                            </span>
-                          )}
+                          <span className="font-display text-base text-ink">{group.year}</span>
+                          <span className="rounded-full bg-ink-faint/15 px-2 py-0.5 font-mono text-[10px] text-ink-faint">
+                            {group.items.length}
+                          </span>
                         </span>
-                        <span className="font-mono tabular-nums">
-                          {money(c.result_json.total_tax_usd, "USD")}
-                        </span>
+                        <ChevronDown open={isExpanded} />
                       </button>
-                    </li>
+
+                      {isExpanded && (
+                        <ul className="space-y-1 border-t border-line p-2">
+                          {group.items.map((c) => {
+                            const isSelected = selected?.id === c.id;
+                            const isLatest = c.id === latestCalculationId;
+                            const isConfirming = confirmingDeleteCalcId === c.id;
+
+                            if (isConfirming) {
+                              return (
+                                <li key={c.id}>
+                                  <div className="flex items-center justify-between gap-2 rounded bg-danger-soft px-3 py-2">
+                                    <span className="text-xs text-danger">
+                                      Delete this calculation? This can&apos;t be undone.
+                                    </span>
+                                    <div className="flex shrink-0 gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => onDeleteCalculation(c)}
+                                        disabled={deletingCalcId === c.id}
+                                        className="rounded bg-danger px-2 py-1 text-xs font-semibold text-paper disabled:opacity-50"
+                                      >
+                                        {deletingCalcId === c.id ? "Deleting..." : "Yes, delete"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmingDeleteCalcId(null)}
+                                        className="rounded border border-line px-2 py-1 text-xs text-ink-soft"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                </li>
+                              );
+                            }
+
+                            return (
+                              <li key={c.id}>
+                                <div
+                                  className={`flex items-center gap-1 rounded text-sm transition ${
+                                    isSelected ? "bg-usd-soft text-usd" : "text-ink-soft hover:bg-paper hover:text-ink"
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelected(c)}
+                                    className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-left"
+                                  >
+                                    <span className="flex min-w-0 flex-col items-start">
+                                      <span className="flex items-center gap-2">
+                                        <span className="truncate">{c.quarter_label}</span>
+                                        {isLatest && <Badge>Latest</Badge>}
+                                        {isSelected && <Badge variant="outline">Viewing</Badge>}
+                                      </span>
+                                      <span className="mt-0.5 font-mono text-[11px] text-ink-faint">
+                                        {formatDateTime(c.created_at)}
+                                      </span>
+                                    </span>
+                                    <span className="shrink-0 font-mono tabular-nums">
+                                      {money(c.result_json.total_tax_usd, "USD")}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmingDeleteCalcId(c.id)}
+                                    aria-label="Delete calculation"
+                                    className="mr-1.5 shrink-0 rounded p-1.5 text-ink-faint/60 transition hover:bg-danger-soft hover:text-danger"
+                                  >
+                                    <TrashIcon />
+                                  </button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   );
                 })}
-              </ul>
+              </div>
             </Card>
           </div>
 
@@ -342,4 +486,3 @@ export default function BusinessPage() {
     </AuthGuard>
   );
 }
-
