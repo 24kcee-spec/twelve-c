@@ -1,29 +1,30 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
       colors: {
-        paper: "#F5F6F0",
-        surface: "#FFFFFF",
+        paper: "rgb(var(--color-paper) / <alpha-value>)",
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
         ink: {
-          DEFAULT: "#16241C",
-          soft: "#45564B",
-          faint: "#7C8B7F",
+          DEFAULT: "rgb(var(--color-ink) / <alpha-value>)",
+          soft: "rgb(var(--color-ink-soft) / <alpha-value>)",
+          faint: "rgb(var(--color-ink-faint) / <alpha-value>)",
         },
-        line: "#DCD9C9",
+        line: "rgb(var(--color-line) / <alpha-value>)",
         usd: {
-          DEFAULT: "#1F6F54",
-          soft: "#E4EFE9",
+          DEFAULT: "rgb(var(--color-usd) / <alpha-value>)",
+          soft: "rgb(var(--color-usd-soft) / <alpha-value>)",
         },
         zig: {
-          DEFAULT: "#B87F27",
-          soft: "#F5EAD7",
+          DEFAULT: "rgb(var(--color-zig) / <alpha-value>)",
+          soft: "rgb(var(--color-zig-soft) / <alpha-value>)",
         },
         danger: {
-          DEFAULT: "#A8412F",
-          soft: "#F3E3DE",
+          DEFAULT: "rgb(var(--color-danger) / <alpha-value>)",
+          soft: "rgb(var(--color-danger-soft) / <alpha-value>)",
         },
       },
       fontFamily: {

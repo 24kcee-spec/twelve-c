@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { ThemeProvider } from "@/lib/theme-context";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -52,9 +53,22 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
-      <body className="font-body antialiased">
+      <head>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`
+            try {
+              var theme = localStorage.getItem('twelve-c-theme') || 'system';
+              var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+              if (isDark) document.documentElement.classList.add('dark');
+            } catch (e) {}
+          `}
+        </Script>
+      </head>
+      <body className="bg-paper font-body text-ink antialiased">
         <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
-        <AuthProvider>{children}</AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -218,6 +218,76 @@ export function TrashIcon({ className = "" }: { className?: string }) {
   );
 }
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+      <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Centered overlay dialog - closes on Escape, backdrop click, or the
+ * close button. Content clicks are stopped from bubbling to the backdrop
+ * so forms/buttons inside work normally.
+ */
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  className = "",
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-10 backdrop-blur-sm"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`fade-in-up w-full max-w-lg rounded-md border border-line bg-surface p-6 shadow-card ${className}`}
+      >
+        {title && (
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="font-display text-lg text-ink">{title}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="rounded p-1.5 text-ink-faint transition hover:bg-paper hover:text-ink"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /** A small pill badge used on history rows ("Latest", "Viewing"). */
 export function Badge({
   children,

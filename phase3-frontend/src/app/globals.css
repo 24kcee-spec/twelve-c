@@ -1,19 +1,62 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ---------------------------------------------------------------------
+   Design tokens as CSS variables (RGB triplets so Tailwind can apply
+   opacity via rgb(var(--x) / <alpha-value>)). Light values are the
+   original "quality paper" palette; .dark is the "control room"
+   register from the UX blueprint - genuine near-black, same green/amber
+   accents, brightened slightly for contrast. Switching themes is just
+   toggling the "dark" class on <html> - every bg-paper/text-ink/etc.
+   utility in the app repaints automatically, nothing else has to change.
+   --------------------------------------------------------------------- */
+:root {
+  --color-paper: 245 246 240;
+  --color-surface: 255 255 255;
+  --color-ink: 22 36 28;
+  --color-ink-soft: 69 86 75;
+  --color-ink-faint: 124 139 127;
+  --color-line: 220 217 201;
+  --color-usd: 31 111 84;
+  --color-usd-soft: 228 239 233;
+  --color-zig: 184 127 39;
+  --color-zig-soft: 245 234 215;
+  --color-danger: 168 65 47;
+  --color-danger-soft: 243 227 222;
+}
+
+html.dark {
+  --color-paper: 14 19 16;
+  --color-surface: 22 29 25;
+  --color-ink: 237 239 234;
+  --color-ink-soft: 169 179 172;
+  --color-ink-faint: 110 120 111;
+  --color-line: 42 51 44;
+  --color-usd: 63 163 127;
+  --color-usd-soft: 22 51 42;
+  --color-zig: 217 166 78;
+  --color-zig-soft: 58 46 20;
+  --color-danger: 224 102 90;
+  --color-danger-soft: 58 31 27;
+}
 
 html {
   color-scheme: light;
 }
+html.dark {
+  color-scheme: dark;
+}
 
 body {
-  background-color: #f5f6f0;
-  color: #16241c;
+  background-color: rgb(var(--color-paper));
+  color: rgb(var(--color-ink));
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 ::selection {
-  background-color: #b87f27;
-  color: #f5f6f0;
+  background-color: rgb(var(--color-zig));
+  color: rgb(var(--color-paper));
 }
 
 .tabular-nums {
@@ -22,7 +65,7 @@ body {
 
 /* Hairline rule used throughout instead of drop shadows */
 .rule {
-  border-color: #dcd9c9;
+  border-color: rgb(var(--color-line));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -38,7 +81,7 @@ body {
 
 /* Focus ring: visible, on-brand, never suppressed */
 :focus-visible {
-  outline: 2px solid #1f6f54;
+  outline: 2px solid rgb(var(--color-usd));
   outline-offset: 2px;
 }
 
@@ -55,13 +98,15 @@ input[type="number"]::-webkit-inner-spin-button {
 
 /* Tax summary PDF export - triggered by window.print() on the "Download PDF
    summary" button. Everything else on the page carries print:hidden so only
-   the TaxSummaryPrint component renders in the printed/PDF output. */
+   the TaxSummaryPrint component renders in the printed/PDF output. The PDF
+   always prints light/white regardless of the app's current theme. */
 @media print {
   @page {
     margin: 1.5cm;
   }
   body {
     background: white;
+    color: black;
   }
 }
 

@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme, Theme } from "@/lib/theme-context";
 import { api } from "@/lib/api";
 import { Business } from "@/lib/types";
+import { RateSettingsModal } from "@/components/RateSettingsModal";
 import {
   ChevronDown,
   Dropdown,
@@ -36,6 +38,76 @@ function HelpIcon() {
       <path d="M9.5 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 1.7-2.4 3.4" />
       <circle cx="12" cy="16.5" r="0.6" fill="currentColor" stroke="none" />
     </svg>
+  );
+}
+
+function RatesIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v18" />
+      <path d="M17 7.5c0-1.7-2-3-5-3s-5 1.3-5 3 2 2.3 5 2.7 5 1 5 2.8-2 3-5 3-5-1.3-5-3" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z" />
+    </svg>
+  );
+}
+
+function MonitorIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="12" rx="1.5" />
+      <path d="M8.5 20h7M12 16.5V20" />
+    </svg>
+  );
+}
+
+/** Appearance segmented control (Light / Dark / Auto) shown inside the account dropdown. */
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  const options: { value: Theme; label: string; icon: JSX.Element }[] = [
+    { value: "light", label: "Light", icon: <SunIcon /> },
+    { value: "dark", label: "Dark", icon: <MoonIcon /> },
+    { value: "system", label: "Auto", icon: <MonitorIcon /> },
+  ];
+  return (
+    <div className="px-3 py-2">
+      <span className="mb-1.5 block font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+        Appearance
+      </span>
+      <div className="flex gap-1 rounded border border-line bg-paper p-1">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setTheme(opt.value);
+            }}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition ${
+              theme === opt.value ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+            }`}
+          >
+            {opt.icon}
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -92,6 +164,7 @@ export function TopBar() {
   const pathname = usePathname();
 
   const [businesses, setBusinesses] = useState<Business[] | null>(null);
+  const [ratesOpen, setRatesOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,6 +256,14 @@ export function TopBar() {
               How Twelve C works
             </span>
           </DropdownItem>
+          <DropdownItem onClick={() => setRatesOpen(true)}>
+            <span className="flex items-center gap-2.5">
+              <RatesIcon />
+              Rate settings
+            </span>
+          </DropdownItem>
+          <DropdownDivider />
+          <ThemeToggle />
           <DropdownDivider />
           <LegalSubmenu />
           <DropdownDivider />
@@ -191,6 +272,8 @@ export function TopBar() {
           </DropdownItem>
         </Dropdown>
       </div>
+
+      <RateSettingsModal open={ratesOpen} onClose={() => setRatesOpen(false)} />
     </header>
   );
 }

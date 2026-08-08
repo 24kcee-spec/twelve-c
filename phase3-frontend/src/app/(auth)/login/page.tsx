@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/types";
+import { Button, Card, ErrorNote, Field, Logo } from "@/components/ui";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 function LoginForm() {
@@ -63,87 +64,83 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-[#f7f8f6] px-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-sm border border-neutral-200">
-        <h1 className="text-2xl font-semibold text-center text-neutral-900 mb-2">Welcome back</h1>
-        <p className="text-sm text-neutral-500 text-center mb-6">Log in to your businesses.</p>
-
-        {justVerified && !error && (
-          <div className="mb-4 p-3 rounded text-sm text-emerald-700 bg-emerald-50 border border-emerald-200">
-            Email verified. You can log in now.
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-4 p-3 rounded text-sm text-red-600 bg-red-50 border border-red-200">
-            {error}
-            {needsVerification && (
-              <>
-                {" "}
-                <Link
-                  href={`/register/check-email?email=${encodeURIComponent(email)}`}
-                  className="font-medium underline"
-                >
-                  Enter your verification code
-                </Link>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className="mb-6">
-          <GoogleSignInButton
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError("Google Sign-In failed to connect.")}
-          />
+    <main className="flex min-h-screen items-center justify-center bg-paper px-6">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex justify-center">
+          <Logo />
         </div>
+        <Card>
+          <h1 className="font-display text-2xl text-ink">Welcome back</h1>
+          <p className="mt-1 text-sm text-ink-soft">Log in to your businesses.</p>
 
-        <div className="my-6 flex items-center gap-3">
-          <div className="h-px flex-1 bg-neutral-200" />
-          <span className="text-xs uppercase text-neutral-400 font-medium">OR</span>
-          <div className="h-px flex-1 bg-neutral-200" />
-        </div>
+          {justVerified && !error && (
+            <div className="mt-4 rounded border border-usd/30 bg-usd-soft px-3 py-2 text-sm text-usd">
+              Email verified. You can log in now.
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 mb-1">Email</label>
-            <input
+          <div className="mt-6">
+            <GoogleSignInButton
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError("Google Sign-In failed to connect.")}
+            />
+          </div>
+
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-line" />
+            <span className="font-mono text-xs uppercase tracking-[0.15em] text-ink-faint">or</span>
+            <div className="h-px flex-1 bg-line" />
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Field
+              label="Email"
               type="email"
+              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 mb-1">Password</label>
-            <input
+            <Field
+              label="Password"
               type="password"
+              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 px-4 bg-emerald-900 text-white rounded-md font-medium hover:bg-emerald-800 disabled:opacity-50"
-          >
-            {loading ? "Logging in..." : "Log in"}
-          </button>
-        </form>
+            <ErrorNote>
+              {error && (
+                <>
+                  {error}
+                  {needsVerification && (
+                    <>
+                      {" "}
+                      <Link
+                        href={`/register/check-email?email=${encodeURIComponent(email)}`}
+                        className="font-medium underline"
+                      >
+                        Enter your verification code
+                      </Link>
+                    </>
+                  )}
+                </>
+              )}
+            </ErrorNote>
 
-        <p className="mt-6 text-center text-xs text-neutral-500">
-          Need an account?{" "}
-          <Link href="/register" className="text-emerald-700 font-medium hover:underline">
-            Create one
-          </Link>
-        </p>
+            <Button type="submit" variant="primary" className="w-full" disabled={loading}>
+              {loading ? "Logging in…" : "Log in"}
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-ink-soft">
+            Need an account?{" "}
+            <Link href="/register" className="font-medium text-usd">
+              Create one
+            </Link>
+          </p>
+        </Card>
       </div>
-    </div>
+    </main>
   );
 }
 

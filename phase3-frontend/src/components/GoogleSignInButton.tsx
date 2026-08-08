@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
+import { useTheme } from "@/lib/theme-context";
 
 declare global {
   interface Window {
@@ -21,6 +22,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     if (!clientId || !containerRef.current) return;
@@ -52,8 +54,9 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         callback: handleCredential,
       });
 
+      containerRef.current.innerHTML = "";
       window.google.accounts.id.renderButton(containerRef.current, {
-        theme: "outline",
+        theme: resolvedTheme === "dark" ? "filled_black" : "outline",
         size: "large",
         text,
         width: "100%",
@@ -78,11 +81,11 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [clientId, onSuccess, onError, text]);
+  }, [clientId, onSuccess, onError, text, resolvedTheme]);
 
   if (!clientId) {
     return (
-      <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 p-2 rounded text-center">
+      <div className="rounded border border-zig/40 bg-zig-soft p-2 text-center text-xs text-zig">
         Google Sign-In disabled (NEXT_PUBLIC_GOOGLE_CLIENT_ID missing).
       </div>
     );
