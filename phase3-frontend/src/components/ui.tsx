@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { InputHTMLAttributes, ButtonHTMLAttributes } from "react";
+import { InputHTMLAttributes, ButtonHTMLAttributes, ReactNode, useEffect, useRef, useState } from "react";
 
 export function Logo({ className = "" }: { className?: string }) {
   return (
@@ -85,5 +85,119 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
     <Link href={href} className="text-sm text-ink-soft transition hover:text-ink">
       {children}
     </Link>
+  );
+}
+
+/**
+ * Generic dropdown menu primitive - closes on outside click, Escape, or any
+ * click inside its panel (so DropdownItem links and action buttons both
+ * close it automatically without each one needing its own handler).
+ */
+export function Dropdown({
+  trigger,
+  children,
+  align = "left",
+}: {
+  trigger: (state: { open: boolean }) => ReactNode;
+  children: ReactNode;
+  align?: "left" | "right";
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        {trigger({ open })}
+      </button>
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className={`absolute z-50 mt-2 min-w-[14rem] overflow-hidden rounded-md border border-line bg-surface py-1 shadow-card ${
+            align === "right" ? "right-0" : "left-0"
+          }`}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function DropdownLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="truncate px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+      {children}
+    </div>
+  );
+}
+
+export function DropdownDivider() {
+  return <div className="my-1 border-t border-line" />;
+}
+
+export function DropdownItem({
+  href,
+  onClick,
+  active = false,
+  danger = false,
+  children,
+}: {
+  href?: string;
+  onClick?: () => void;
+  active?: boolean;
+  danger?: boolean;
+  children: ReactNode;
+}) {
+  const className = `block w-full truncate px-3 py-2 text-left text-sm transition ${
+    danger
+      ? "text-danger hover:bg-danger-soft"
+      : active
+      ? "bg-usd-soft text-usd"
+      : "text-ink-soft hover:bg-paper hover:text-ink"
+  }`;
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      {children}
+    </button>
+  );
+}
+
+export function ChevronDown({ open = false }: { open?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      width="10"
+      height="10"
+      className={`shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+      fill="none"
+    >
+      <path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

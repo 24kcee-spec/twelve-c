@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { QuarterlyRhythm } from "@/components/QuarterlyRhythm";
+import { InstalmentStatus, QuarterWheel, WheelSegment } from "@/components/QuarterWheel";
 import { Card, Eyebrow } from "@/components/ui";
 import { money, percent } from "@/lib/format";
 import { QpdResultJson } from "@/lib/types";
@@ -33,14 +33,6 @@ function Row({ label, usd, zig }: { label: string; usd: number; zig: number }) {
 export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYear: number }) {
   const [currency, setCurrency] = useState<"USD" | "ZIG">("USD");
 
-  const segments = result.schedule.map((inst, i) => ({
-    label: `Q${i + 1}`,
-    date: DATES[i] ?? inst.label,
-    percentage: inst.percentage,
-    amountUsd: inst.usd,
-    amountZig: inst.zig,
-  }));
-
   const today = startOfDay(new Date());
   const withDates = result.schedule.map((inst, i) => {
     const { month, day } = QUARTER_DATES[i];
@@ -50,17 +42,34 @@ export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYe
       paid: inst.usd_balance <= 0.01 && inst.zig_balance <= 0.01,
     };
   });
-  const overdue = withDates.find((i) => !i.paid && i.date < today);
+  const overdueIdx = new Set(withDates.filter((d) => !d.paid && d.date < today).map((d) => d.idx));
   const upcoming = withDates
-    .filter((i) => !i.paid && i.date >= today)
+    .filter((d) => !d.paid && d.date >= today)
     .sort((a, b) => a.date.getTime() - b.date.getTime());
-  const activeIndex = overdue ? overdue.idx : upcoming.length > 0 ? upcoming[0].idx : undefined;
+  const activeIndex = upcoming.length > 0 ? upcoming[0].idx : undefined;
+
+  const wheelSegments: WheelSegment[] = result.schedule.map((inst, i) => {
+    const paid = inst.usd_balance <= 0.01 && inst.zig_balance <= 0.01;
+    let status: InstalmentStatus = "upcoming";
+    if (paid) status = "paid";
+    else if (overdueIdx.has(i)) status = "overdue";
+    else if (i === activeIndex) status = "active";
+
+    return {
+      label: `Q${i + 1}`,
+      date: DATES[i] ?? inst.label,
+      percentage: inst.percentage,
+      amountUsd: inst.usd,
+      amountZig: inst.zig,
+      status,
+    };
+  });
 
   return (
     <div className="space-y-6">
       <Card>
         <Eyebrow>Trading currency split</Eyebrow>
-        <div className="mt-3 flex gap-8 text-sm">
+        <div className="mt-3 flex flex-wrap gap-8 text-sm">
           <div>
             <div className="font-mono text-2xl text-usd tabular-nums">{percent(result.usd_ratio)}</div>
             <div className="text-ink-faint">of trade in USD</div>
@@ -69,7 +78,7 @@ export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYe
             <div className="font-mono text-2xl text-zig tabular-nums">{percent(result.zig_ratio)}</div>
             <div className="text-ink-faint">of trade in ZiG</div>
           </div>
-          {(result.payment_ratio_usd === 0.5 && result.usd_ratio !== 0.5) && (
+          {result.payment_ratio_usd === 0.5 && result.usd_ratio !== 0.5 && (
             <div className="flex items-center rounded bg-paper px-3 py-2 text-xs text-ink-faint">
               Public Notice 71 cap applied — USD is dominant, so the payment
               ratio is capped at 50/50 rather than the raw {percent(result.usd_ratio, 1)}.
@@ -108,8 +117,13 @@ export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYe
             </button>
           </div>
         </div>
-        <div className="mt-4">
-          <QuarterlyRhythm segments={segments} currency={currency} showAmounts activeIndex={activeIndex} />
+        <div className="mt-5">
+          <QuarterWheel
+            segments={wheelSegments}
+            currency={currency}
+            totalUsd={result.total_tax_usd}
+            totalZig={result.total_tax_zig}
+          />
         </div>
       </Card>
     </div>

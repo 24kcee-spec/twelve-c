@@ -1,4 +1,4 @@
-import {
+﻿import {
   ApplyPaymentsRequest,
   Business,
   MfaRequiredResponse,
@@ -204,4 +204,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  deleteCalculation: (businessId: string, calculationId: string) =>
+    request<void>(`/businesses/${businessId}/qpd-calculations/${calculationId}`, { method: "DELETE" }),
 };
