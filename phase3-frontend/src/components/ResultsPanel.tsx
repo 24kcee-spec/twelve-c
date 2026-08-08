@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { InstalmentStatus, QuarterWheel, WheelSegment } from "@/components/QuarterWheel";
+import { CurrencySplitBars } from "@/components/CurrencySplitBars";
 import { Card, Eyebrow } from "@/components/ui";
 import { money, percent } from "@/lib/format";
+import { useCountUp } from "@/lib/useCountUp";
 import { QpdResultJson } from "@/lib/types";
 
 const DATES = ["25 Mar", "25 Jun", "25 Sep", "20 Dec"];
@@ -19,15 +21,22 @@ function startOfDay(d: Date) {
 }
 
 function Row({ label, usd, zig }: { label: string; usd: number; zig: number }) {
+  const usdAnim = useCountUp(usd);
+  const zigAnim = useCountUp(zig);
   return (
     <div className="flex items-center justify-between border-b border-line py-2 text-sm last:border-b-0">
       <span className="text-ink-soft">{label}</span>
       <div className="flex gap-6 font-mono tabular-nums">
-        <span className="w-24 text-right text-usd">{money(usd, "USD")}</span>
-        <span className="w-28 text-right text-zig">{money(zig, "ZIG")}</span>
+        <span className="w-24 text-right text-usd">{money(usdAnim, "USD")}</span>
+        <span className="w-28 text-right text-zig">{money(zigAnim, "ZIG")}</span>
       </div>
     </div>
   );
+}
+
+function AnimatedPercent({ value, colorClass }: { value: number; colorClass: string }) {
+  const anim = useCountUp(value * 100);
+  return <span className={`font-mono text-2xl tabular-nums ${colorClass}`}>{anim.toFixed(0)}%</span>;
 }
 
 export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYear: number }) {
@@ -65,26 +74,29 @@ export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYe
     };
   });
 
+  const isCapped = result.payment_ratio_usd === 0.5 && result.usd_ratio !== 0.5;
+
   return (
     <div className="space-y-6">
       <Card>
         <Eyebrow>Trading currency split</Eyebrow>
         <div className="mt-3 flex flex-wrap gap-8 text-sm">
           <div>
-            <div className="font-mono text-2xl text-usd tabular-nums">{percent(result.usd_ratio)}</div>
+            <AnimatedPercent value={result.usd_ratio} colorClass="text-usd" />
             <div className="text-ink-faint">of trade in USD</div>
           </div>
           <div>
-            <div className="font-mono text-2xl text-zig tabular-nums">{percent(result.zig_ratio)}</div>
+            <AnimatedPercent value={result.zig_ratio} colorClass="text-zig" />
             <div className="text-ink-faint">of trade in ZiG</div>
           </div>
-          {result.payment_ratio_usd === 0.5 && result.usd_ratio !== 0.5 && (
-            <div className="flex items-center rounded bg-paper px-3 py-2 text-xs text-ink-faint">
-              Public Notice 71 cap applied — USD is dominant, so the payment
-              ratio is capped at 50/50 rather than the raw {percent(result.usd_ratio, 1)}.
-            </div>
-          )}
         </div>
+        <CurrencySplitBars
+          rawUsd={result.usd_ratio}
+          rawZig={result.zig_ratio}
+          paymentUsd={result.payment_ratio_usd}
+          paymentZig={result.payment_ratio_zig}
+          capped={isCapped}
+        />
       </Card>
 
       <Card>

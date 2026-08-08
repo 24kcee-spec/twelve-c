@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { TopBar } from "@/components/TopBar";
+import { OverdueDigest, DigestItem } from "@/components/OverdueDigest";
 import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
 import { api } from "@/lib/api";
 import { Business } from "@/lib/types";
 
 function DashboardContent() {
   const [businesses, setBusinesses] = useState<Business[] | null>(null);
+  const [digestItems, setDigestItems] = useState<DigestItem[]>([]);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -25,6 +27,18 @@ function DashboardContent() {
     try {
       const data = await api.listBusinesses();
       setBusinesses(data);
+
+      const items = await Promise.all(
+        data.map(async (business) => {
+          try {
+            const calcs = await api.listCalculations(business.id);
+            return { business, latestCalc: calcs[0] ?? null };
+          } catch {
+            return { business, latestCalc: null };
+          }
+        })
+      );
+      setDigestItems(items);
     } catch {
       setError("Couldn't load your businesses. Is the API running?");
     }
@@ -40,6 +54,7 @@ function DashboardContent() {
     try {
       await api.deleteBusiness(id);
       setBusinesses((prev) => prev?.filter((b) => b.id !== id) ?? null);
+      setDigestItems((prev) => prev.filter((d) => d.business.id !== id));
       setConfirmingDeleteId(null);
     } catch {
       setError("Couldn't delete that business. Try again in a moment.");
@@ -73,6 +88,8 @@ function DashboardContent() {
     <main className="min-h-screen bg-paper">
       <TopBar />
       <div className="mx-auto max-w-4xl px-6 py-12">
+        <OverdueDigest items={digestItems} />
+
         <div className="flex items-center justify-between">
           <div>
             <Eyebrow>Your businesses</Eyebrow>
