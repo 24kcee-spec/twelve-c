@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 _PASSWORD_MIN_LEN = 12
 
@@ -75,7 +75,8 @@ class MessageResponse(BaseModel):
 
 
 class VerifyEmailRequest(BaseModel):
-    token: str
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
 class ResendVerificationRequest(BaseModel):

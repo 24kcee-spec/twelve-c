@@ -30,6 +30,24 @@ async def _reset_rate_limiter():
     limiter.reset()
 
 
+# Verification codes "sent" during tests land here instead of a real inbox,
+# keyed by recipient email - see _capture_verification_codes below.
+SENT_CODES: dict[str, str] = {}
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _capture_verification_codes(monkeypatch):
+    import app.api.routes.auth as auth_routes
+
+    SENT_CODES.clear()
+
+    async def fake_send(to_email: str, code: str) -> None:
+        SENT_CODES[to_email] = code
+
+    monkeypatch.setattr(auth_routes, "send_verification_email", fake_send)
+    yield
+
+
 @pytest_asyncio.fixture
 async def db_engine():
     from sqlalchemy.ext.asyncio import create_async_engine

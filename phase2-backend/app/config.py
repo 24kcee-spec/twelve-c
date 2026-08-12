@@ -36,12 +36,15 @@ class Settings(BaseSettings):
     # e.g. https://twelvec.vercel.app or http://localhost:3000
     frontend_url: str = "http://localhost:3000"
 
-    # Email verification token lifetime
-    email_verification_expire_hours: int = 24
+    # Email verification code lifetime (numeric OTP, not a link)
+    email_verification_code_expire_minutes: int = 15
 
-    # Resend (transactional email) - https://resend.com
-    resend_api_key: str | None = None
-    resend_from_email: str = "Twelve C <onboarding@resend.dev>"
+    # Brevo (transactional email) - https://app.brevo.com - free tier, works
+    # with any "from" address once that address is verified as a sender
+    # (no domain purchase required, unlike Resend).
+    brevo_api_key: str | None = None
+    brevo_sender_email: str = "onboarding@example.com"
+    brevo_sender_name: str = "Twelve C"
 
     # Google Sign-In (OAuth) - https://console.cloud.google.com/apis/credentials
     google_client_id: str | None = None

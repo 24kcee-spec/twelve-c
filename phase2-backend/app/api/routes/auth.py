@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from google.auth.transport import requests as google_requests
@@ -20,10 +21,11 @@ from app.core.security import (
     JWTError,
     TokenType,
     create_access_token,
-    create_email_verification_token,
     create_mfa_pending_token,
     decode_token,
+    generate_verification_code,
     hash_password,
+    hash_verification_code,
     verify_password,
 )
 from app.crud.refresh_token import (
@@ -53,6 +55,18 @@ from app.schemas.auth import (
 router = APIRouter()
 settings = get_settings()
 
+MAX_VERIFICATION_ATTEMPTS = 5
+
+
+def _issue_verification_code(user: User) -> str:
+    code = generate_verification_code()
+    user.verification_code_hash = hash_verification_code(code)
+    user.verification_code_expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.email_verification_code_expire_minutes
+    )
+    user.verification_attempts = 0
+    return code
+
 
 async def _issue_token_pair(db: AsyncSession, user: User) -> TokenPair:
     access_token = create_access_token(user.id)
@@ -79,7 +93,8 @@ def _decode_or_401(token: str, expected_type: TokenType, detail: str) -> uuid.UU
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/hour")
+async def register(request: Request, payload: UserRegister, db: AsyncSession = Depends(get_db)):
     existing = await get_user_by_email(db, payload.email)
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
@@ -90,38 +105,69 @@ async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
         is_active=True,
         is_verified=False,
     )
+    code = _issue_verification_code(user)
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    token = create_email_verification_token(user.id)
-    await send_verification_email(user.email, token)
+    await send_verification_email(user.email, code)
 
     return user
 
 
 @router.post("/verify-email", response_model=MessageResponse)
-async def verify_email(payload: VerifyEmailRequest, db: AsyncSession = Depends(get_db)):
-    user_id = _decode_or_401(payload.token, TokenType.EMAIL_VERIFY, "Invalid or expired link")
+@limiter.limit("10/minute")
+async def verify_email(request: Request, payload: VerifyEmailRequest, db: AsyncSession = Depends(get_db)):
+    generic_error = "That code is incorrect or has expired. Request a new one and try again."
 
-    user = await db.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired link")
+    user = await get_user_by_email(db, payload.email)
+    if user is None or user.is_verified:
+        # Same message whether the account doesn't exist or is already
+        # verified - don't leak which emails are registered.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=generic_error)
+
+    if user.verification_code_hash is None or user.verification_code_expires_at is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=generic_error)
+
+    expires_at = user.verification_code_expires_at
+    if expires_at.tzinfo is None:
+        # SQLite doesn't round-trip tzinfo; the value was always written as
+        # UTC, so re-attach it rather than compare naive-vs-aware.
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=generic_error)
+
+    if user.verification_attempts >= MAX_VERIFICATION_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many incorrect attempts. Request a new code and try again.",
+        )
+
+    if hash_verification_code(payload.code) != user.verification_code_hash:
+        user.verification_attempts += 1
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=generic_error)
 
     user.is_verified = True
+    user.verification_code_hash = None
+    user.verification_code_expires_at = None
+    user.verification_attempts = 0
     await db.commit()
     return MessageResponse(message="Email verified. You can log in now.")
 
 
 @router.post("/resend-verification", response_model=MessageResponse)
-async def resend_verification(payload: ResendVerificationRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("3/minute")
+async def resend_verification(request: Request, payload: ResendVerificationRequest, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(db, payload.email)
     # Always return the same message, whether or not the account exists -
     # avoids leaking which emails are registered.
     if user is not None and not user.is_verified:
-        token = create_email_verification_token(user.id)
-        await send_verification_email(user.email, token)
-    return MessageResponse(message="If that account exists and isn't verified yet, a new link is on its way.")
+        code = _issue_verification_code(user)
+        await db.commit()
+        await send_verification_email(user.email, code)
+    return MessageResponse(message="If that account exists and isn't verified yet, a new code is on its way.")
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
@@ -28,7 +29,6 @@ class TokenType(StrEnum):
     ACCESS = "access"
     REFRESH = "refresh"
     MFA_PENDING = "mfa_pending"  # short-lived token issued after password check, before TOTP
-    EMAIL_VERIFY = "email_verify"  # emailed to the user after registration
 
 
 def _create_token(subject: str, token_type: TokenType, expires_delta: timedelta) -> str:
@@ -60,10 +60,18 @@ def create_mfa_pending_token(user_id: uuid.UUID) -> str:
     return _create_token(str(user_id), TokenType.MFA_PENDING, timedelta(minutes=5))
 
 
-def create_email_verification_token(user_id: uuid.UUID) -> str:
-    return _create_token(
-        str(user_id), TokenType.EMAIL_VERIFY, timedelta(hours=settings.email_verification_expire_hours)
-    )
+def generate_verification_code() -> str:
+    """A zero-padded 6-digit numeric OTP, e.g. '042917'.
+
+    Uses `secrets` (CSPRNG), not `random` - this is a security-sensitive value.
+    """
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def hash_verification_code(code: str) -> str:
+    # Same principle as password/refresh-token storage: the DB never holds
+    # the usable secret, only a hash of it.
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
 
 def decode_token(token: str) -> dict:
@@ -85,7 +93,8 @@ __all__ = [
     "create_access_token",
     "create_refresh_token",
     "create_mfa_pending_token",
-    "create_email_verification_token",
+    "generate_verification_code",
+    "hash_verification_code",
     "decode_token",
     "hash_refresh_token",
 ]

@@ -47,13 +47,31 @@ export function RateSettingsModal({ open, onClose }: { open: boolean; onClose: (
     const draft = drafts[id];
     if (!draft) return;
     setError("");
+
+    const rate = parseFloat(draft.rate);
+    const tax = parseFloat(draft.tax);
+    const levy = parseFloat(draft.levy);
+
+    if (!Number.isFinite(rate) || rate <= 0) {
+      setError("Exchange rate must be a number greater than 0.");
+      return;
+    }
+    if (!Number.isFinite(tax) || tax < 0 || tax > 1) {
+      setError("Tax rate must be a number between 0 and 1 (e.g. 0.25 for 25%).");
+      return;
+    }
+    if (!Number.isFinite(levy) || levy < 0 || levy > 1) {
+      setError("AIDS levy rate must be a number between 0 and 1 (e.g. 0.03 for 3%).");
+      return;
+    }
+
     setSavingId(id);
     setSavedId(null);
     try {
       const updated = await api.updateBusiness(id, {
-        default_exchange_rate: parseFloat(draft.rate),
-        default_tax_rate: parseFloat(draft.tax),
-        default_aids_levy_rate: parseFloat(draft.levy),
+        default_exchange_rate: rate,
+        default_tax_rate: tax,
+        default_aids_levy_rate: levy,
       });
       setBusinesses((prev) => prev?.map((b) => (b.id === id ? updated : b)) ?? null);
       setSavedId(id);

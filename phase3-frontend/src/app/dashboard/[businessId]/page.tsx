@@ -459,7 +459,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                 </div>
                 <NextPaymentDue calculation={selected} />
                 <ResultsPanel result={selected.result_json} taxYear={selected.tax_year} />
-                <PaymentTracker calculation={selected} onSubmit={onSavePayments} />
+                <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
                 <TaxSummaryPrint business={business} calculation={selected} />
               </>
             ) : (

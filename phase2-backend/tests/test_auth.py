@@ -3,7 +3,7 @@ from __future__ import annotations
 import pyotp
 import pytest
 
-from app.core.security import create_email_verification_token
+from tests.conftest import SENT_CODES
 
 pytestmark = pytest.mark.asyncio
 
@@ -13,17 +13,17 @@ VALID_PASSWORD = "Str0ngPassw0rd!"
 async def _register_and_login(client, email="user@example.com", password=VALID_PASSWORD):
     r = await client.post("/auth/register", json={"email": email, "password": password})
     assert r.status_code == 201, r.text
-    await _verify(client, r.json()["id"])
+    await _verify(client, email)
     r = await client.post("/auth/login", json={"email": email, "password": password})
     assert r.status_code == 200, r.text
     return r.json()
 
 
-async def _verify(client, user_id: str):
-    # In production this token is emailed via Resend; tests mint it directly
-    # since no real inbox exists here.
-    token = create_email_verification_token(user_id)
-    r = await client.post("/auth/verify-email", json={"token": token})
+async def _verify(client, email: str):
+    # In production this code is emailed via Brevo; tests capture it from
+    # the monkeypatched sender instead, since no real inbox exists here.
+    code = SENT_CODES[email]
+    r = await client.post("/auth/verify-email", json={"email": email, "code": code})
     assert r.status_code == 200, r.text
 
 
@@ -47,7 +47,7 @@ async def test_unverified_user_cannot_login(client):
 
 async def test_login_wrong_password_rejected(client):
     r = await client.post("/auth/register", json={"email": "a@example.com", "password": VALID_PASSWORD})
-    await _verify(client, r.json()["id"])
+    await _verify(client, "a@example.com")
     r = await client.post("/auth/login", json={"email": "a@example.com", "password": "WrongPassword1"})
     assert r.status_code == 401
 
@@ -127,3 +127,58 @@ async def test_logout_revokes_refresh_token(client):
 
     r = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
     assert r.status_code == 401
+
+
+async def test_verify_email_wrong_code_rejected(client):
+    email = "wrongcode@example.com"
+    await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    real_code = SENT_CODES[email]
+    wrong_code = "000000" if real_code != "000000" else "111111"
+
+    r = await client.post("/auth/verify-email", json={"email": email, "code": wrong_code})
+    assert r.status_code == 400
+
+    # The real code still works afterwards - one bad guess doesn't burn it.
+    r = await client.post("/auth/verify-email", json={"email": email, "code": real_code})
+    assert r.status_code == 200
+
+
+async def test_verify_email_locks_out_after_too_many_wrong_attempts(client):
+    email = "bruteforce@example.com"
+    await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    real_code = SENT_CODES[email]
+    wrong_code = "000000" if real_code != "000000" else "111111"
+
+    for _ in range(5):
+        r = await client.post("/auth/verify-email", json={"email": email, "code": wrong_code})
+        assert r.status_code == 400
+
+    # 6th attempt (even with the correct code) is locked out.
+    r = await client.post("/auth/verify-email", json={"email": email, "code": real_code})
+    assert r.status_code == 429
+
+
+async def test_resend_verification_issues_a_new_working_code(client):
+    email = "resend@example.com"
+    await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    first_code = SENT_CODES[email]
+
+    r = await client.post("/auth/resend-verification", json={"email": email})
+    assert r.status_code == 200
+    second_code = SENT_CODES[email]
+    if first_code == second_code:
+        pytest.skip("random 6-digit codes collided - practically a 1-in-a-million fluke")
+
+    # The old code must no longer work (a fresh code invalidates it)...
+    r = await client.post("/auth/verify-email", json={"email": email, "code": first_code})
+    assert r.status_code == 400
+
+    # ...but the new one verifies successfully.
+    r = await client.post("/auth/verify-email", json={"email": email, "code": second_code})
+    assert r.status_code == 200
+
+
+async def test_resend_verification_does_not_leak_account_existence(client):
+    r = await client.post("/auth/resend-verification", json={"email": "nobody@example.com"})
+    assert r.status_code == 200
+    assert "exists" in r.json()["message"] or "on its way" in r.json()["message"]
