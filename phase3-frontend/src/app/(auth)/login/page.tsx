@@ -128,7 +128,7 @@ function LoginForm() {
             </ErrorNote>
 
             <Button type="submit" variant="primary" className="w-full" disabled={loading}>
-              {loading ? "Logging in…" : "Log in"}
+              {loading ? "Logging in..." : "Log in"}
             </Button>
           </form>
 
@@ -137,6 +137,18 @@ function LoginForm() {
             <Link href="/register" className="font-medium text-usd">
               Create one
             </Link>
+          </p>
+
+          <p className="mt-4 border-t border-line pt-4 text-center text-xs leading-relaxed text-ink-faint">
+            By continuing, you agree to Twelve C's{" "}
+            <Link href="/legal/terms-of-service" className="underline hover:text-ink-soft">
+              Terms of Service
+            </Link>{" "}
+            and acknowledge our{" "}
+            <Link href="/legal/privacy-policy" className="underline hover:text-ink-soft">
+              Privacy Policy
+            </Link>
+            .
           </p>
         </Card>
       </div>

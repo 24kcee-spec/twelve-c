@@ -94,7 +94,7 @@ export default function RegisterPage() {
             />
             <ErrorNote>{error}</ErrorNote>
             <Button type="submit" variant="primary" className="w-full" disabled={submitting}>
-              {submitting ? "Creating account…" : "Create account"}
+              {submitting ? "Creating account..." : "Create account"}
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-ink-soft">
@@ -102,6 +102,18 @@ export default function RegisterPage() {
             <Link href="/login" className="font-medium text-usd">
               Log in
             </Link>
+          </p>
+
+          <p className="mt-4 border-t border-line pt-4 text-center text-xs leading-relaxed text-ink-faint">
+            By creating an account, you agree to Twelve C's{" "}
+            <Link href="/legal/terms-of-service" className="underline hover:text-ink-soft">
+              Terms of Service
+            </Link>{" "}
+            and acknowledge our{" "}
+            <Link href="/legal/privacy-policy" className="underline hover:text-ink-soft">
+              Privacy Policy
+            </Link>
+            .
           </p>
         </Card>
       </div>
