@@ -1,6 +1,6 @@
-﻿import { LogoMark } from "@/components/LogoMark";
-"use client";
+﻿"use client";
 
+import { LogoMark } from "@/components/LogoMark";
 import Link from "next/link";
 import { InputHTMLAttributes, ButtonHTMLAttributes, ReactNode, useEffect, useRef, useState } from "react";
 
