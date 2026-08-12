@@ -20,8 +20,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
   const [selected, setSelected] = useState<QpdCalculationOut | null>(null);
   const [error, setError] = useState("");
 
-  // History grouping/delete state. Years start collapsed except the most
-  // recent one, which is expanded the first time calculations load.
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const yearsInitialized = useRef(false);
   const [confirmingDeleteCalcId, setConfirmingDeleteCalcId] = useState<string | null>(null);
@@ -35,8 +33,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
   const [zigExpenses, setZigExpenses] = useState<CurrencyExpensesIn>(emptyExpenses());
   const [calculating, setCalculating] = useState(false);
 
-  // Rate overrides - default to the business's saved rates, but editable per
-  // calculation since ZIMRA rates and the exchange rate both change during the year.
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
   const [taxRatePct, setTaxRatePct] = useState<number | null>(null);
   const [aidsLevyPct, setAidsLevyPct] = useState<number | null>(null);
@@ -64,10 +60,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
   }
 
   useEffect(() => {
-    // Next.js reuses this component instance when navigating between
-    // businesses via the switcher (only the [businessId] param changes,
-    // no remount) - reset per-business UI state explicitly or it would
-    // leak across businesses.
     yearsInitialized.current = false;
     setExpandedYears(new Set());
     setConfirmingDeleteCalcId(null);
@@ -76,9 +68,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId]);
 
-  // Calculations are already ordered by the API (tax_year desc, created_at
-  // desc), so same-year entries are contiguous - safe to fold into groups
-  // in a single pass without re-sorting on the client.
   const groupedCalculations = useMemo(() => {
     const groups: { year: number; items: QpdCalculationOut[] }[] = [];
     for (const c of calculations) {
@@ -143,10 +132,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
         tax_rate: taxRatePct !== null ? taxRatePct / 100 : null,
         aids_levy_rate: aidsLevyPct !== null ? aidsLevyPct / 100 : null,
       });
-      // Re-fetch rather than prepend locally: the list must stay ordered by
-      // (tax_year desc, created_at desc) for the year-grouping above to
-      // stay correct, and a blind prepend would break that if the user
-      // calculates for an earlier tax year than what's already showing.
       const refreshed = await api.listCalculations(businessId);
       setCalculations(refreshed);
       setSelected(result);
@@ -181,6 +166,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
   }
 
   return (
+    <>
     <main className="min-h-screen bg-paper print:hidden">
       <TopBar />
       <div className="mx-auto max-w-5xl px-6 py-12">
@@ -460,7 +446,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
                 <NextPaymentDue calculation={selected} />
                 <ResultsPanel result={selected.result_json} taxYear={selected.tax_year} />
                 <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
-                <TaxSummaryPrint business={business} calculation={selected} />
               </>
             ) : (
               <Card>
@@ -473,6 +458,8 @@ function BusinessContent({ businessId }: { businessId: string }) {
         </div>
       </div>
     </main>
+    {selected && <TaxSummaryPrint business={business} calculation={selected} />}
+    </>
   );
 }
 
