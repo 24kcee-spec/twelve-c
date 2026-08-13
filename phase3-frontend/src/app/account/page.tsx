@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/AuthGuard";
 import { TopBar } from "@/components/TopBar";
 import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
@@ -9,11 +10,19 @@ import { api } from "@/lib/api";
 import { ApiError, MfaSetupResponse } from "@/lib/types";
 
 function AccountContent() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
+  const router = useRouter();
   const [setup, setSetup] = useState<MfaSetupResponse | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const [showDelete, setShowDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteTotp, setDeleteTotp] = useState("");
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   async function startSetup() {
     setError("");
@@ -56,6 +65,30 @@ function AccountContent() {
       setError(err instanceof ApiError && typeof err.detail === "string" ? err.detail : "Invalid code");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function confirmDelete(e: React.FormEvent) {
+    e.preventDefault();
+    setDeleteError("");
+
+    if (deleteConfirmText.trim().toUpperCase() !== "DELETE") {
+      setDeleteError('Type "DELETE" in the box below to confirm.');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await api.deleteAccount({
+        password: user?.has_password ? deletePassword : undefined,
+        totp_code: user?.mfa_enabled ? deleteTotp : undefined,
+      });
+      await logout();
+      router.push("/");
+    } catch (err) {
+      setDeleteError(err instanceof ApiError && typeof err.detail === "string" ? err.detail : "Couldn't delete your account. Check the details and try again.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -131,6 +164,79 @@ function AccountContent() {
               <Button type="submit" variant="secondary" disabled={busy}>
                 Disable MFA
               </Button>
+            </form>
+          )}
+        </Card>
+
+        <Card className="mt-6 border-danger/30">
+          <Eyebrow>Danger zone</Eyebrow>
+          <p className="mt-1 text-sm text-ink-soft">
+            Permanently delete your account, every business you&apos;ve added, and all saved
+            calculations. This cannot be undone.
+          </p>
+
+          {!showDelete && (
+            <Button variant="secondary" className="mt-4 border-danger text-danger hover:bg-danger hover:text-paper" onClick={() => setShowDelete(true)}>
+              Delete my account
+            </Button>
+          )}
+
+          {showDelete && (
+            <form className="mt-4 space-y-4" onSubmit={confirmDelete}>
+              {user?.has_password && (
+                <Field
+                  label="Confirm your password"
+                  type="password"
+                  required
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                />
+              )}
+
+              {user?.mfa_enabled && (
+                <Field
+                  label="6-digit authentication code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  required
+                  value={deleteTotp}
+                  onChange={(e) => setDeleteTotp(e.target.value.replace(/\D/g, ""))}
+                />
+              )}
+
+              <Field
+                label='Type "DELETE" to confirm'
+                required
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+              />
+
+              <ErrorNote>{deleteError}</ErrorNote>
+
+              <div className="flex gap-3">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="bg-danger hover:bg-danger"
+                  disabled={deleting}
+                >
+                  {deleting ? "Deleting…" : "Permanently delete my account"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowDelete(false);
+                    setDeletePassword("");
+                    setDeleteTotp("");
+                    setDeleteConfirmText("");
+                    setDeleteError("");
+                  }}
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+              </div>
             </form>
           )}
         </Card>

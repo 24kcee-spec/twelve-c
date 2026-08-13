@@ -4,6 +4,7 @@ export interface UserOut {
   is_active: boolean;
   is_verified: boolean;
   mfa_enabled: boolean;
+  has_password: boolean;
 }
 
 export interface TokenPair {
@@ -25,6 +26,11 @@ export interface MfaRequiredResponse {
 export interface MfaSetupResponse {
   provisioning_uri: string;
   qr_code_data_uri: string;
+}
+
+export interface DeleteAccountRequest {
+  password?: string;
+  totp_code?: string;
 }
 
 export interface Business {

@@ -2,6 +2,7 @@
   AccessTokenResponse,
   ApplyPaymentsRequest,
   Business,
+  DeleteAccountRequest,
   MfaRequiredResponse,
   MfaSetupResponse,
   QpdCalculationCreate,
@@ -146,6 +147,9 @@ export const api = {
   },
 
   me: () => request<UserOut>("/auth/me"),
+
+  deleteAccount: (payload: DeleteAccountRequest) =>
+    request<void>("/auth/me", { method: "DELETE", body: JSON.stringify(payload) }),
 
   verifyEmail: (email: string, code: string) =>
     rawRequest<{ message: string }>(
