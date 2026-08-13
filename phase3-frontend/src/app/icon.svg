@@ -1,8 +1,6 @@
 ﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <rect width="24" height="24" rx="6" fill="#F5F6F0"/>
-  <circle cx="12" cy="12" r="7.2" stroke="#CFE3D8" stroke-width="3.2"/>
-  <circle cx="12" cy="12" r="7.2" fill="none" stroke="#5FA588" stroke-width="3.2" stroke-dasharray="4.53 40.71" stroke-dashoffset="0" transform="rotate(-90 12 12)"/>
-  <circle cx="12" cy="12" r="7.2" fill="none" stroke="#357E64" stroke-width="3.2" stroke-dasharray="11.31 33.92" stroke-dashoffset="-4.53" transform="rotate(-90 12 12)"/>
-  <circle cx="12" cy="12" r="7.2" fill="none" stroke="#1F6F54" stroke-width="3.2" stroke-dasharray="13.57 31.67" stroke-dashoffset="-15.84" transform="rotate(-90 12 12)"/>
-  <circle cx="12" cy="12" r="7.2" fill="none" stroke="#12503D" stroke-width="3.2" stroke-dasharray="15.83 29.41" stroke-dashoffset="-29.41" transform="rotate(-90 12 12)"/>
+  <circle cx="12" cy="12" r="8.5" fill="none" stroke="#5FA588" stroke-width="6.5" stroke-dasharray="5.34 48.07" stroke-dashoffset="0" transform="rotate(-90 12 12)"/>
+  <circle cx="12" cy="12" r="8.5" fill="none" stroke="#357E64" stroke-width="6.5" stroke-dasharray="13.35 40.06" stroke-dashoffset="-5.34" transform="rotate(-90 12 12)"/>
+  <circle cx="12" cy="12" r="8.5" fill="none" stroke="#1F6F54" stroke-width="6.5" stroke-dasharray="16.02 37.39" stroke-dashoffset="-18.69" transform="rotate(-90 12 12)"/>
+  <circle cx="12" cy="12" r="8.5" fill="none" stroke="#12503D" stroke-width="6.5" stroke-dasharray="18.69 34.72" stroke-dashoffset="-34.71" transform="rotate(-90 12 12)"/>
 </svg>
