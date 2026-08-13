@@ -35,6 +35,13 @@ class User(Base):
     # 6-digit code (1,000,000 combos) within its short expiry window.
     verification_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # --- Password reset (6-digit code, same pattern as email verification) ---
+    reset_code_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reset_code_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    reset_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     # --- MFA (TOTP) ---
     # mfa_secret is stored only once the user has *confirmed* enrollment (see
     # /auth/mfa/verify). A secret being generated but never confirmed is kept

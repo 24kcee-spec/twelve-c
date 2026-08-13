@@ -8,6 +8,18 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 _PASSWORD_MIN_LEN = 12
 
 
+def _validate_password_strength(v: str) -> str:
+    if len(v) < _PASSWORD_MIN_LEN:
+        raise ValueError(f"Password must be at least {_PASSWORD_MIN_LEN} characters")
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Password must contain an uppercase letter")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("Password must contain a lowercase letter")
+    if not re.search(r"\d", v):
+        raise ValueError("Password must contain a digit")
+    return v
+
+
 class UserRegister(BaseModel):
     email: EmailStr
     password: str
@@ -15,15 +27,7 @@ class UserRegister(BaseModel):
     @field_validator("password")
     @classmethod
     def password_strength(cls, v: str) -> str:
-        if len(v) < _PASSWORD_MIN_LEN:
-            raise ValueError(f"Password must be at least {_PASSWORD_MIN_LEN} characters")
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("Password must contain an uppercase letter")
-        if not re.search(r"[a-z]", v):
-            raise ValueError("Password must contain a lowercase letter")
-        if not re.search(r"\d", v):
-            raise ValueError("Password must contain a digit")
-        return v
+        return _validate_password_strength(v)
 
 
 class UserOut(BaseModel):
@@ -44,6 +48,14 @@ class LoginRequest(BaseModel):
 class TokenPair(BaseModel):
     access_token: str
     refresh_token: str
+    token_type: str = "bearer"
+
+
+class AccessTokenResponse(BaseModel):
+    """What login/refresh endpoints return now that the refresh token
+    travels only as an httpOnly cookie, never in the JSON body."""
+
+    access_token: str
     token_type: str = "bearer"
 
 
@@ -81,6 +93,21 @@ class VerifyEmailRequest(BaseModel):
 
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class GoogleAuthRequest(BaseModel):
