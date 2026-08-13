@@ -79,6 +79,12 @@ function LoginForm() {
             </div>
           )}
 
+          {searchParams.get("reset") === "1" && !error && (
+            <div className="mt-4 rounded border border-usd/30 bg-usd-soft px-3 py-2 text-sm text-usd">
+              Password reset. Log in with your new password.
+            </div>
+          )}
+
           <div className="mt-6">
             <GoogleSignInButton
               onSuccess={handleGoogleSuccess}
@@ -107,6 +113,11 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            <div className="text-right">
+              <Link href="/forgot-password" className="text-sm font-medium text-usd">
+                Forgot password?
+              </Link>
+            </div>
 
             <ErrorNote>
               {error && (

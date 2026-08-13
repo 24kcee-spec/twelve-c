@@ -12,6 +12,11 @@ export interface TokenPair {
   token_type: "bearer";
 }
 
+export interface AccessTokenResponse {
+  access_token: string;
+  token_type: "bearer";
+}
+
 export interface MfaRequiredResponse {
   mfa_required: true;
   mfa_pending_token: string;

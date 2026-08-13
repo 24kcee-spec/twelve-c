@@ -1,4 +1,5 @@
 ﻿import {
+  AccessTokenResponse,
   ApplyPaymentsRequest,
   Business,
   MfaRequiredResponse,
@@ -12,54 +13,36 @@
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://twelve-c.onrender.com";
 
-const ACCESS_KEY = "twelvec_access_token";
-const REFRESH_KEY = "twelvec_refresh_token";
+// The access token now lives ONLY in memory - never in localStorage or
+// sessionStorage - so it isn't readable by an injected script (XSS). The
+// refresh token lives in an httpOnly cookie the browser manages on its own;
+// JS never sees it at all. This means the access token doesn't survive a
+// hard page refresh by itself - AuthProvider calls /auth/refresh on mount
+// (which succeeds off the cookie) to get a fresh one silently.
+let accessToken: string | null = null;
 
-function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ACCESS_KEY);
-}
-
-function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(REFRESH_KEY);
-}
-
-export function setTokens(tokens: TokenPair | null) {
-  if (typeof window === "undefined") return;
-  if (!tokens) {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
-    return;
-  }
-  localStorage.setItem(ACCESS_KEY, tokens.access_token);
-  localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
+export function setAccessToken(token: string | null) {
+  accessToken = token;
 }
 
 export function hasAccessToken(): boolean {
-  return getAccessToken() !== null;
+  return accessToken !== null;
 }
 
 // Only one refresh should ever be in flight at a time - concurrent 401s all
 // wait on the same promise instead of racing the backend with several
-// refresh_token calls (which would revoke each other via rotation).
-let refreshInFlight: Promise<TokenPair | null> | null = null;
+// refresh calls (which would revoke each other via rotation).
+let refreshInFlight: Promise<AccessTokenResponse | null> | null = null;
 
-async function tryRefresh(): Promise<TokenPair | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
-
+async function tryRefresh(): Promise<AccessTokenResponse | null> {
   if (!refreshInFlight) {
-    refreshInFlight = rawRequest<TokenPair>("/auth/refresh", {
-      method: "POST",
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    })
+    refreshInFlight = rawRequest<AccessTokenResponse>("/auth/refresh", { method: "POST" }, true)
       .then((tokens) => {
-        setTokens(tokens);
+        setAccessToken(tokens.access_token);
         return tokens;
       })
       .catch(() => {
-        setTokens(null);
+        setAccessToken(null);
         return null;
       })
       .finally(() => {
@@ -75,12 +58,14 @@ async function rawRequest<T>(path: string, init: RequestInit = {}, skipAuth = fa
     ...((init.headers as Record<string, string>) || {}),
   };
 
-  if (!skipAuth) {
-    const token = getAccessToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
+  if (!skipAuth && accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  // credentials: "include" is required so the browser attaches (and
+  // accepts) the httpOnly refresh-token cookie on cross-site requests
+  // between the Vercel frontend and the Render backend.
+  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers, credentials: "include" });
 
   if (res.status === 204) {
     return undefined as T;
@@ -129,36 +114,35 @@ export const api = {
     rawRequest<UserOut>("/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }, true),
 
   login: (email: string, password: string) =>
-    rawRequest<TokenPair | MfaRequiredResponse>(
+    rawRequest<TokenPair | AccessTokenResponse | MfaRequiredResponse>(
       "/auth/login",
       { method: "POST", body: JSON.stringify({ email, password }) },
       true
     ),
 
   mfaLogin: (mfaPendingToken: string, totpCode: string) =>
-    rawRequest<TokenPair>(
+    rawRequest<AccessTokenResponse>(
       "/auth/mfa/login",
       { method: "POST", body: JSON.stringify({ mfa_pending_token: mfaPendingToken, totp_code: totpCode }) },
       true
     ),
 
   googleAuth: (idToken: string) =>
-    rawRequest<TokenPair | MfaRequiredResponse>(
+    rawRequest<TokenPair | AccessTokenResponse | MfaRequiredResponse>(
       "/auth/google",
       { method: "POST", body: JSON.stringify({ id_token: idToken }) },
       true
     ),
 
+  refresh: () => rawRequest<AccessTokenResponse>("/auth/refresh", { method: "POST" }, true),
+
   logout: async () => {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      try {
-        await rawRequest("/auth/logout", { method: "POST", body: JSON.stringify({ refresh_token: refreshToken }) }, true);
-      } catch {
-        // Best-effort - clear local tokens regardless of server outcome.
-      }
+    try {
+      await rawRequest("/auth/logout", { method: "POST" }, true);
+    } catch {
+      // Best-effort - clear the in-memory token regardless of server outcome.
     }
-    setTokens(null);
+    setAccessToken(null);
   },
 
   me: () => request<UserOut>("/auth/me"),
@@ -174,6 +158,20 @@ export const api = {
     rawRequest<{ message: string }>(
       "/auth/resend-verification",
       { method: "POST", body: JSON.stringify({ email }) },
+      true
+    ),
+
+  forgotPassword: (email: string) =>
+    rawRequest<{ message: string }>(
+      "/auth/forgot-password",
+      { method: "POST", body: JSON.stringify({ email }) },
+      true
+    ),
+
+  resetPassword: (email: string, code: string, newPassword: string) =>
+    rawRequest<{ message: string }>(
+      "/auth/reset-password",
+      { method: "POST", body: JSON.stringify({ email, code, new_password: newPassword }) },
       true
     ),
 

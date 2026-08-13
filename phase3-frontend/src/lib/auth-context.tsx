@@ -1,12 +1,14 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { api, setTokens, hasAccessToken } from "./api";
-import { UserOut, TokenPair, MfaRequiredResponse } from "./types";
+import { api, setAccessToken } from "./api";
+import { UserOut, TokenPair, AccessTokenResponse, MfaRequiredResponse } from "./types";
 
 const MFA_PENDING_KEY = "twelvec_mfa_pending";
 
-function isMfaRequired(res: TokenPair | MfaRequiredResponse): res is MfaRequiredResponse {
+function isMfaRequired(
+  res: TokenPair | AccessTokenResponse | MfaRequiredResponse
+): res is MfaRequiredResponse {
   return (res as MfaRequiredResponse).mfa_required === true;
 }
 
@@ -39,8 +41,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     (async () => {
       setLoading(true);
-      if (hasAccessToken()) {
+      // The access token lives only in memory, so on a fresh page load we
+      // don't have one yet - try to mint one off the httpOnly refresh
+      // cookie before deciding whether the user is logged in.
+      try {
+        const tokens = await api.refresh();
+        setAccessToken(tokens.access_token);
         await refreshUser();
+      } catch {
+        setAccessToken(null);
+        setUser(null);
       }
       setLoading(false);
     })();
@@ -50,14 +60,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await api.register(email, password);
   };
 
-  const handleAuthResult = async (result: TokenPair | MfaRequiredResponse): Promise<{ mfaRequired: boolean }> => {
+  const handleAuthResult = async (
+    result: TokenPair | AccessTokenResponse | MfaRequiredResponse
+  ): Promise<{ mfaRequired: boolean }> => {
     if (isMfaRequired(result)) {
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem(MFA_PENDING_KEY, result.mfa_pending_token);
       }
       return { mfaRequired: true };
     }
-    setTokens(result);
+    setAccessToken(result.access_token);
     await refreshUser();
     return { mfaRequired: false };
   };
@@ -74,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const completeMfaLogin = async (pendingToken: string, code: string) => {
     const tokens = await api.mfaLogin(pendingToken, code);
-    setTokens(tokens);
+    setAccessToken(tokens.access_token);
     await refreshUser();
   };
 
