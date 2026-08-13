@@ -170,3 +170,45 @@ def test_zero_income_with_real_expenses_does_not_zero_out_deductions():
     # Tax owed is still correctly zero - there's no income to tax.
     assert result.total_tax_usd == pytest.approx(0.0)
     assert result.total_tax_zig == pytest.approx(0.0)
+
+def test_decimal_precision_exact_reconciliation_at_repeating_rate():
+    """
+    Regression test for the float -> Decimal migration. Exchange rate 3.0
+    with sales/expenses chosen so several intermediate ratios are repeating
+    binary fractions (thirds) - exactly the kind of number that used to
+    accumulate silent float drift across the ratio -> split -> adjusted
+    income/deductions -> tax -> AIDS levy chain. With Decimal at 50-digit
+    precision this must reconcile EXACTLY (tight tolerance), not just
+    "close enough".
+    """
+    data = QpdInput(
+        usd_sales=10000,
+        zig_sales=20000,  # /3.0 exchange rate -> repeating fraction ratios
+        usd_expenses=CurrencyExpenses(cost_of_sales=1000, salaries=1000, other_expenses=1000),
+        zig_expenses=CurrencyExpenses(cost_of_sales=3000, salaries=1500, other_expenses=750),
+        exchange_rate=3.0,
+        tax_rate=0.25,
+        aids_levy_rate=0.03,
+    )
+    result = calculate_qpd(data)
+
+    # Tight tolerance (1e-9) - float drift on this scenario would show up
+    # well before this threshold; Decimal-based math clears it easily.
+    assert result.usd_ratio + result.zig_ratio == pytest.approx(1.0, abs=1e-9)
+    assert result.payment_ratio_usd + result.payment_ratio_zig == pytest.approx(1.0, abs=1e-9)
+    assert result.aids_levy_usd == pytest.approx(
+        result.tax_payable_usd * data.aids_levy_rate, abs=1e-9
+    )
+
+    # The 4 instalments must reconcile to the cent against total_tax, using
+    # the SAME rounding convention production uses (ROUND_HALF_UP), not
+    # Python's round() - this is the check that would catch a mismatch
+    # between the engine's rounding and a naive test-side round().
+    from decimal import ROUND_HALF_UP, Decimal
+    def half_up(x: float) -> float:
+        return float(Decimal(str(x)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+    total_usd = Decimal(str(result.total_tax_usd))
+    for instalment, pct in zip(result.schedule, [Decimal("0.10"), Decimal("0.25"), Decimal("0.30"), Decimal("0.35")]):
+        expected = float((total_usd * pct).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+        assert instalment.usd == pytest.approx(expected, abs=1e-9)

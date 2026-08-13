@@ -57,7 +57,11 @@ async def test_qpd_calculation_matches_engine_and_supports_payments(client):
     assert len(calc["result_json"]["schedule"]) == 4
     # 10/25/30/35 split of total_tax should reproduce the ZIMRA QPD schedule.
     total_usd = calc["result_json"]["total_tax_usd"]
-    assert calc["result_json"]["schedule"][0]["usd"] == round(total_usd * 0.10, 2)
+    from decimal import Decimal, ROUND_HALF_UP
+    expected_q1 = float(
+        (Decimal(str(total_usd)) * Decimal("0.10")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    )
+    assert calc["result_json"]["schedule"][0]["usd"] == expected_q1
 
     calc_id = calc["id"]
     pay_r = await client.post(
