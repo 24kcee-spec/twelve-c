@@ -41,6 +41,15 @@ function HelpIcon() {
   );
 }
 
+function BookIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z" />
+      <path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5v-13Z" />
+    </svg>
+  );
+}
+
 function RatesIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -255,6 +264,12 @@ export function TopBar() {
               <HelpIcon />
               How Twelve C works
             </span>
+          </DropdownItem>
+          <DropdownItem href="/learn">
+          <span className="flex items-center gap-2.5">
+          <BookIcon />
+          Know your taxes
+          </span>
           </DropdownItem>
           <DropdownItem onClick={() => setRatesOpen(true)}>
             <span className="flex items-center gap-2.5">

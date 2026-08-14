@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { QuarterlyRhythm } from "@/components/QuarterlyRhythm";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 
@@ -10,6 +10,9 @@ export default function LandingPage() {
         <nav className="flex items-center gap-6">
           <Link href="/tutorial" className="text-sm text-ink-soft hover:text-ink">
             How it works
+          </Link>
+          <Link href="/learn" className="text-sm text-ink-soft hover:text-ink">
+            Know your taxes
           </Link>
           <Link href="/login" className="text-sm text-ink-soft hover:text-ink">
             Log in
