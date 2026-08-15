@@ -1,13 +1,10 @@
 import Link from "next/link";
-import HeroSequence from "@/components/HeroSequence";
-import { QuarterlyRhythm } from "@/components/QuarterlyRhythm";
+import { AnimatedScheduleReveal } from "@/components/AnimatedScheduleReveal";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-paper">
-      <HeroSequence />
-
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <Logo />
         <nav className="flex items-center gap-6">
@@ -34,8 +31,8 @@ export default function LandingPage() {
           <p className="mt-5 max-w-md text-ink-soft">
             ZIMRA&apos;s QPD schedule front-loads almost nothing and back-loads
             65% of the year&apos;s tax into September and December. Twelve C
-            calculates the split correctly — across USD and ZIG, with the
-            Public Notice 71 capping rule applied properly — so the number
+            calculates the split correctly - across USD and ZIG, with the
+            Public Notice 71 capping rule applied properly - so the number
             you see is the number you owe.
           </p>
           <div className="mt-8 flex gap-3">
@@ -52,10 +49,10 @@ export default function LandingPage() {
           <Card>
             <Eyebrow>The actual schedule</Eyebrow>
             <div className="mt-4">
-              <QuarterlyRhythm />
+              <AnimatedScheduleReveal />
             </div>
             <p className="mt-4 text-sm text-ink-faint">
-              10 / 25 / 30 / 35 — most businesses only notice how uneven this
+              10 / 25 / 30 / 35 - most businesses only notice how uneven this
               is when Q3 arrives and the bill is triple what Q1 was.
             </p>
           </Card>
@@ -68,13 +65,13 @@ export default function LandingPage() {
             icon={<CurrencyIcon />}
             eyebrow="01 · Dual currency"
             title="USD and ZIG, one calculation"
-            body="Enter sales and expenses in whichever currency they actually traded in. Twelve C applies the Public Notice 71 50/50 cap correctly — only when USD is the dominant currency, uncapped when ZIG dominates — instead of guessing."
+            body="Enter sales and expenses in whichever currency they actually traded in. Twelve C applies the Public Notice 71 50/50 cap correctly - only when USD is the dominant currency, uncapped when ZIG dominates - instead of guessing."
           />
           <Feature
             icon={<CalendarIcon />}
             eyebrow="02 · Built for the deadline"
             title="A schedule you can act on"
-            body="25 March, 25 June, 25 September, 20 December. Each instalment shows what's owed, what's paid, and what's still outstanding — no dead cell references, no silent zeroes."
+            body="25 March, 25 June, 25 September, 20 December. Each instalment shows what's owed, what's paid, and what's still outstanding - no dead cell references, no silent zeroes."
           />
           <Feature
             icon={<BuildingsIcon />}
