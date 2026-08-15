@@ -8,14 +8,13 @@ interface Quarter {
   date: string;
   pct: number;
   fill: string;
-  text: string;
 }
 
 const QUARTERS: Quarter[] = [
-  { label: "Q1", date: "25 Mar", pct: 0.1, fill: "bg-usd", text: "text-surface" },
-  { label: "Q2", date: "25 Jun", pct: 0.25, fill: "bg-usd/60", text: "text-ink" },
-  { label: "Q3", date: "25 Sep", pct: 0.3, fill: "bg-zig/70", text: "text-ink" },
-  { label: "Q4", date: "20 Dec", pct: 0.35, fill: "bg-zig", text: "text-surface" },
+  { label: "Q1", date: "25 Mar", pct: 0.1, fill: "bg-usd" },
+  { label: "Q2", date: "25 Jun", pct: 0.25, fill: "bg-usd/60" },
+  { label: "Q3", date: "25 Sep", pct: 0.3, fill: "bg-zig/70" },
+  { label: "Q4", date: "20 Dec", pct: 0.35, fill: "bg-zig" },
 ];
 
 const USD_VALUES = [980, 2450, 2940, 3430];
@@ -45,30 +44,31 @@ function easeInOutCubic(t: number): number {
  * AnimatedScheduleReveal — a self-playing, infinitely looping visualization
  * of "the actual schedule" card on the landing page.
  *
- * Runs a continuous breathing cycle with no user interaction and no replay
- * control: a USD/ZiG stream converges on the 50/50 cap point, the four QPD
- * segments grow in with the app's real currency colors, the per-segment
- * amounts lift into view, everything holds for a beat with a soft
- * "live preview" pulse and a light sheen sweep, then eases back down and
- * starts again — forever, on its own.
+ * Layout: a small USD/ZiG convergence marker settles on the 50/50 cap
+ * point, a slim proportional bar shows the real 10/25/30/35 split, and a
+ * 2x2 grid of equal-width stat cards carries the quarter, date, percentage
+ * and dual-currency amount — so the narrow Q1 slice never has to cram real
+ * text into a 10%-wide box. The whole thing breathes in, holds, eases back
+ * down, and repeats forever with no button and no user interaction.
  *
  * Respects prefers-reduced-motion by rendering the final settled frame
  * once, with no looping animation.
  */
 export function AnimatedScheduleReveal() {
-  const capDotRef = useRef<HTMLDivElement | null>(null);
   const capLabelRef = useRef<HTMLSpanElement | null>(null);
+  const usdDotRef = useRef<HTMLDivElement | null>(null);
+  const zigDotRef = useRef<HTMLDivElement | null>(null);
+  const capDotRef = useRef<HTMLDivElement | null>(null);
   const segmentRefs = useRef<HTMLDivElement[]>([]);
-  const amountRefs = useRef<HTMLDivElement[]>([]);
-  const liveDotRef = useRef<HTMLSpanElement | null>(null);
+  const cardRefs = useRef<HTMLDivElement[]>([]);
   const rafRef = useRef<number | null>(null);
   const wasFullRef = useRef(false);
 
   const addSegment = (el: HTMLDivElement | null) => {
     if (el && !segmentRefs.current.includes(el)) segmentRefs.current.push(el);
   };
-  const addAmount = (el: HTMLDivElement | null) => {
-    if (el && !amountRefs.current.includes(el)) amountRefs.current.push(el);
+  const addCard = (el: HTMLDivElement | null) => {
+    if (el && !cardRefs.current.includes(el)) cardRefs.current.push(el);
   };
 
   useEffect(() => {
@@ -77,14 +77,21 @@ export function AnimatedScheduleReveal() {
     ).matches;
 
     const render = (p: number) => {
-      const sCap = seg(p, 0.0, 0.28);
-      const eased = easeOutCubic(sCap);
+      const sConverge = seg(p, 0, 0.26);
+      const easedConverge = easeOutCubic(sConverge);
+      if (usdDotRef.current) {
+        usdDotRef.current.style.left = `${4 + easedConverge * 44}%`;
+        usdDotRef.current.style.opacity = String(sConverge);
+      }
+      if (zigDotRef.current) {
+        zigDotRef.current.style.left = `${96 - easedConverge * 44}%`;
+        zigDotRef.current.style.opacity = String(sConverge);
+      }
       if (capDotRef.current) {
-        capDotRef.current.style.left = `${50 - (1 - eased) * 22}%`;
-        capDotRef.current.style.opacity = String(sCap);
+        capDotRef.current.style.opacity = String(seg(p, 0.22, 0.32));
       }
       if (capLabelRef.current) {
-        capLabelRef.current.style.opacity = String(seg(p, 0.2, 0.32));
+        capLabelRef.current.style.opacity = String(seg(p, 0.16, 0.3));
       }
 
       segmentRefs.current.forEach((el, i) => {
@@ -93,14 +100,13 @@ export function AnimatedScheduleReveal() {
         const pct = QUARTERS[i].pct * 100;
         el.style.flexGrow = String(pct * local || 0.001);
         el.style.opacity = String(local);
-        el.style.transform = `scaleY(${0.94 + 0.06 * local})`;
       });
 
-      amountRefs.current.forEach((el, i) => {
-        const start = 0.72 + i * 0.05;
-        const local = seg(p, start, start + 0.18);
+      cardRefs.current.forEach((el, i) => {
+        const start = 0.66 + i * 0.06;
+        const local = seg(p, start, start + 0.2);
         el.style.opacity = String(local);
-        el.style.transform = `translateY(${(1 - local) * 4}px)`;
+        el.style.transform = `translateY(${(1 - local) * 6}px)`;
       });
     };
 
@@ -132,7 +138,7 @@ export function AnimatedScheduleReveal() {
 
       if (isFull !== wasFullRef.current) {
         wasFullRef.current = isFull;
-        liveDotRef.current?.classList.toggle("aqs-live-on", isFull);
+        capDotRef.current?.classList.toggle("aqs-live-on", isFull);
       }
 
       rafRef.current = requestAnimationFrame(tick);
@@ -146,60 +152,72 @@ export function AnimatedScheduleReveal() {
 
   return (
     <div className="aqs-root w-full">
-      <div className="relative mb-3 h-6">
-        <div
-          ref={capDotRef}
-          className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-ink shadow-[0_0_0_4px_rgba(22,36,28,0.08)]"
-          style={{ left: "28%", opacity: 0 }}
-        />
-        <span
-          ref={capLabelRef}
-          className="absolute left-1/2 top-0 -translate-x-1/2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint"
-          style={{ opacity: 0 }}
-        >
-          50 / 50 cap · Public Notice 71
-        </span>
+      <div className="mb-4">
+        <div className="mb-2 text-center">
+          <span
+            ref={capLabelRef}
+            className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint"
+            style={{ opacity: 0 }}
+          >
+            50 / 50 cap · Public Notice 71
+          </span>
+        </div>
+        <div className="relative h-3">
+          <div className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-line" />
+          <div
+            ref={usdDotRef}
+            className="absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-usd"
+            style={{ left: "4%", opacity: 0 }}
+          />
+          <div
+            ref={zigDotRef}
+            className="absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-zig"
+            style={{ left: "96%", opacity: 0 }}
+          />
+          <div
+            ref={capDotRef}
+            className="aqs-cap-dot absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink"
+            style={{ opacity: 0 }}
+          />
+        </div>
       </div>
 
-      <div className="aqs-bar relative flex h-20 w-full overflow-hidden rounded-lg border border-line shadow-card">
-        <div className="aqs-sheen pointer-events-none absolute inset-0" />
+      <div className="aqs-bar relative flex h-3 w-full overflow-hidden rounded-full border border-line/70">
+        <div className="aqs-sheen pointer-events-none absolute inset-0 z-10" />
         {QUARTERS.map((q) => (
           <div
             key={q.label}
             ref={addSegment}
-            className={`${q.fill} flex flex-col justify-center border-r border-paper/40 px-3 py-2 last:border-r-0`}
+            className={`${q.fill} h-full`}
             style={{ flexGrow: 0.001, flexBasis: 0, opacity: 0 }}
-          >
-            <span className={`font-mono text-[11px] uppercase tracking-wide ${q.text} opacity-90`}>
-              {q.label} · {q.date}
-            </span>
-            <span className={`font-display text-lg leading-tight ${q.text}`}>
-              {(q.pct * 100).toFixed(0)}%
-            </span>
-          </div>
+          />
         ))}
       </div>
 
-      <div className="mt-2 flex w-full">
+      <div className="mt-5 grid grid-cols-2 gap-3">
         {QUARTERS.map((q, i) => (
           <div
             key={q.label}
-            ref={addAmount}
-            className="px-3 text-sm text-ink-soft tabular-nums"
-            style={{ flexGrow: q.pct, flexBasis: 0, opacity: 0 }}
+            ref={addCard}
+            className="rounded-lg border border-line/70 bg-surface/60 px-3 py-2.5"
+            style={{ opacity: 0 }}
           >
-            {money(USD_VALUES[i], "USD")}
-            <span className="text-ink-faint"> / </span>
-            {money(ZIG_VALUES[i], "ZIG")}
+            <div className="flex items-center gap-1.5">
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${q.fill}`} />
+              <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                {q.label} · {q.date}
+              </span>
+            </div>
+            <div className="mt-1 font-display text-xl leading-tight text-ink">
+              {(q.pct * 100).toFixed(0)}%
+            </div>
+            <div className="mt-1 text-[12px] leading-snug text-ink-soft tabular-nums">
+              {money(USD_VALUES[i], "USD")}
+              <span className="text-ink-faint"> / </span>
+              {money(ZIG_VALUES[i], "ZIG")}
+            </div>
           </div>
         ))}
-      </div>
-
-      <div className="mt-3 flex h-5 items-center justify-end gap-2">
-        <span ref={liveDotRef} className="aqs-live-dot" />
-        <span className="font-mono text-[11px] uppercase tracking-wide text-ink-faint">
-          Live preview
-        </span>
       </div>
 
       <style jsx>{`
@@ -207,25 +225,16 @@ export function AnimatedScheduleReveal() {
           background: linear-gradient(
             110deg,
             transparent 20%,
-            rgba(255, 255, 255, 0.16) 40%,
-            rgba(255, 255, 255, 0.28) 50%,
-            rgba(255, 255, 255, 0.16) 60%,
+            rgba(255, 255, 255, 0.35) 40%,
+            rgba(255, 255, 255, 0.55) 50%,
+            rgba(255, 255, 255, 0.35) 60%,
             transparent 80%
           );
           background-size: 220% 100%;
           animation: aqs-shimmer 5.2s ease-in-out infinite;
           mix-blend-mode: overlay;
         }
-        .aqs-live-dot {
-          display: inline-block;
-          width: 6px;
-          height: 6px;
-          border-radius: 9999px;
-          background: rgb(var(--color-ink-faint));
-          transition: background-color 0.3s ease;
-        }
-        .aqs-live-dot.aqs-live-on {
-          background: rgb(var(--color-usd));
+        .aqs-cap-dot.aqs-live-on {
           animation: aqs-pulse 1.8s ease-in-out infinite;
         }
         @keyframes aqs-shimmer {
@@ -239,10 +248,10 @@ export function AnimatedScheduleReveal() {
         @keyframes aqs-pulse {
           0%,
           100% {
-            box-shadow: 0 0 0 0 rgb(var(--color-usd) / 0.35);
+            box-shadow: 0 0 0 0 rgb(var(--color-ink) / 0.3);
           }
           50% {
-            box-shadow: 0 0 0 5px rgb(var(--color-usd) / 0);
+            box-shadow: 0 0 0 6px rgb(var(--color-ink) / 0);
           }
         }
         @media (prefers-reduced-motion: reduce) {
