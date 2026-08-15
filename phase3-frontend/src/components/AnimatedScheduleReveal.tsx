@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { money } from "@/lib/format";
 
 interface Quarter {
@@ -21,8 +21,12 @@ const QUARTERS: Quarter[] = [
 const USD_VALUES = [980, 2450, 2940, 3430];
 const ZIG_VALUES = [29600, 74000, 88800, 103600];
 
-const DURATION_MS = 3600;
-const REPLAY_KEY_STAGGER = 0;
+// One full breathing cycle: grow in -> hold (live) -> ease back down -> brief rest -> repeat.
+const GROW_MS = 2600;
+const HOLD_FULL_MS = 2400;
+const SHRINK_MS = 1500;
+const HOLD_EMPTY_MS = 500;
+const CYCLE_MS = GROW_MS + HOLD_FULL_MS + SHRINK_MS + HOLD_EMPTY_MS;
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
@@ -33,33 +37,32 @@ function seg(p: number, start: number, end: number): number {
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
 
 /**
- * AnimatedScheduleReveal - the colorful, autoplay-on-mount version of
- * "the actual schedule" card on the landing page.
+ * AnimatedScheduleReveal — a self-playing, infinitely looping visualization
+ * of "the actual schedule" card on the landing page.
  *
- * Plays automatically as soon as it mounts (no scroll interaction
- * required): a thin USD/ZiG stream converges toward the 50/50 cap point,
- * then the four QPD segments grow in using the app's real currency
- * colors (usd green -> zig gold across the quarter arc, matching the
- * legend used everywhere else in the product), then per-segment amounts
- * fade in. A ghost "Replay" button appears once it settles so a visitor
- * can watch it again without reloading the page.
+ * Runs a continuous breathing cycle with no user interaction and no replay
+ * control: a USD/ZiG stream converges on the 50/50 cap point, the four QPD
+ * segments grow in with the app's real currency colors, the per-segment
+ * amounts lift into view, everything holds for a beat with a soft
+ * "live preview" pulse and a light sheen sweep, then eases back down and
+ * starts again — forever, on its own.
  *
  * Respects prefers-reduced-motion by rendering the final settled frame
- * immediately with no animation.
+ * once, with no looping animation.
  */
 export function AnimatedScheduleReveal() {
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const capDotRef = useRef<HTMLDivElement | null>(null);
   const capLabelRef = useRef<HTMLSpanElement | null>(null);
   const segmentRefs = useRef<HTMLDivElement[]>([]);
   const amountRefs = useRef<HTMLDivElement[]>([]);
-
-  const [replayTick, setReplayTick] = useState(0);
-  const [settled, setSettled] = useState(false);
+  const liveDotRef = useRef<HTMLSpanElement | null>(null);
   const rafRef = useRef<number | null>(null);
-  const reducedMotionRef = useRef(false);
+  const wasFullRef = useRef(false);
 
   const addSegment = (el: HTMLDivElement | null) => {
     if (el && !segmentRefs.current.includes(el)) segmentRefs.current.push(el);
@@ -69,7 +72,7 @@ export function AnimatedScheduleReveal() {
   };
 
   useEffect(() => {
-    reducedMotionRef.current = window.matchMedia(
+    const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
@@ -89,47 +92,64 @@ export function AnimatedScheduleReveal() {
         const local = easeOutCubic(seg(p, start, start + 0.22));
         const pct = QUARTERS[i].pct * 100;
         el.style.flexGrow = String(pct * local || 0.001);
-        el.style.opacity = String(local > 0 ? 1 : 0);
+        el.style.opacity = String(local);
+        el.style.transform = `scaleY(${0.94 + 0.06 * local})`;
       });
 
       amountRefs.current.forEach((el, i) => {
         const start = 0.72 + i * 0.05;
-        el.style.opacity = String(seg(p, start, start + 0.15));
+        const local = seg(p, start, start + 0.18);
+        el.style.opacity = String(local);
+        el.style.transform = `translateY(${(1 - local) * 4}px)`;
       });
     };
 
-    if (reducedMotionRef.current) {
+    if (reducedMotion) {
       render(1);
-      setSettled(true);
       return;
     }
 
     const startTime = performance.now();
-    setSettled(false);
 
     const tick = (now: number) => {
-      const elapsed = now - startTime;
-      const p = clamp(elapsed / DURATION_MS, 0, 1);
-      render(p);
-      if (p < 1) {
-        rafRef.current = requestAnimationFrame(tick);
+      const elapsed = (now - startTime) % CYCLE_MS;
+      let p: number;
+      let isFull = false;
+
+      if (elapsed < GROW_MS) {
+        p = elapsed / GROW_MS;
+      } else if (elapsed < GROW_MS + HOLD_FULL_MS) {
+        p = 1;
+        isFull = true;
+      } else if (elapsed < GROW_MS + HOLD_FULL_MS + SHRINK_MS) {
+        const t = (elapsed - GROW_MS - HOLD_FULL_MS) / SHRINK_MS;
+        p = 1 - easeInOutCubic(t);
       } else {
-        setSettled(true);
+        p = 0;
       }
+
+      render(p);
+
+      if (isFull !== wasFullRef.current) {
+        wasFullRef.current = isFull;
+        liveDotRef.current?.classList.toggle("aqs-live-on", isFull);
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
 
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [replayTick]);
+  }, []);
 
   return (
-    <div ref={containerRef} className="w-full">
+    <div className="aqs-root w-full">
       <div className="relative mb-3 h-6">
         <div
           ref={capDotRef}
-          className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-ink"
+          className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-ink shadow-[0_0_0_4px_rgba(22,36,28,0.08)]"
           style={{ left: "28%", opacity: 0 }}
         />
         <span
@@ -141,8 +161,9 @@ export function AnimatedScheduleReveal() {
         </span>
       </div>
 
-      <div className="flex h-20 w-full overflow-hidden rounded-md border border-line">
-        {QUARTERS.map((q, i) => (
+      <div className="aqs-bar relative flex h-20 w-full overflow-hidden rounded-lg border border-line shadow-card">
+        <div className="aqs-sheen pointer-events-none absolute inset-0" />
+        {QUARTERS.map((q) => (
           <div
             key={q.label}
             ref={addSegment}
@@ -174,17 +195,62 @@ export function AnimatedScheduleReveal() {
         ))}
       </div>
 
-      <div className="mt-3 flex h-5 items-center justify-end">
-        {settled && (
-          <button
-            type="button"
-            onClick={() => setReplayTick((t) => t + REPLAY_KEY_STAGGER + 1)}
-            className="font-mono text-[11px] uppercase tracking-wide text-ink-faint transition hover:text-ink"
-          >
-            Replay
-          </button>
-        )}
+      <div className="mt-3 flex h-5 items-center justify-end gap-2">
+        <span ref={liveDotRef} className="aqs-live-dot" />
+        <span className="font-mono text-[11px] uppercase tracking-wide text-ink-faint">
+          Live preview
+        </span>
       </div>
+
+      <style jsx>{`
+        .aqs-sheen {
+          background: linear-gradient(
+            110deg,
+            transparent 20%,
+            rgba(255, 255, 255, 0.16) 40%,
+            rgba(255, 255, 255, 0.28) 50%,
+            rgba(255, 255, 255, 0.16) 60%,
+            transparent 80%
+          );
+          background-size: 220% 100%;
+          animation: aqs-shimmer 5.2s ease-in-out infinite;
+          mix-blend-mode: overlay;
+        }
+        .aqs-live-dot {
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          border-radius: 9999px;
+          background: rgb(var(--color-ink-faint));
+          transition: background-color 0.3s ease;
+        }
+        .aqs-live-dot.aqs-live-on {
+          background: rgb(var(--color-usd));
+          animation: aqs-pulse 1.8s ease-in-out infinite;
+        }
+        @keyframes aqs-shimmer {
+          0% {
+            background-position: 140% 0;
+          }
+          100% {
+            background-position: -60% 0;
+          }
+        }
+        @keyframes aqs-pulse {
+          0%,
+          100% {
+            box-shadow: 0 0 0 0 rgb(var(--color-usd) / 0.35);
+          }
+          50% {
+            box-shadow: 0 0 0 5px rgb(var(--color-usd) / 0);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .aqs-sheen {
+            animation: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }
