@@ -1,10 +1,13 @@
 import Link from "next/link";
+import HeroSequence from "@/components/HeroSequence";
 import { QuarterlyRhythm } from "@/components/QuarterlyRhythm";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-paper">
+      <HeroSequence />
+
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <Logo />
         <nav className="flex items-center gap-6">
