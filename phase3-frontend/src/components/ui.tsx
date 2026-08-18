@@ -65,9 +65,9 @@ export function Card({ children, className = "" }: { children: React.ReactNode; 
   );
 }
 
-export function Eyebrow({ children }: { children: React.ReactNode }) {
+export function Eyebrow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className="font-mono text-xs uppercase tracking-[0.15em] text-ink-faint">
+    <span className={`font-mono text-xs uppercase tracking-[0.15em] text-ink-faint ${className}`}>
       {children}
     </span>
   );

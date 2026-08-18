@@ -1,156 +1,622 @@
-import Link from "next/link";
-import { AnimatedScheduleReveal } from "@/components/AnimatedScheduleReveal";
-import { Button, Card, Eyebrow, Logo } from "@/components/ui";
+"use client";
 
-export default function LandingPage() {
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { AuthGuard } from "@/components/AuthGuard";
+import { TopBar } from "@/components/TopBar";
+import { CurrencyPairInput } from "@/components/CurrencyPairInput";
+import { ResultsPanel } from "@/components/ResultsPanel";
+import { PaymentTracker } from "@/components/PaymentTracker";
+import { NextPaymentDue } from "@/components/NextPaymentDue";
+import { downloadTaxSummaryPdf } from "@/lib/generatePdf";
+import { Badge, Button, Card, ChevronDown, ErrorNote, Eyebrow, Field, TrashIcon } from "@/components/ui";
+import { api } from "@/lib/api";
+import { formatDateTime, money } from "@/lib/format";
+import { Business, emptyExpenses, QpdCalculationOut, CurrencyExpensesIn } from "@/lib/types";
+
+function ConfirmPaymentBox({
+  calculation,
+  onConfirm,
+}: {
+  calculation: QpdCalculationOut;
+  onConfirm: (usdPaid: number, zigPaid: number) => Promise<void>;
+}) {
+  const [usd, setUsd] = useState(calculation.actual_usd_paid ?? calculation.result_json.net_payable_usd);
+  const [zig, setZig] = useState(calculation.actual_zig_paid ?? calculation.result_json.net_payable_zig);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await onConfirm(usd, zig);
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <Eyebrow>Confirm what you actually paid ZIMRA for Q{calculation.quarter}</Eyebrow>
+      <p className="mt-1 text-xs text-ink-faint">
+        This is what the next quarter&apos;s calculation nets against - it&apos;s pre-filled with the
+        calculated amount, but correct it if you paid a different amount, paid late, or ZIMRA adjusted it.
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-4">
+        <Field
+          label="Actual USD paid"
+          type="number"
+          step="0.01"
+          min={0}
+          value={usd}
+          onChange={(e) => setUsd(parseFloat(e.target.value) || 0)}
+        />
+        <Field
+          label="Actual ZiG paid"
+          type="number"
+          step="0.01"
+          min={0}
+          value={zig}
+          onChange={(e) => setZig(parseFloat(e.target.value) || 0)}
+        />
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <Button type="button" onClick={save} disabled={saving}>
+          {saving ? "Saving..." : "Confirm payment"}
+        </Button>
+        {saved && <span className="text-xs text-usd">Saved</span>}
+      </div>
+    </Card>
+  );
+}
+
+function BusinessContent({ businessId }: { businessId: string }) {
+  const [business, setBusiness] = useState<Business | null>(null);
+  const [calculations, setCalculations] = useState<QpdCalculationOut[]>([]);
+  const [selected, setSelected] = useState<QpdCalculationOut | null>(null);
+  const [error, setError] = useState("");
+
+  // History grouping/delete state. Years start collapsed except the most
+  // recent one, which is expanded the first time calculations load.
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+  const yearsInitialized = useRef(false);
+  const [confirmingDeleteCalcId, setConfirmingDeleteCalcId] = useState<string | null>(null);
+  const [deletingCalcId, setDeletingCalcId] = useState<string | null>(null);
+
+  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
+  const [quarter, setQuarter] = useState(1);
+  const [quarterLabel, setQuarterLabel] = useState("Q1");
+  const [usdSales, setUsdSales] = useState(0);
+  const [zigSales, setZigSales] = useState(0);
+  const [usdExpenses, setUsdExpenses] = useState<CurrencyExpensesIn>(emptyExpenses());
+  const [zigExpenses, setZigExpenses] = useState<CurrencyExpensesIn>(emptyExpenses());
+  const [calculating, setCalculating] = useState(false);
+
+  // Previous QPDs paid - left blank (null) lets the backend auto-sum
+  // whatever's been CONFIRMED paid in earlier quarters of this tax year
+  // for this business. Only fill these in to override that (e.g. this
+  // business's earlier quarters weren't calculated in this app).
+  const [prevPaidUsdOverride, setPrevPaidUsdOverride] = useState<number | "">("");
+  const [prevPaidZigOverride, setPrevPaidZigOverride] = useState<number | "">("");
+  const [showPrevPaidOverride, setShowPrevPaidOverride] = useState(false);
+
+  // Rate overrides - default to the business's saved rates, but editable per
+  // calculation since ZIMRA rates and the exchange rate both change during the year.
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+  const [taxRatePct, setTaxRatePct] = useState<number | null>(null);
+  const [aidsLevyPct, setAidsLevyPct] = useState<number | null>(null);
+  const [showRateSettings, setShowRateSettings] = useState(false);
+
+  async function loadAll() {
+    try {
+      const [b, calcs] = await Promise.all([
+        api.getBusiness(businessId),
+        api.listCalculations(businessId),
+      ]);
+      setBusiness(b);
+      setExchangeRate(b.default_exchange_rate);
+      setTaxRatePct(b.default_tax_rate * 100);
+      setAidsLevyPct(b.default_aids_levy_rate * 100);
+      setCalculations(calcs);
+      if (calcs.length > 0) setSelected(calcs[0]);
+      if (!yearsInitialized.current && calcs.length > 0) {
+        setExpandedYears(new Set([calcs[0].tax_year]));
+        yearsInitialized.current = true;
+      }
+    } catch {
+      setError("Couldn't load this business.");
+    }
+  }
+
+  useEffect(() => {
+    // Next.js reuses this component instance when navigating between
+    // businesses via the switcher (only the [businessId] param changes,
+    // no remount) - reset per-business UI state explicitly or it would
+    // leak across businesses.
+    yearsInitialized.current = false;
+    setExpandedYears(new Set());
+    setConfirmingDeleteCalcId(null);
+    setDeletingCalcId(null);
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId]);
+
+  // Calculations are already ordered by the API (tax_year desc, created_at
+  // desc), so same-year entries are contiguous - safe to fold into groups
+  // in a single pass without re-sorting on the client.
+  const groupedCalculations = useMemo(() => {
+    const groups: { year: number; items: QpdCalculationOut[] }[] = [];
+    for (const c of calculations) {
+      const current = groups[groups.length - 1];
+      if (current && current.year === c.tax_year) current.items.push(c);
+      else groups.push({ year: c.tax_year, items: [c] });
+    }
+    return groups;
+  }, [calculations]);
+
+  const latestCalculationId = calculations[0]?.id ?? null;
+
+  function toggleYear(year: number) {
+    setExpandedYears((prev) => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  }
+
+  async function onDeleteCalculation(calc: QpdCalculationOut) {
+    setDeletingCalcId(calc.id);
+    setError("");
+    try {
+      await api.deleteCalculation(businessId, calc.id);
+      setCalculations((prev) => {
+        const next = prev.filter((c) => c.id !== calc.id);
+        if (selected?.id === calc.id) setSelected(next[0] ?? null);
+        return next;
+      });
+      setConfirmingDeleteCalcId(null);
+    } catch {
+      setError("Couldn't delete that calculation. Try again in a moment.");
+    } finally {
+      setDeletingCalcId(null);
+    }
+  }
+
+  function updateExpense(
+    which: "usd" | "zig",
+    field: keyof CurrencyExpensesIn,
+    value: number
+  ) {
+    if (which === "usd") setUsdExpenses((prev) => ({ ...prev, [field]: value }));
+    else setZigExpenses((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function onCalculate(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setCalculating(true);
+    try {
+      const result = await api.createCalculation(businessId, {
+        tax_year: taxYear,
+        quarter_label: quarterLabel,
+        quarter,
+        usd_sales: usdSales,
+        zig_sales: zigSales,
+        usd_expenses: usdExpenses,
+        zig_expenses: zigExpenses,
+        exchange_rate: exchangeRate,
+        tax_rate: taxRatePct !== null ? taxRatePct / 100 : null,
+        aids_levy_rate: aidsLevyPct !== null ? aidsLevyPct / 100 : null,
+        previous_qpds_paid_usd: prevPaidUsdOverride === "" ? null : prevPaidUsdOverride,
+        previous_qpds_paid_zig: prevPaidZigOverride === "" ? null : prevPaidZigOverride,
+      });
+      // Re-fetch rather than prepend locally: the list must stay ordered by
+      // (tax_year desc, created_at desc) for the year-grouping above to
+      // stay correct, and a blind prepend would break that if the user
+      // calculates for an earlier tax year than what's already showing.
+      const refreshed = await api.listCalculations(businessId);
+      setCalculations(refreshed);
+      setSelected(result);
+      setExpandedYears((prev) => new Set(prev).add(result.tax_year));
+    } catch {
+      setError("Couldn't run that calculation. Check the figures and try again.");
+    } finally {
+      setCalculating(false);
+    }
+  }
+
+  async function onSavePayments(usdPaid: number[], zigPaid: number[]) {
+    if (!selected) return;
+    const updated = await api.applyPayments(businessId, selected.id, {
+      usd_paid: usdPaid,
+      zig_paid: zigPaid,
+    });
+    setSelected(updated);
+    setCalculations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+  }
+
+  async function onConfirmActualPayment(usdPaid: number, zigPaid: number) {
+    if (!selected) return;
+    const updated = await api.confirmActualPayment(businessId, selected.id, {
+      actual_usd_paid: usdPaid,
+      actual_zig_paid: zigPaid,
+    });
+    setSelected(updated);
+    setCalculations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+  }
+
+  if (!business) {
+    return (
+      <main className="min-h-screen bg-paper">
+        <TopBar />
+        <div className="mx-auto max-w-5xl px-6 py-12">
+          <ErrorNote>{error}</ErrorNote>
+          {!error && <p className="text-sm text-ink-faint">Loading...</p>}
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-paper">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <Logo />
-        <nav className="flex items-center gap-6">
-          <Link href="/tutorial" className="text-sm text-ink-soft hover:text-ink">
-            How it works
-          </Link>
-          <Link href="/learn" className="text-sm text-ink-soft hover:text-ink">
-            Know your taxes
-          </Link>
-          <Link href="/login" className="text-sm text-ink-soft hover:text-ink">
-            Log in
-          </Link>
-          <Link href="/register">
-            <Button variant="primary">Get started</Button>
-          </Link>
-        </nav>
-      </header>
+      <TopBar />
+      <div className="mx-auto max-w-5xl px-6 py-12">
+        <Eyebrow>Business</Eyebrow>
+        <h1 className="mt-1 font-display text-3xl text-ink">{business.name}</h1>
+        <p className="mt-1 text-sm text-ink-faint">
+          Default rate ZiG {business.default_exchange_rate} / USD · {(business.default_tax_rate * 100).toFixed(0)}% tax
+          + {(business.default_aids_levy_rate * 100).toFixed(0)}% AIDS levy
+        </p>
 
-      <section className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 pb-24 pt-8 md:grid-cols-2 md:gap-8">
-        <div className="flex flex-col justify-center">
-          <h1 className="font-display text-4xl leading-[1.05] text-ink md:text-5xl">
-            Your provisional tax isn&apos;t due in four equal chunks.
-          </h1>
-          <p className="mt-5 max-w-md text-ink-soft">
-            ZIMRA&apos;s QPD schedule front-loads almost nothing and back-loads
-            65% of the year&apos;s tax into September and December. Twelve C
-            calculates the split correctly - across USD and ZIG, with the
-            Public Notice 71 capping rule applied properly - so the number
-            you see is the number you owe.
-          </p>
-          <div className="mt-8 flex gap-3">
-            <Link href="/register">
-              <Button variant="primary">Calculate your QPD</Button>
-            </Link>
-            <Link href="/login">
-              <Button variant="secondary">I already have an account</Button>
-            </Link>
+        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
+          <div className="space-y-6">
+            <Card>
+              <Eyebrow>New QPD calculation</Eyebrow>
+              <form className="mt-4 space-y-4" onSubmit={onCalculate}>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field
+                    label="Tax year"
+                    type="number"
+                    required
+                    value={taxYear}
+                    onChange={(e) => setTaxYear(parseInt(e.target.value, 10) || taxYear)}
+                  />
+                  <div>
+                    <label className="block font-mono text-xs uppercase tracking-[0.1em] text-ink-faint">
+                      Quarter
+                    </label>
+                    <select
+                      className="mt-1 w-full rounded border border-line bg-surface px-3 py-2 text-sm text-ink"
+                      value={quarter}
+                      onChange={(e) => {
+                        const q = parseInt(e.target.value, 10);
+                        setQuarter(q);
+                        setQuarterLabel(`Q${q}`);
+                      }}
+                    >
+                      <option value={1}>QPD1 · due 25 March</option>
+                      <option value={2}>QPD2 · due 25 June</option>
+                      <option value={3}>QPD3 · due 25 September</option>
+                      <option value={4}>QPD4 · due 20 December</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    className="text-xs text-ink-faint underline underline-offset-2"
+                    onClick={() => setShowPrevPaidOverride((v) => !v)}
+                  >
+                    {showPrevPaidOverride ? "Hide" : "Override"} previous QPDs paid
+                  </button>
+                  {showPrevPaidOverride && (
+                    <div className="mt-2 grid grid-cols-2 gap-4 rounded border border-line p-3">
+                      <Field
+                        label="Prev. paid USD"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        emptyIfZero
+                        value={prevPaidUsdOverride}
+                        onChange={(e) =>
+                          setPrevPaidUsdOverride(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)
+                        }
+                        hint="Leave blank to auto-sum confirmed prior quarters"
+                      />
+                      <Field
+                        label="Prev. paid ZiG"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        emptyIfZero
+                        value={prevPaidZigOverride}
+                        onChange={(e) =>
+                          setPrevPaidZigOverride(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)
+                        }
+                        hint="Leave blank to auto-sum confirmed prior quarters"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Field
+                    label="USD sales"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    emptyIfZero
+                    value={usdSales}
+                    onChange={(e) => setUsdSales(parseFloat(e.target.value) || 0)}
+                  />
+                  <Field
+                    label="ZiG sales"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    emptyIfZero
+                    value={zigSales}
+                    onChange={(e) => setZigSales(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+
+                <div>
+                  <p className="mb-1 text-sm font-medium text-ink-soft">Deductions</p>
+                  <div className="rounded border border-line px-3">
+                    <CurrencyPairInput
+                      label="Cost of sales"
+                      usdValue={usdExpenses.cost_of_sales}
+                      zigValue={zigExpenses.cost_of_sales}
+                      onUsdChange={(v) => updateExpense("usd", "cost_of_sales", v)}
+                      onZigChange={(v) => updateExpense("zig", "cost_of_sales", v)}
+                    />
+                    <CurrencyPairInput
+                      label="Salaries"
+                      usdValue={usdExpenses.salaries}
+                      zigValue={zigExpenses.salaries}
+                      onUsdChange={(v) => updateExpense("usd", "salaries", v)}
+                      onZigChange={(v) => updateExpense("zig", "salaries", v)}
+                    />
+                    <CurrencyPairInput
+                      label="Other expenses"
+                      usdValue={usdExpenses.other_expenses}
+                      zigValue={zigExpenses.other_expenses}
+                      onUsdChange={(v) => updateExpense("usd", "other_expenses", v)}
+                      onZigChange={(v) => updateExpense("zig", "other_expenses", v)}
+                    />
+                    <CurrencyPairInput
+                      label="Capital allowances"
+                      usdValue={usdExpenses.capital_allowances}
+                      zigValue={zigExpenses.capital_allowances}
+                      onUsdChange={(v) => updateExpense("usd", "capital_allowances", v)}
+                      onZigChange={(v) => updateExpense("zig", "capital_allowances", v)}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded border border-line px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowRateSettings((s) => !s)}
+                    className="flex w-full items-center justify-between text-left text-sm font-medium text-ink-soft"
+                  >
+                    <span>
+                      Rate settings
+                      <span className="ml-2 font-mono text-xs font-normal text-ink-faint">
+                        ZiG {exchangeRate ?? "-"}/USD - {taxRatePct ?? "-"}% tax + {aidsLevyPct ?? "-"}% AIDS levy
+                      </span>
+                    </span>
+                    <span className="text-ink-faint">{showRateSettings ? "Hide" : "Edit"}</span>
+                  </button>
+
+                  {showRateSettings && (
+                    <div className="mt-3 grid grid-cols-3 gap-3 border-t border-line pt-3">
+                      <Field
+                        label="Exchange rate"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        hint="ZiG per USD"
+                        value={exchangeRate ?? ""}
+                        onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
+                      />
+                      <Field
+                        label="Tax rate"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        max={100}
+                        hint="% of taxable profit"
+                        value={taxRatePct ?? ""}
+                        onChange={(e) => setTaxRatePct(parseFloat(e.target.value) || 0)}
+                      />
+                      <Field
+                        label="AIDS levy"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        max={100}
+                        hint="% of tax payable"
+                        value={aidsLevyPct ?? ""}
+                        onChange={(e) => setAidsLevyPct(parseFloat(e.target.value) || 0)}
+                      />
+                      <p className="col-span-3 text-xs text-ink-faint">
+                        These carry over from this business&apos;s saved defaults. Change them here for a
+                        one-off recalculation (e.g. a new ZIMRA budget rate) without editing the business
+                        itself.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <ErrorNote>{error}</ErrorNote>
+                <Button type="submit" variant="primary" disabled={calculating}>
+                  {calculating ? "Calculating..." : "Calculate QPD"}
+                </Button>
+              </form>
+            </Card>
+
+            <Card>
+              <div className="flex items-center justify-between">
+                <Eyebrow>History</Eyebrow>
+                {calculations.length > 0 && (
+                  <span className="font-mono text-xs text-ink-faint">
+                    {calculations.length} {calculations.length === 1 ? "entry" : "entries"}
+                  </span>
+                )}
+              </div>
+
+              {calculations.length === 0 && (
+                <p className="mt-2 text-sm text-ink-faint">No calculations yet.</p>
+              )}
+
+              <div className="mt-3 space-y-2">
+                {groupedCalculations.map((group) => {
+                  const isExpanded = expandedYears.has(group.year);
+                  return (
+                    <div key={group.year} className="overflow-hidden rounded border border-line">
+                      <button
+                        type="button"
+                        onClick={() => toggleYear(group.year)}
+                        aria-expanded={isExpanded}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-left transition ${
+                          isExpanded ? "bg-paper" : "bg-surface hover:bg-paper"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="font-display text-base text-ink">{group.year}</span>
+                          <span className="rounded-full bg-ink-faint/15 px-2 py-0.5 font-mono text-[10px] text-ink-faint">
+                            {group.items.length}
+                          </span>
+                        </span>
+                        <ChevronDown open={isExpanded} />
+                      </button>
+
+                      {isExpanded && (
+                        <ul className="space-y-1 border-t border-line p-2">
+                          {group.items.map((c) => {
+                            const isSelected = selected?.id === c.id;
+                            const isLatest = c.id === latestCalculationId;
+                            const isConfirming = confirmingDeleteCalcId === c.id;
+
+                            if (isConfirming) {
+                              return (
+                                <li key={c.id}>
+                                  <div className="flex items-center justify-between gap-2 rounded bg-danger-soft px-3 py-2">
+                                    <span className="text-xs text-danger">
+                                      Delete this calculation? This can&apos;t be undone.
+                                    </span>
+                                    <div className="flex shrink-0 gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => onDeleteCalculation(c)}
+                                        disabled={deletingCalcId === c.id}
+                                        className="rounded bg-danger px-2 py-1 text-xs font-semibold text-paper disabled:opacity-50"
+                                      >
+                                        {deletingCalcId === c.id ? "Deleting..." : "Yes, delete"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmingDeleteCalcId(null)}
+                                        className="rounded border border-line px-2 py-1 text-xs text-ink-soft"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                </li>
+                              );
+                            }
+
+                            return (
+                              <li key={c.id}>
+                                <div
+                                  className={`flex items-center gap-1 rounded text-sm transition ${
+                                    isSelected ? "bg-usd-soft text-usd" : "text-ink-soft hover:bg-paper hover:text-ink"
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelected(c)}
+                                    className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-left"
+                                  >
+                                    <span className="flex min-w-0 flex-col items-start">
+                                      <span className="flex items-center gap-2">
+                                        <span className="truncate">{c.quarter_label}</span>
+                                        {isLatest && <Badge>Latest</Badge>}
+                                        {isSelected && <Badge variant="outline">Viewing</Badge>}
+                                      </span>
+                                      <span className="mt-0.5 font-mono text-[11px] text-ink-faint">
+                                        {formatDateTime(c.created_at)}
+                                      </span>
+                                    </span>
+                                    <span className="shrink-0 font-mono tabular-nums">
+                                      {money(c.result_json.total_tax_usd, "USD")}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmingDeleteCalcId(c.id)}
+                                    aria-label="Delete calculation"
+                                    className="mr-1.5 shrink-0 rounded p-1.5 text-ink-faint/60 transition hover:bg-danger-soft hover:text-danger"
+                                  >
+                                    <TrashIcon />
+                                  </button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            {selected ? (
+              <>
+                <div className="flex justify-end">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => downloadTaxSummaryPdf(business, selected)}
+                  >
+                    Download PDF summary
+                  </Button>
+                </div>
+                <NextPaymentDue calculation={selected} />
+                <ResultsPanel result={selected.result_json} taxYear={selected.tax_year} />
+                <ConfirmPaymentBox key={`confirm-${selected.id}`} calculation={selected} onConfirm={onConfirmActualPayment} />
+                <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
+              </>
+            ) : (
+              <Card>
+                <p className="text-sm text-ink-faint">
+                  Run a calculation on the left to see the breakdown and schedule here.
+                </p>
+              </Card>
+            )}
           </div>
         </div>
-
-        <div className="flex flex-col justify-center">
-          <Card>
-            <Eyebrow>The actual schedule</Eyebrow>
-            <div className="mt-4">
-              <AnimatedScheduleReveal />
-            </div>
-            <p className="mt-4 text-sm text-ink-faint">
-              10 / 25 / 30 / 35 - most businesses only notice how uneven this
-              is when Q3 arrives and the bill is triple what Q1 was.
-            </p>
-          </Card>
-        </div>
-      </section>
-
-      <section className="border-t border-line bg-surface py-20">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 md:grid-cols-3">
-          <Feature
-            icon={<CurrencyIcon />}
-            eyebrow="01 · Dual currency"
-            title="USD and ZIG, one calculation"
-            body="Enter sales and expenses in whichever currency they actually traded in. Twelve C applies the Public Notice 71 50/50 cap correctly - only when USD is the dominant currency, uncapped when ZIG dominates - instead of guessing."
-          />
-          <Feature
-            icon={<CalendarIcon />}
-            eyebrow="02 · Built for the deadline"
-            title="A schedule you can act on"
-            body="25 March, 25 June, 25 September, 20 December. Each instalment shows what's owed, what's paid, and what's still outstanding - no dead cell references, no silent zeroes."
-          />
-          <Feature
-            icon={<BuildingsIcon />}
-            eyebrow="03 · One business or several"
-            title="Every entity, one login"
-            body="Run more than one business through the same account, each with its own exchange rate and rate defaults, each calculation kept on record for when ZIMRA asks how you got the number."
-          />
-        </div>
-      </section>
-
-      <footer className="border-t border-line px-6 py-10">
-        <div className="mx-auto max-w-6xl">
-          <p className="text-xs text-ink-faint">
-            Twelve C is an independent calculator and is not affiliated with
-            the Zimbabwe Revenue Authority. Verify figures before filing.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-4 text-xs text-ink-soft">
-            <Link href="/legal/disclaimer" className="hover:text-ink">Disclaimer</Link>
-            <Link href="/legal/privacy-policy" className="hover:text-ink">Privacy Policy</Link>
-            <Link href="/legal/terms-of-service" className="hover:text-ink">Terms of Service</Link>
-          </div>
-        </div>
-      </footer>
+      </div>
     </main>
   );
 }
 
-function Feature({
-  icon,
-  eyebrow,
-  title,
-  body,
-}: {
-  icon: React.ReactNode;
-  eyebrow: string;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="border-t-2 border-ink pt-4">
-      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-usd-soft text-usd">
-        {icon}
-      </div>
-      <Eyebrow>{eyebrow}</Eyebrow>
-      <h3 className="mt-2 font-display text-xl text-ink">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-ink-soft">{body}</p>
-    </div>
-  );
-}
+export default function BusinessPage() {
+  const params = useParams<{ businessId: string }>();
+  const businessId = params.businessId;
 
-function CurrencyIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 7h13l-3.5-3.5" />
-      <path d="M4 7l3.5 3.5" />
-      <path d="M20 17H7l3.5-3.5" />
-      <path d="M20 17l-3.5 3.5" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="5" width="18" height="15" rx="2" />
-      <path d="M3 10h18" />
-      <path d="M8 3v4" />
-      <path d="M16 3v4" />
-      <circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function BuildingsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="10" width="6" height="10" />
-      <rect x="14" y="4" width="6" height="16" />
-      <path d="M6.5 13h1M6.5 16h1M16.5 7h1M16.5 10h1M16.5 13h1M16.5 16h1" />
-    </svg>
+    <AuthGuard>
+      <BusinessContent businessId={businessId} />
+    </AuthGuard>
   );
 }

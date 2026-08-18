@@ -2,6 +2,7 @@
   AccessTokenResponse,
   ApplyPaymentsRequest,
   Business,
+  ConfirmActualPaymentRequest,
   DeleteAccountRequest,
   MfaRequiredResponse,
   MfaSetupResponse,
@@ -213,6 +214,22 @@ export const api = {
     }),
   applyPayments: (businessId: string, calculationId: string, payload: ApplyPaymentsRequest) =>
     request<QpdCalculationOut>(`/businesses/${businessId}/qpd-calculations/${calculationId}/payments`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // Records what was genuinely paid to ZIMRA for a quarter - the next
+  // quarter's calculation auto-sums this (not the seeded estimate) to
+  // work out what's actually still owed.
+  confirmActualPayment: (businessId: string, calculationId: string, payload: ConfirmActualPaymentRequest) =>
+    request<QpdCalculationOut>(`/businesses/${businessId}/qpd-calculations/${calculationId}/confirm-payment`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // Records what was genuinely paid to ZIMRA for a quarter - the next
+  // quarter's calculation auto-sums this (not the seeded estimate) to
+  // work out what's actually still owed.
+  confirmActualPayment: (businessId: string, calculationId: string, payload: ConfirmActualPaymentRequest) =>
+    request<QpdCalculationOut>(`/businesses/${businessId}/qpd-calculations/${calculationId}/confirm-payment`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),

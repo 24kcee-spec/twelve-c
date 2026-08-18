@@ -36,6 +36,7 @@ class UserOut(BaseModel):
     is_active: bool
     is_verified: bool
     mfa_enabled: bool
+    has_password: bool
 
     model_config = {"from_attributes": True}
 
@@ -114,3 +115,8 @@ class GoogleAuthRequest(BaseModel):
     # The ID token returned by Google Identity Services on the frontend
     # (google.accounts.id.callback response.credential), NOT an access token.
     id_token: str
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str | None = None
+    totp_code: str | None = None

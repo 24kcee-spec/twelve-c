@@ -39,6 +39,7 @@ from app.models.user import User
 from app.schemas.auth import (
     AccessTokenResponse,
     ForgotPasswordRequest,
+    DeleteAccountRequest,
     GoogleAuthRequest,
     LoginRequest,
     MessageResponse,
@@ -463,3 +464,36 @@ async def mfa_disable(
     user.mfa_secret = None
     await db.commit()
     return {"mfa_enabled": False}
+
+# ---------------------------------------------------------------------------
+# Account deletion
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@limiter.limit("5/hour")
+async def delete_account(
+    request: Request,
+    response: Response,
+    payload: DeleteAccountRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Password accounts must re-confirm their password before deletion -
+    # a valid access token alone isn't enough for something irreversible.
+    if user.hashed_password is not None:
+        if not payload.password or not verify_password(payload.password, user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
+
+    # MFA-enabled accounts must also re-confirm a fresh TOTP code.
+    if user.mfa_enabled:
+        if not payload.totp_code or not verify_totp_code(user.mfa_secret, payload.totp_code):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
+
+    # Cascade deletes (set on the DB foreign keys) remove this user's
+    # businesses, calculations, and refresh tokens automatically.
+    await db.delete(user)
+    await db.commit()
+
+    _clear_refresh_cookie(response)
+    return None

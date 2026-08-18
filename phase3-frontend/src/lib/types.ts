@@ -60,6 +60,7 @@ export const emptyExpenses = (): CurrencyExpensesIn => ({
 export interface QpdCalculationCreate {
   tax_year: number;
   quarter_label: string;
+  quarter: number;
   usd_sales: number;
   zig_sales: number;
   usd_expenses: CurrencyExpensesIn;
@@ -67,6 +68,10 @@ export interface QpdCalculationCreate {
   exchange_rate?: number | null;
   tax_rate?: number | null;
   aids_levy_rate?: number | null;
+  // Leave both undefined to let the backend auto-sum confirmed prior-quarter
+  // payments for this business/tax_year. Only pass these to override that.
+  previous_qpds_paid_usd?: number | null;
+  previous_qpds_paid_zig?: number | null;
 }
 
 export interface QpdInstalmentOut {
@@ -98,6 +103,18 @@ export interface QpdResultJson {
   total_tax_usd: number;
   total_tax_zig: number;
   schedule: QpdInstalmentOut[];
+  // The actual amount owed THIS quarter - this is the headline figure,
+  // not `schedule`, which is a full-year projection at the current
+  // estimate and isn't netted against what's already been paid.
+  quarter: number;
+  due_date: string;
+  cumulative_percentage: number;
+  cumulative_due_usd: number;
+  cumulative_due_zig: number;
+  previous_paid_usd: number;
+  previous_paid_zig: number;
+  net_payable_usd: number;
+  net_payable_zig: number;
 }
 
 export interface QpdCalculationOut {
@@ -105,14 +122,22 @@ export interface QpdCalculationOut {
   business_id: string;
   tax_year: number;
   quarter_label: string;
+  quarter: number;
   input_json: QpdCalculationCreate;
   result_json: QpdResultJson;
+  actual_usd_paid: number | null;
+  actual_zig_paid: number | null;
   created_at: string;
 }
 
 export interface ApplyPaymentsRequest {
   usd_paid: number[];
   zig_paid: number[];
+}
+
+export interface ConfirmActualPaymentRequest {
+  actual_usd_paid: number;
+  actual_zig_paid: number;
 }
 
 export class ApiError extends Error {

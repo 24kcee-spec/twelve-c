@@ -52,6 +52,44 @@ sites quoting a stale 24%+3%=24.72% figure. Re-verify on ZIMRA's site (or
 the TaRMS portal) at the start of each tax year, since rates change via
 annual budget/public notice. Both rates are exposed as parameters, not
 hardcoded, so a rate change is a one-line default update, not a rebuild.
+
+5. CUMULATIVE QPD LOGIC (added - this is the actual bug the workbook had):
+
+   The workbook (and this engine, until now) computed one annual tax
+   estimate and sliced it into four INDEPENDENT flat shares (10/25/30/35%
+   of ONE number, entered once). That's only correct if a business's
+   estimate never changes all year. It's not how ZIMRA actually requires
+   QPDs to work.
+
+   ZIMRA's own guidance (FAQ "How do you calculate amounts paid on QPD",
+   public-notice 19/2023, and multiple 2025/2026 practitioner writeups)
+   is explicit: "The annual estimated tax due should be revised to update
+   the estimate every quarter... the actual amount due at the quarter must
+   be arrived at after deducting the QPDs already paid from the amount
+   due." That's a CUMULATIVE calculation against your CURRENT best
+   estimate, netted against what was actually remitted in prior quarters -
+   not four independent slices of a number frozen at Q1.
+
+   Concretely, for quarter N with cumulative percentage C(N):
+     C(1)=10%, C(2)=35%, C(3)=65%, C(4)=100%
+     net_payable(N) = max(0, total_tax(current estimate) * C(N) - sum of
+                              QPDs ACTUALLY PAID in quarters 1..N-1)
+
+   `calculate_qpd()` now takes `quarter` and `previous_qpds_paid_usd/zig`
+   and returns `net_payable_usd/zig` - the one number that's actually owed
+   right now - alongside the existing `schedule`, which is kept as a
+   full-year PROJECTION ("if this estimate holds for the rest of the
+   year, here's roughly how the remaining quarters would land") and must
+   never be presented as a bill for a future quarter.
+
+   Backward compatibility: when an estimate never changes between
+   quarters and every quarter is paid in full and on time,
+   net_payable(N) equals the old flat-share table exactly (verified: with
+   total_tax=12.875, feeding each quarter's own cumulative due back in as
+   "previous paid" reproduces 1.2875 / 3.21875 / 3.8625 / 4.50625 to the
+   last decimal). The new fields default to quarter=1 and zero prior
+   payments, so every existing caller that doesn't pass them gets
+   identical output to before.
 """
 
 from __future__ import annotations
@@ -66,6 +104,23 @@ from decimal import Decimal, ROUND_HALF_UP, getcontext
 getcontext().prec = 50
 
 _CENTS = Decimal("0.01")
+
+# Cumulative percentage of the annual estimate due BY (not AT) each QPD,
+# per ZIMRA's published schedule (10/25/30/35% quarterly shares, read
+# cumulatively: 10%, 10+25=35%, 35+30=65%, 65+35=100%).
+QUARTER_CUMULATIVE_PERCENTAGE: dict[int, Decimal] = {
+    1: Decimal("0.10"),
+    2: Decimal("0.35"),
+    3: Decimal("0.65"),
+    4: Decimal("1.00"),
+}
+
+QUARTER_DUE_DATES: dict[int, str] = {
+    1: "25 March",
+    2: "25 June",
+    3: "25 September",
+    4: "20 December",
+}
 
 
 def _d(value: float | int | str | Decimal) -> Decimal:
@@ -134,6 +189,19 @@ class QpdInput:
     tax_rate: float = 0.25       # ZIMRA corporate tax rate
     aids_levy_rate: float = 0.03  # charged on tax payable, not on income
 
+    # Which QPD this calculation is FOR (1=March, 2=June, 3=September,
+    # 4=December). Drives the cumulative-percentage lookup below.
+    quarter: int = 1
+
+    # What was ACTUALLY remitted to ZIMRA for this business/tax year in
+    # every quarter BEFORE this one, combined. Use real payment amounts,
+    # not the previously-calculated theoretical figures - if a business
+    # revised its estimate or under/overpaid, those are what ZIMRA
+    # actually holds on account, and that's what this quarter's payment
+    # must net against.
+    previous_qpds_paid_usd: float = 0.0
+    previous_qpds_paid_zig: float = 0.0
+
 
 @dataclass
 class QpdInstalment:
@@ -173,6 +241,17 @@ class QpdResult:
     total_tax_zig: float
     schedule: list[QpdInstalment]
 
+    # --- The actual amount owed THIS quarter (the headline figure) ---
+    quarter: int
+    due_date: str
+    cumulative_percentage: float
+    cumulative_due_usd: float
+    cumulative_due_zig: float
+    previous_paid_usd: float
+    previous_paid_zig: float
+    net_payable_usd: float
+    net_payable_zig: float
+
 
 def calculate_qpd(data: QpdInput) -> QpdResult:
     exchange_rate = _d(data.exchange_rate)
@@ -186,6 +265,14 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
 
     tax_rate = _d(data.tax_rate)
     aids_levy_rate = _d(data.aids_levy_rate)
+
+    if data.quarter not in QUARTER_CUMULATIVE_PERCENTAGE:
+        raise ValueError("quarter must be 1, 2, 3, or 4")
+
+    previous_paid_usd = _d(data.previous_qpds_paid_usd)
+    previous_paid_zig = _d(data.previous_qpds_paid_zig)
+    if previous_paid_usd < 0 or previous_paid_zig < 0:
+        raise ValueError("previous_qpds_paid_usd/zig cannot be negative")
 
     ZERO = Decimal(0)
     HALF = Decimal("0.5")
@@ -278,6 +365,16 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
         QpdInstalment("Q4 - 20 December", 0.35, _money(total_tax_usd * Decimal("0.35")), _money(total_tax_zig * Decimal("0.35"))),
     ]
 
+    # --- Cumulative amount actually due THIS quarter (fixes the workbook's
+    # flat-share bug: see module docstring section 5). Uses the CURRENT
+    # estimate's total_tax, cumulative-to-date, minus what was genuinely
+    # paid in prior quarters - not a fixed slice of a number frozen at Q1. ---
+    cumulative_pct = QUARTER_CUMULATIVE_PERCENTAGE[data.quarter]
+    cumulative_due_usd = total_tax_usd * cumulative_pct
+    cumulative_due_zig = total_tax_zig * cumulative_pct
+    net_payable_usd = max(ZERO, cumulative_due_usd - previous_paid_usd)
+    net_payable_zig = max(ZERO, cumulative_due_zig - previous_paid_zig)
+
     return QpdResult(
         usd_ratio=float(usd_ratio),
         zig_ratio=float(zig_ratio),
@@ -296,6 +393,15 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
         total_tax_usd=float(total_tax_usd),
         total_tax_zig=float(total_tax_zig),
         schedule=schedule,
+        quarter=data.quarter,
+        due_date=QUARTER_DUE_DATES[data.quarter],
+        cumulative_percentage=float(cumulative_pct),
+        cumulative_due_usd=_money(cumulative_due_usd),
+        cumulative_due_zig=_money(cumulative_due_zig),
+        previous_paid_usd=_money(previous_paid_usd),
+        previous_paid_zig=_money(previous_paid_zig),
+        net_payable_usd=_money(net_payable_usd),
+        net_payable_zig=_money(net_payable_zig),
     )
 
 

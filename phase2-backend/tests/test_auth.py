@@ -32,10 +32,13 @@ async def test_register_rejects_weak_password(client):
     assert r.status_code == 422
 
 
-async def test_register_and_login_returns_token_pair(client):
+async def test_register_and_login_returns_access_token(client):
     tokens = await _register_and_login(client)
     assert "access_token" in tokens
-    assert "refresh_token" in tokens
+    # The refresh token now lives in an httpOnly cookie, not the JSON body -
+    # that's intentional, so JS can never read it directly.
+    assert "refresh_token" not in tokens
+    assert "refresh_token" in client.cookies
 
 
 async def test_unverified_user_cannot_login(client):
@@ -109,23 +112,30 @@ async def test_mfa_login_rejects_bad_code(client):
 
 
 async def test_refresh_token_rotation(client):
-    tokens = await _register_and_login(client, email="rot@example.com")
-    r = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
-    assert r.status_code == 200
-    new_tokens = r.json()
-    assert new_tokens["refresh_token"] != tokens["refresh_token"]
+    await _register_and_login(client, email="rot@example.com")
 
-    # Old refresh token must now be dead (rotation).
-    reuse = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    # httpx carries the httpOnly cookie automatically - no body needed.
+    old_cookie = client.cookies.get("refresh_token")
+    assert old_cookie is not None
+
+    r = await client.post("/auth/refresh")
+    assert r.status_code == 200
+    new_cookie = client.cookies.get("refresh_token")
+    assert new_cookie != old_cookie
+
+    # Old refresh token must now be dead (rotation) - force the old cookie
+    # back in explicitly, since the client has already moved on to the new one.
+    reuse = await client.post("/auth/refresh", cookies={"refresh_token": old_cookie})
     assert reuse.status_code == 401
 
 
 async def test_logout_revokes_refresh_token(client):
-    tokens = await _register_and_login(client, email="logout@example.com")
-    r = await client.post("/auth/logout", json={"refresh_token": tokens["refresh_token"]})
+    await _register_and_login(client, email="logout@example.com")
+
+    r = await client.post("/auth/logout")
     assert r.status_code == 204
 
-    r = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    r = await client.post("/auth/refresh")
     assert r.status_code == 401
 
 
