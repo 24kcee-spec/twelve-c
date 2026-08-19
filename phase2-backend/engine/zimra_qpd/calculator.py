@@ -90,6 +90,16 @@ hardcoded, so a rate change is a one-line default update, not a rebuild.
    last decimal). The new fields default to quarter=1 and zero prior
    payments, so every existing caller that doesn't pass them gets
    identical output to before.
+
+6. ASSESSED LOSSES + WITHHOLDING TAX CREDITS (new):
+   `assessed_loss_usd/zig` reduces taxable profit (the base tax is
+   computed on) before tax_payable/aids_levy are calculated, so a loss
+   correctly shrinks both. `withholding_credits_usd/zig` is netted off
+   the cumulative amount due at every quarter checkpoint, the same way
+   previous_qpds_paid already is - it represents tax ZIMRA already holds
+   against this business (e.g. clients withheld 30% for lack of an
+   ITF263 clearance), not a percentage-scaled discount. Both default to
+   0.0, so every existing caller is unaffected.
 """
 
 from __future__ import annotations
@@ -202,6 +212,15 @@ class QpdInput:
     previous_qpds_paid_usd: float = 0.0
     previous_qpds_paid_zig: float = 0.0
 
+    # Optional annual adjustments (all default to 0.0 -> byte-for-byte
+    # identical behaviour to every existing caller; only affects output
+    # when a business actually has one of these). New in this revision -
+    # see calculate_qpd() for exactly where each is applied.
+    assessed_loss_usd: float = 0.0        # prior-year assessed tax loss b/f, USD
+    assessed_loss_zig: float = 0.0        # prior-year assessed tax loss b/f, ZIG
+    withholding_credits_usd: float = 0.0  # WHT already suffered (e.g. no ITF263), USD
+    withholding_credits_zig: float = 0.0  # WHT already suffered (e.g. no ITF263), ZIG
+
 
 @dataclass
 class QpdInstalment:
@@ -271,6 +290,17 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
 
     previous_paid_usd = _d(data.previous_qpds_paid_usd)
     previous_paid_zig = _d(data.previous_qpds_paid_zig)
+    assessed_loss_usd_in = _d(data.assessed_loss_usd)
+    assessed_loss_zig_in = _d(data.assessed_loss_zig)
+    withholding_credits_usd_in = _d(data.withholding_credits_usd)
+    withholding_credits_zig_in = _d(data.withholding_credits_zig)
+    if (
+        assessed_loss_usd_in < 0
+        or assessed_loss_zig_in < 0
+        or withholding_credits_usd_in < 0
+        or withholding_credits_zig_in < 0
+    ):
+        raise ValueError("assessed_loss_usd/zig and withholding_credits_usd/zig cannot be negative")
     if previous_paid_usd < 0 or previous_paid_zig < 0:
         raise ValueError("previous_qpds_paid_usd/zig cannot be negative")
 
@@ -345,6 +375,14 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
     taxable_profit_usd = max(ZERO, adjusted_income_usd - adjusted_deductions_usd)
     taxable_profit_zig = max(ZERO, adjusted_income_zig - adjusted_deductions_zig)
 
+    # --- Assessed losses b/f (new) ---
+    # Reduces the taxable BASE before tax is computed on it, not a credit
+    # bolted onto the tax figure afterward - so it correctly flows through
+    # into a smaller AIDS levy too (3% of a smaller tax_payable), exactly
+    # as ZIMRA's own ITF12C treats a loss carried forward.
+    taxable_profit_usd = max(ZERO, taxable_profit_usd - assessed_loss_usd_in)
+    taxable_profit_zig = max(ZERO, taxable_profit_zig - assessed_loss_zig_in)
+
     # --- Tax payable + AIDS levy (ITF12C rows 31-33) ---
     tax_payable_usd = taxable_profit_usd * tax_rate
     tax_payable_zig = taxable_profit_zig * tax_rate
@@ -372,8 +410,13 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
     cumulative_pct = QUARTER_CUMULATIVE_PERCENTAGE[data.quarter]
     cumulative_due_usd = total_tax_usd * cumulative_pct
     cumulative_due_zig = total_tax_zig * cumulative_pct
-    net_payable_usd = max(ZERO, cumulative_due_usd - previous_paid_usd)
-    net_payable_zig = max(ZERO, cumulative_due_zig - previous_paid_zig)
+    # Withholding tax credits (new): WHT already suffered this tax year
+    # (e.g. a client withheld 30% for lack of an ITF263 tax clearance) is
+    # tax ZIMRA already holds on your account, so it's netted off exactly
+    # like previous_qpds_paid - a flat reduction against the cumulative
+    # due at every checkpoint, not prorated by the quarter's percentage.
+    net_payable_usd = max(ZERO, cumulative_due_usd - previous_paid_usd - withholding_credits_usd_in)
+    net_payable_zig = max(ZERO, cumulative_due_zig - previous_paid_zig - withholding_credits_zig_in)
 
     return QpdResult(
         usd_ratio=float(usd_ratio),

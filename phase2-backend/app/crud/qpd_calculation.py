@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import dataclasses
 import uuid
@@ -80,6 +80,10 @@ async def _build_engine_input(
         quarter=data.quarter,
         previous_qpds_paid_usd=prev_usd,
         previous_qpds_paid_zig=prev_zig,
+        assessed_loss_usd=data.assessed_loss_usd,
+        assessed_loss_zig=data.assessed_loss_zig,
+        withholding_credits_usd=data.withholding_credits_usd,
+        withholding_credits_zig=data.withholding_credits_zig,
     )
 
 

@@ -72,6 +72,17 @@ export interface QpdCalculationCreate {
   // payments for this business/tax_year. Only pass these to override that.
   previous_qpds_paid_usd?: number | null;
   previous_qpds_paid_zig?: number | null;
+
+  // Prior-year assessed tax loss carried forward - reduces the taxable base
+  // before tax is computed, not a credit against tax already computed.
+  assessed_loss_usd?: number;
+  assessed_loss_zig?: number;
+
+  // Withholding tax already suffered this tax year (e.g. a client withheld
+  // 30% for lack of an ITF263 clearance) - netted off the cumulative amount
+  // due, the same way previous_qpds_paid is.
+  withholding_credits_usd?: number;
+  withholding_credits_zig?: number;
 }
 
 export interface QpdInstalmentOut {
@@ -138,6 +149,42 @@ export interface ApplyPaymentsRequest {
 export interface ConfirmActualPaymentRequest {
   actual_usd_paid: number;
   actual_zig_paid: number;
+}
+
+// --- Capital asset register ---
+
+export type AssetCategory =
+  | "commercial_building"
+  | "industrial_farm_building"
+  | "motor_vehicle"
+  | "machinery_other";
+
+export const ASSET_CATEGORY_LABELS: Record<AssetCategory, string> = {
+  commercial_building: "Commercial building (2.5% W&T)",
+  industrial_farm_building: "Industrial / farm building (5% W&T)",
+  motor_vehicle: "Motor vehicle (20% W&T)",
+  machinery_other: "Machinery & other movable assets (10% W&T)",
+};
+
+export interface CapitalAssetCreate {
+  description: string;
+  category: AssetCategory;
+  cost_usd: number;
+  cost_zig: number;
+  year_acquired: number;
+  elect_sia: boolean;
+}
+
+export interface CapitalAssetOut extends CapitalAssetCreate {
+  id: string;
+  business_id: string;
+  created_at: string;
+}
+
+export interface CapitalAllowanceTotals {
+  tax_year: number;
+  total_allowance_usd: number;
+  total_allowance_zig: number;
 }
 
 export class ApiError extends Error {

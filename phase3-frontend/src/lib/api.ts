@@ -1,7 +1,10 @@
-﻿import {
+import {
   AccessTokenResponse,
   ApplyPaymentsRequest,
   Business,
+  CapitalAllowanceTotals,
+  CapitalAssetCreate,
+  CapitalAssetOut,
   ConfirmActualPaymentRequest,
   DeleteAccountRequest,
   MfaRequiredResponse,
@@ -225,14 +228,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  // Records what was genuinely paid to ZIMRA for a quarter - the next
-  // quarter's calculation auto-sums this (not the seeded estimate) to
-  // work out what's actually still owed.
-  confirmActualPayment: (businessId: string, calculationId: string, payload: ConfirmActualPaymentRequest) =>
-    request<QpdCalculationOut>(`/businesses/${businessId}/qpd-calculations/${calculationId}/confirm-payment`, {
+  deleteCalculation: (businessId: string, calculationId: string) =>
+    request<void>(`/businesses/${businessId}/qpd-calculations/${calculationId}`, { method: "DELETE" }),
+
+  // --- Capital asset register ---
+  listAssets: (businessId: string) => request<CapitalAssetOut[]>(`/businesses/${businessId}/assets`),
+  createAsset: (businessId: string, payload: CapitalAssetCreate) =>
+    request<CapitalAssetOut>(`/businesses/${businessId}/assets`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  deleteCalculation: (businessId: string, calculationId: string) =>
-    request<void>(`/businesses/${businessId}/qpd-calculations/${calculationId}`, { method: "DELETE" }),
+  deleteAsset: (businessId: string, assetId: string) =>
+    request<void>(`/businesses/${businessId}/assets/${assetId}`, { method: "DELETE" }),
+  getAllowanceTotals: (businessId: string, taxYear: number) =>
+    request<CapitalAllowanceTotals>(`/businesses/${businessId}/assets/allowance?tax_year=${taxYear}`),
 };

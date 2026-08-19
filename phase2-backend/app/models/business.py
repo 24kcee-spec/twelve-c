@@ -40,3 +40,6 @@ class Business(Base):
     calculations: Mapped[list["QpdCalculation"]] = relationship(  # noqa: F821
         back_populates="business", cascade="all, delete-orphan"
     )
+    capital_assets: Mapped[list["CapitalAsset"]] = relationship(  # noqa: F821
+        back_populates="business", cascade="all, delete-orphan"
+    )
