@@ -1,4 +1,4 @@
-export interface UserOut {
+﻿export interface UserOut {
   id: string;
   email: string;
   is_active: boolean;
@@ -26,6 +26,7 @@ export interface MfaRequiredResponse {
 export interface MfaSetupResponse {
   provisioning_uri: string;
   qr_code_data_uri: string;
+  secret: string;
 }
 
 export interface DeleteAccountRequest {

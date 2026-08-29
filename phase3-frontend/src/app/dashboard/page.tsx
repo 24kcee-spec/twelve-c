@@ -7,7 +7,72 @@ import { TopBar } from "@/components/TopBar";
 import { OverdueDigest, DigestItem } from "@/components/OverdueDigest";
 import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
 import { api } from "@/lib/api";
-import { Business } from "@/lib/types";
+import { Business, QpdCalculationOut } from "@/lib/types";
+import { money } from "@/lib/format";
+
+const QUARTER_DATES = [
+  { month: 2, day: 25 }, // Q1 - 25 March
+  { month: 5, day: 25 }, // Q2 - 25 June
+  { month: 8, day: 25 }, // Q3 - 25 September
+  { month: 11, day: 20 }, // Q4 - 20 December
+];
+
+function startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+interface NextDueBadge {
+  tone: "danger" | "warn" | "ok";
+  label: string;
+  amount: string | null;
+}
+
+// Compact version of the logic in NextPaymentDue/OverdueDigest, sized for a
+// one-line badge on each dashboard business card rather than a full panel.
+function nextDueBadge(calc: QpdCalculationOut | null | undefined): NextDueBadge | null {
+  if (!calc) return null;
+  const today = startOfDay(new Date());
+  const withDates = calc.result_json.schedule.map((inst, i) => {
+    const { month, day } = QUARTER_DATES[i];
+    return {
+      ...inst,
+      date: new Date(calc.tax_year, month, day),
+      paid: inst.usd_balance <= 0.01 && inst.zig_balance <= 0.01,
+    };
+  });
+
+  const overdue = withDates.filter((i) => !i.paid && i.date < today);
+  if (overdue.length > 0) {
+    const usdOwed = overdue.reduce((s, i) => s + i.usd_balance, 0);
+    const zigOwed = overdue.reduce((s, i) => s + i.zig_balance, 0);
+    return {
+      tone: "danger",
+      label: overdue.length === 1 ? "1 instalment overdue" : `${overdue.length} instalments overdue`,
+      amount: `${money(usdOwed, "USD")} / ${money(zigOwed, "ZIG")}`,
+    };
+  }
+
+  const upcoming = withDates
+    .filter((i) => !i.paid && i.date >= today)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  if (upcoming.length > 0) {
+    const next = upcoming[0];
+    const days = Math.round((next.date.getTime() - today.getTime()) / 86400000);
+    return {
+      tone: days <= 14 ? "warn" : "ok",
+      label: days === 0 ? "Due today" : `Due in ${days}d`,
+      amount: `${money(next.usd_balance, "USD")} / ${money(next.zig_balance, "ZIG")}`,
+    };
+  }
+
+  return { tone: "ok", label: "All instalments paid", amount: null };
+}
+
+const BADGE_STYLES: Record<NextDueBadge["tone"], string> = {
+  danger: "border-danger/30 bg-danger-soft text-danger",
+  warn: "border-zig/40 bg-zig-soft text-zig",
+  ok: "border-usd/30 bg-usd-soft text-usd",
+};
 
 function DashboardContent() {
   const [businesses, setBusinesses] = useState<Business[] | null>(null);
@@ -62,6 +127,8 @@ function DashboardContent() {
       setDeletingId(null);
     }
   }
+
+  const calcByBusiness = new Map(digestItems.map((d) => [d.business.id, d.latestCalc]));
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -153,10 +220,24 @@ function DashboardContent() {
               </p>
             </Card>
           )}
-          {businesses?.map((b) => (
+          {businesses?.map((b) => {
+            const badge = nextDueBadge(calcByBusiness.get(b.id));
+            return (
             <Card key={b.id} className="h-full transition hover:border-usd">
               <Link href={`/dashboard/${b.id}`}>
-                <h3 className="font-display text-lg text-ink">{b.name}</h3>
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-display text-lg text-ink">{b.name}</h3>
+                  {badge && (
+                    <span
+                      className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ${BADGE_STYLES[badge.tone]}`}
+                    >
+                      {badge.label}
+                    </span>
+                  )}
+                </div>
+                {badge?.amount && (
+                  <p className="mt-1 font-mono text-sm tabular-nums text-ink-soft">{badge.amount}</p>
+                )}
                 <dl className="mt-3 space-y-1 text-sm text-ink-soft">
                   <div className="flex justify-between">
                     <dt>Exchange rate</dt>
@@ -205,7 +286,8 @@ function DashboardContent() {
                 )}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       </div>
     </main>

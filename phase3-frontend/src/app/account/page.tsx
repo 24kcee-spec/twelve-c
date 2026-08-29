@@ -16,6 +16,7 @@ function AccountContent() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [secretCopied, setSecretCopied] = useState(false);
 
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
@@ -132,9 +133,25 @@ function AccountContent() {
                 alt="Scan this QR code with your authenticator app"
                 className="h-40 w-40 rounded border border-line"
               />
-              <p className="text-xs text-ink-faint break-all">
-                Can&apos;t scan? Enter this manually: {setup.provisioning_uri}
-              </p>
+              <div>
+                <p className="text-xs text-ink-faint">Can&apos;t scan? Enter this key manually:</p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <code className="flex-1 break-all rounded border border-line bg-surface px-3 py-2 font-mono text-sm tracking-wider text-ink">
+                    {setup.secret.match(/.{1,4}/g)?.join(" ") ?? setup.secret}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(setup.secret);
+                      setSecretCopied(true);
+                      setTimeout(() => setSecretCopied(false), 2000);
+                    }}
+                    className="shrink-0 rounded border border-line px-3 py-2 text-xs font-semibold text-ink-soft transition hover:border-usd hover:text-usd"
+                  >
+                    {secretCopied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              </div>
               <form className="flex items-end gap-3" onSubmit={confirmSetup}>
                 <Field
                   label="6-digit code"

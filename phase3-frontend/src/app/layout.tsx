@@ -27,6 +27,11 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  // Required for openGraph/twitter image and canonical URLs to resolve to
+  // absolute addresses instead of Next.js warning and falling back to
+  // localhost at build time. Set NEXT_PUBLIC_SITE_URL on Vercel; falls back
+  // to the production domain so local builds don't warn either.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://twelve-c.vercel.app"),
   title: "Twelve C | ZIMRA provisional tax, calculated properly",
   description:
     "Calculate, file, and track your ZIMRA Quarterly Payment Date provisional tax across USD and ZIG in one place, named for the ITF12C form it replaces.",
