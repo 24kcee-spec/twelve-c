@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
@@ -12,6 +14,7 @@ from app.models.user import User
 from app.schemas.business import BusinessCreate, BusinessOut, BusinessUpdate
 
 router = APIRouter(prefix="/businesses", tags=["businesses"])
+logger = logging.getLogger("twelvec")
 
 
 async def _get_owned_business_or_404(db: AsyncSession, user: User, business_id: uuid.UUID):
@@ -56,4 +59,12 @@ async def delete_business(
     business_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     business = await _get_owned_business_or_404(db, user, business_id)
-    await business_crud.delete_business(db, business)
+    try:
+        await business_crud.delete_business(db, business)
+    except IntegrityError:
+        await db.rollback()
+        logger.exception("Business deletion blocked by a foreign key constraint for business %s", business_id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Couldn't delete this business because some linked data is still attached. Please try again.",
+        )

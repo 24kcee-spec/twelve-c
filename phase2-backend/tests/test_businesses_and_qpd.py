@@ -84,3 +84,67 @@ async def test_qpd_calculation_requires_ownership(client):
     payload = {"tax_year": 2026, "quarter_label": "Q1", "usd_sales": 1000, "zig_sales": 0}
     r = await client.post(f"/businesses/{business_id}/qpd-calculations", headers=headers_b, json=payload)
     assert r.status_code == 404
+
+
+async def test_delete_business_cascades_calculations_and_assets(client):
+    """Regression test: deleting a business with saved QPD calculations and
+    capital assets must actually succeed (204), not 500. This is what was
+    silently broken - the ORM cascade wasn't the problem in SQLite, but this
+    test locks in the passive_deletes fix so it can never regress here."""
+    headers = await _auth_headers(client, "delete-me@example.com")
+
+    r = await client.post("/businesses", headers=headers, json={"name": "Doomed Co"})
+    assert r.status_code == 201
+    business_id = r.json()["id"]
+
+    calc_payload = {
+        "tax_year": 2026,
+        "quarter_label": "Q1",
+        "usd_sales": 1000,
+        "zig_sales": 0,
+        "usd_expenses": {"cost_of_sales": 0, "salaries": 0, "other_expenses": 0, "capital_allowances": 0},
+        "zig_expenses": {"cost_of_sales": 0, "salaries": 0, "other_expenses": 0, "capital_allowances": 0},
+    }
+    r = await client.post(f"/businesses/{business_id}/qpd-calculations", headers=headers, json=calc_payload)
+    assert r.status_code == 201, r.text
+
+    asset_payload = {
+        "description": "Delivery van",
+        "category": "motor_vehicle",
+        "cost_usd": 15000,
+        "cost_zig": 0,
+        "year_acquired": 2026,
+        "elect_sia": False,
+    }
+    r = await client.post(f"/businesses/{business_id}/assets", headers=headers, json=asset_payload)
+    assert r.status_code == 201, r.text
+
+    r = await client.delete(f"/businesses/{business_id}", headers=headers)
+    assert r.status_code == 204, r.text
+
+    r = await client.get(f"/businesses/{business_id}", headers=headers)
+    assert r.status_code == 404
+
+    r = await client.get("/businesses", headers=headers)
+    assert r.json() == []
+
+
+async def test_delete_account_cascades_everything(client):
+    """Regression test for the same class of bug on account deletion, which
+    shares the identical cascade pattern one level up (User -> Business ->
+    calculations/assets)."""
+    headers = await _auth_headers(client, "delete-account@example.com")
+
+    r = await client.post("/businesses", headers=headers, json={"name": "Also Doomed Co"})
+    business_id = r.json()["id"]
+    calc_payload = {"tax_year": 2026, "quarter_label": "Q1", "usd_sales": 500, "zig_sales": 0}
+    r = await client.post(f"/businesses/{business_id}/qpd-calculations", headers=headers, json=calc_payload)
+    assert r.status_code == 201, r.text
+
+    r = await client.request(
+        "DELETE", "/auth/me", headers=headers, json={"password": VALID_PASSWORD}
+    )
+    assert r.status_code == 204, r.text
+
+    r = await client.get("/businesses", headers=headers)
+    assert r.status_code == 401

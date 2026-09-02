@@ -185,15 +185,22 @@ function AccountContent() {
           )}
         </Card>
 
-        <Card className="mt-6 border-danger/30">
-          <Eyebrow>Danger zone</Eyebrow>
+        <Card className="mt-6 border-danger/40">
+          <span className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-danger">
+            <span className="h-1 w-1 rounded-full bg-danger" />
+            Danger zone
+          </span>
           <p className="mt-1 text-sm text-ink-soft">
             Permanently delete your account, every business you&apos;ve added, and all saved
             calculations. This cannot be undone.
           </p>
 
           {!showDelete && (
-            <Button variant="secondary" className="mt-4 border-danger text-danger hover:bg-danger hover:text-paper" onClick={() => setShowDelete(true)}>
+            <Button
+              variant="secondary"
+              className="mt-4 border-danger/50 text-danger hover:border-danger hover:bg-danger hover:text-paper hover:shadow-[0_0_24px_rgba(220,38,38,0.35)]"
+              onClick={() => setShowDelete(true)}
+            >
               Delete my account
             </Button>
           )}
@@ -233,8 +240,8 @@ function AccountContent() {
               <div className="flex gap-3">
                 <Button
                   type="submit"
-                  variant="primary"
-                  className="bg-danger hover:bg-danger"
+                  variant="secondary"
+                  className="border-danger bg-danger text-paper shadow-[0_0_20px_rgba(220,38,38,0.4)] hover:bg-danger hover:text-paper"
                   disabled={deleting}
                 >
                   {deleting ? "Deleting…" : "Permanently delete my account"}

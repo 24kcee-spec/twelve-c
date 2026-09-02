@@ -98,7 +98,7 @@ function ThemeToggle() {
       <span className="mb-1.5 block font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">
         Appearance
       </span>
-      <div className="flex gap-1 rounded border border-line bg-paper p-1">
+      <div className="flex gap-1 rounded-md border border-line bg-paper/60 p-1">
         {options.map((opt) => (
           <button
             key={opt.value}
@@ -107,8 +107,8 @@ function ThemeToggle() {
               e.stopPropagation();
               setTheme(opt.value);
             }}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition ${
-              theme === opt.value ? "bg-ink text-paper" : "text-ink-soft hover:text-ink"
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition duration-150 ${
+              theme === opt.value ? "bg-signal-gradient text-paper shadow-glow-sm" : "text-ink-soft hover:text-ink"
             }`}
           >
             {opt.icon}
@@ -199,7 +199,7 @@ export function TopBar() {
   }
 
   return (
-    <header className="border-b border-line bg-surface">
+    <header className="sticky top-0 z-40 glass border-x-0 border-t-0">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2">
           <Link href="/dashboard" className="mr-4">
@@ -210,8 +210,8 @@ export function TopBar() {
             align="left"
             trigger={({ open }) => (
               <span
-                className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition ${
-                  open ? "bg-paper text-ink" : "text-ink-soft hover:text-ink"
+                className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition duration-150 ${
+                  open ? "bg-paper/60 text-ink" : "text-ink-soft hover:text-usd"
                 }`}
               >
                 <span className="max-w-[10rem] truncate">
@@ -244,7 +244,7 @@ export function TopBar() {
           align="right"
           trigger={({ open }) => (
             <span
-              className={`flex h-8 w-8 items-center justify-center rounded-full bg-ink font-mono text-xs font-semibold text-paper transition ${
+              className={`flex h-8 w-8 items-center justify-center rounded-full bg-signal-gradient font-mono text-xs font-semibold text-paper shadow-glow-sm transition ${
                 open ? "ring-2 ring-usd ring-offset-2 ring-offset-surface" : ""
               }`}
             >
@@ -266,10 +266,10 @@ export function TopBar() {
             </span>
           </DropdownItem>
           <DropdownItem href="/learn">
-          <span className="flex items-center gap-2.5">
-          <BookIcon />
-          Know your taxes
-          </span>
+            <span className="flex items-center gap-2.5">
+              <BookIcon />
+              Know your taxes
+            </span>
           </DropdownItem>
           <DropdownItem onClick={() => setRatesOpen(true)}>
             <span className="flex items-center gap-2.5">
@@ -288,7 +288,11 @@ export function TopBar() {
         </Dropdown>
       </div>
 
-      <RateSettingsModal open={ratesOpen} onClose={() => setRatesOpen(false)} />
+      <RateSettingsModal
+        open={ratesOpen}
+        onClose={() => setRatesOpen(false)}
+        highlightBusinessId={currentBusinessId}
+      />
     </header>
   );
 }

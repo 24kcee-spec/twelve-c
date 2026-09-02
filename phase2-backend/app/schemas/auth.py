@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 import uuid
@@ -77,6 +77,11 @@ class RefreshRequest(BaseModel):
 class MfaSetupResponse(BaseModel):
     provisioning_uri: str
     qr_code_data_uri: str
+    # Raw base32 secret, separate from provisioning_uri. The URI is meant for
+    # QR scanning only - apps that support "enter key manually" expect just
+    # this value, not the full otpauth:// string (which most authenticator
+    # apps will reject or mangle if pasted into the manual-entry field).
+    secret: str
 
 
 class MfaVerifyRequest(BaseModel):

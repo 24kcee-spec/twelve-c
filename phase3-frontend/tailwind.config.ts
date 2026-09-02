@@ -33,13 +33,23 @@ const config: Config = {
         mono: ["var(--font-plex-mono)", "ui-monospace", "monospace"],
       },
       borderRadius: {
-        sm: "2px",
-        DEFAULT: "3px",
-        md: "5px",
-        lg: "8px",
+        sm: "4px",
+        DEFAULT: "8px",
+        md: "12px",
+        lg: "18px",
+        xl: "24px",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(22, 36, 28, 0.06), 0 1px 0 rgba(22, 36, 28, 0.04)",
+        card: "0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 0 rgba(255, 255, 255, 0.03)",
+        "glow-usd": "0 0 0 1px rgb(var(--glow-usd) / 0.4), 0 0 24px rgb(var(--glow-usd) / 0.35)",
+        "glow-zig": "0 0 0 1px rgb(var(--glow-zig) / 0.4), 0 0 24px rgb(var(--glow-zig) / 0.35)",
+        "glow-sm": "0 0 12px rgb(var(--glow-usd) / 0.25)",
+      },
+      backgroundImage: {
+        "signal-gradient": "linear-gradient(135deg, rgb(var(--color-usd)), rgb(var(--color-zig)))",
+      },
+      transitionTimingFunction: {
+        snap: "cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },
   },

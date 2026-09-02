@@ -37,9 +37,14 @@ class Business(Base):
     )
 
     owner: Mapped["User"] = relationship(back_populates="businesses")  # noqa: F821
+    # passive_deletes=True: don't SELECT-load every child row into the
+    # session just to issue individual DELETEs (that pattern is what trips
+    # "MissingGreenlet"/lazy-load errors on AsyncSession, and is also just
+    # slower). The DB-level ForeignKey(ondelete="CASCADE") already does the
+    # cleanup; the ORM only needs to know to trust it and not fight it.
     calculations: Mapped[list["QpdCalculation"]] = relationship(  # noqa: F821
-        back_populates="business", cascade="all, delete-orphan"
+        back_populates="business", cascade="all, delete-orphan", passive_deletes=True
     )
     capital_assets: Mapped[list["CapitalAsset"]] = relationship(  # noqa: F821
-        back_populates="business", cascade="all, delete-orphan"
+        back_populates="business", cascade="all, delete-orphan", passive_deletes=True
     )

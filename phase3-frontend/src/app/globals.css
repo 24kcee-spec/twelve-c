@@ -4,41 +4,45 @@
 
 /* ---------------------------------------------------------------------
    Design tokens as CSS variables (RGB triplets so Tailwind can apply
-   opacity via rgb(var(--x) / <alpha-value>)). Light values are the
-   original "quality paper" palette; .dark is the "control room"
-   register from the UX blueprint - genuine near-black, same green/amber
-   accents, brightened slightly for contrast. Switching themes is just
-   toggling the "dark" class on <html> - every bg-paper/text-ink/etc.
-   utility in the app repaints automatically, nothing else has to change.
+   opacity via rgb(var(--x) / <alpha-value>)). "Terminal" register:
+   deep near-black void with a faint blue-graphite undertone, glass
+   panels, and two signal colours - emerald (USD) and cyan (ZIG) - that
+   glow rather than sit flat. Switching themes is just toggling the
+   "dark" class on <html> - every bg-paper/text-ink/etc. utility in the
+   app repaints automatically, nothing else has to change.
    --------------------------------------------------------------------- */
 :root {
-  --color-paper: 245 246 240;
+  --color-paper: 250 251 253;
   --color-surface: 255 255 255;
-  --color-ink: 22 36 28;
-  --color-ink-soft: 69 86 75;
-  --color-ink-faint: 124 139 127;
-  --color-line: 220 217 201;
-  --color-usd: 31 111 84;
-  --color-usd-soft: 228 239 233;
-  --color-zig: 184 127 39;
-  --color-zig-soft: 245 234 215;
-  --color-danger: 168 65 47;
-  --color-danger-soft: 243 227 222;
+  --color-ink: 13 18 28;
+  --color-ink-soft: 71 84 105;
+  --color-ink-faint: 130 141 158;
+  --color-line: 222 227 235;
+  --color-usd: 5 150 105;
+  --color-usd-soft: 220 245 235;
+  --color-zig: 8 145 178;
+  --color-zig-soft: 219 244 250;
+  --color-danger: 220 38 38;
+  --color-danger-soft: 254 226 226;
+  --glow-usd: 5 150 105;
+  --glow-zig: 34 211 238;
 }
 
 html.dark {
-  --color-paper: 14 19 16;
-  --color-surface: 22 29 25;
-  --color-ink: 237 239 234;
-  --color-ink-soft: 169 179 172;
-  --color-ink-faint: 110 120 111;
-  --color-line: 42 51 44;
-  --color-usd: 63 163 127;
-  --color-usd-soft: 22 51 42;
-  --color-zig: 217 166 78;
-  --color-zig-soft: 58 46 20;
-  --color-danger: 224 102 90;
-  --color-danger-soft: 58 31 27;
+  --color-paper: 6 9 16;
+  --color-surface: 13 17 28;
+  --color-ink: 226 232 244;
+  --color-ink-soft: 148 163 184;
+  --color-ink-faint: 94 106 128;
+  --color-line: 30 38 56;
+  --color-usd: 52 211 153;
+  --color-usd-soft: 8 35 30;
+  --color-zig: 34 211 238;
+  --color-zig-soft: 8 32 40;
+  --color-danger: 248 113 113;
+  --color-danger-soft: 42 15 15;
+  --glow-usd: 52 211 153;
+  --glow-zig: 34 211 238;
 }
 
 html {
@@ -52,6 +56,38 @@ body {
   background-color: rgb(var(--color-paper));
   color: rgb(var(--color-ink));
   transition: background-color 200ms ease, color 200ms ease;
+  position: relative;
+}
+
+/* Futuristic backdrop: a faint drifting grid + two soft glow blooms.
+   Fixed and behind everything, purely decorative, ignored by
+   prefers-reduced-motion and never intercepts pointer events. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(var(--color-line) / 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--color-line) / 0.35) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 90%);
+  opacity: 0.5;
+}
+html.dark body::before {
+  opacity: 0.35;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(680px 420px at 8% -6%, rgb(var(--glow-usd) / 0.16), transparent 65%),
+    radial-gradient(680px 420px at 96% 8%, rgb(var(--glow-zig) / 0.14), transparent 65%);
 }
 
 ::selection {
@@ -83,6 +119,7 @@ body {
 :focus-visible {
   outline: 2px solid rgb(var(--color-usd));
   outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* Remove native spinner arrows from number inputs across the whole app -
@@ -108,6 +145,10 @@ input[type="number"]::-webkit-inner-spin-button {
     background: white;
     color: black;
   }
+  body::before,
+  body::after {
+    display: none;
+  }
 }
 
 @keyframes fadeInUp {
@@ -117,6 +158,42 @@ input[type="number"]::-webkit-inner-spin-button {
 .fade-in-up {
   animation: fadeInUp 400ms ease-out both;
 }
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.glow-pulse {
+  animation: glowPulse 2.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .fade-in-up { animation: none; }
+  .fade-in-up,
+  .glow-pulse { animation: none; }
+}
+
+/* ---------------------------------------------------------------------
+   Glass panel utility - the core "futuristic" surface used by Card,
+   Modal, TopBar, and dropdowns. Translucent, blurred, hairline-bordered,
+   with an inner top highlight to read as a physical pane of glass.
+   --------------------------------------------------------------------- */
+.glass {
+  background: rgb(var(--color-surface) / 0.72);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgb(var(--color-line) / 0.8);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 1px 2px rgb(0 0 0 / 0.04);
+}
+html.dark .glass {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 8px 30px rgb(0 0 0 / 0.35);
+}
+
+/* Thin glowing rule used as a section divider / circuit-trace accent */
+.trace {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(var(--color-usd) / 0.6), rgb(var(--color-zig) / 0.6), transparent);
 }

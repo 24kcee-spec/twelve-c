@@ -35,19 +35,19 @@ const STEPS = [
 
 function LandingHeader() {
   return (
-    <header className="border-b border-line">
+    <header className="glass sticky top-0 z-40 border-x-0 border-t-0">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
         <Logo />
         <nav className="hidden items-center gap-6 md:flex">
-          <Link href="/learn" className="text-sm text-ink-soft transition hover:text-ink">
+          <Link href="/learn" className="text-sm text-ink-soft transition duration-150 hover:text-usd">
             Know your taxes
           </Link>
-          <Link href="/tutorial" className="text-sm text-ink-soft transition hover:text-ink">
+          <Link href="/tutorial" className="text-sm text-ink-soft transition duration-150 hover:text-usd">
             Tutorial
           </Link>
         </nav>
         <div className="flex items-center gap-3">
-          <Link href="/login" className="text-sm font-medium text-ink-soft transition hover:text-ink">
+          <Link href="/login" className="text-sm font-medium text-ink-soft transition duration-150 hover:text-ink">
             Log in
           </Link>
           <Link href="/register">
@@ -112,7 +112,10 @@ export default function LandingPage() {
           <div>
             <Eyebrow>ZIMRA provisional tax, calculated properly</Eyebrow>
             <h1 className="mt-3 font-display text-4xl leading-[1.1] text-ink md:text-5xl">
-              QPD tax, without the spreadsheet.
+              QPD tax,{" "}
+              <span className="bg-signal-gradient bg-clip-text text-transparent">
+                without the spreadsheet.
+              </span>
             </h1>
             <p className="mt-5 max-w-md text-base leading-relaxed text-ink-soft">
               Twelve C calculates your ZIMRA Quarterly Payment Date instalments the way
@@ -142,7 +145,8 @@ export default function LandingPage() {
       </section>
 
       {/* The cumulative rhythm, visualised */}
-      <section className="border-y border-line bg-surface/50">
+      <div className="trace" />
+      <section className="border-y border-line bg-surface/40 backdrop-blur-sm">
         <div className="mx-auto max-w-5xl px-6 py-14">
           <Eyebrow>How the year is structured</Eyebrow>
           <h2 className="mt-2 font-display text-2xl text-ink md:text-3xl">

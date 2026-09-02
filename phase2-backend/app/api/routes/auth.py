@@ -1,3 +1,4 @@
+﻿import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -55,6 +57,7 @@ from app.schemas.auth import (
 )
 
 router = APIRouter()
+logger = logging.getLogger("twelvec")
 settings = get_settings()
 
 MAX_VERIFICATION_ATTEMPTS = 5
@@ -426,7 +429,11 @@ async def mfa_setup(user: User = Depends(get_current_user), db: AsyncSession = D
 
     provisioning_uri = get_provisioning_uri(secret, user.email)
     qr_code_data_uri = generate_qr_code_data_uri(provisioning_uri)
-    return MfaSetupResponse(provisioning_uri=provisioning_uri, qr_code_data_uri=qr_code_data_uri)
+    return MfaSetupResponse(
+        provisioning_uri=provisioning_uri,
+        qr_code_data_uri=qr_code_data_uri,
+        secret=secret,
+    )
 
 
 @router.post("/mfa/verify")
@@ -492,8 +499,16 @@ async def delete_account(
 
     # Cascade deletes (set on the DB foreign keys) remove this user's
     # businesses, calculations, and refresh tokens automatically.
-    await db.delete(user)
-    await db.commit()
+    try:
+        await db.delete(user)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        logger.exception("Account deletion blocked by a foreign key constraint for user %s", user.id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Couldn't delete your account because some linked data is still attached. Please try again, and contact support if this keeps happening.",
+        )
 
     _clear_refresh_cookie(response)
     return None

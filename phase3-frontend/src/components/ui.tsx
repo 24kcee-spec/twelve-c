@@ -8,7 +8,7 @@ export function Logo({ className = "" }: { className?: string }) {
   return (
     <span className={`flex items-center gap-2 font-display text-xl tracking-tight text-ink ${className}`}>
       <LogoMark size={22} />
-      Twelve<span className="text-usd">C</span>
+      Twelve<span className="bg-signal-gradient bg-clip-text text-transparent">C</span>
     </span>
   );
 }
@@ -31,14 +31,14 @@ export function Field({
   const displayValue = emptyIfZero && (value === 0 || value === "0") ? "" : value;
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-ink-soft">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium text-ink-soft">{label}</span>
       <input
         {...props}
         value={displayValue}
         placeholder={emptyIfZero ? "0.00" : placeholder}
-        className={`w-full rounded border border-line bg-surface px-3 py-2 font-mono text-sm text-ink outline-none transition focus:border-usd placeholder:text-ink-faint/50 ${props.className ?? ""}`}
+        className={`w-full rounded-md border border-line bg-surface/60 px-3 py-2.5 font-mono text-sm text-ink outline-none backdrop-blur-sm transition duration-150 ease-snap focus:border-usd focus:shadow-glow-sm placeholder:text-ink-faint/50 ${props.className ?? ""}`}
       />
-      {hint && <span className="mt-1 block text-xs text-ink-faint">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-xs text-ink-faint">{hint}</span>}
     </label>
   );
 }
@@ -48,18 +48,21 @@ export function Button({
   className = "",
   ...props
 }: { variant?: "primary" | "secondary" | "ghost" } & ButtonHTMLAttributes<HTMLButtonElement>) {
-  const base = "inline-flex items-center justify-center rounded px-4 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed";
+  const base =
+    "relative inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold tracking-wide transition duration-150 ease-snap disabled:opacity-50 disabled:cursor-not-allowed";
   const variants: Record<string, string> = {
-    primary: "bg-ink text-paper hover:bg-usd",
-    secondary: "border border-ink text-ink hover:bg-ink hover:text-paper",
-    ghost: "text-ink-soft hover:text-ink",
+    primary:
+      "bg-signal-gradient text-paper shadow-glow-sm hover:shadow-glow-usd hover:-translate-y-px active:translate-y-0",
+    secondary:
+      "border border-line bg-surface/50 text-ink backdrop-blur-sm hover:border-usd hover:text-usd hover:shadow-glow-sm",
+    ghost: "text-ink-soft hover:text-usd",
   };
   return <button {...props} className={`${base} ${variants[variant]} ${className}`} />;
 }
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`fade-in-up rounded-md border border-line bg-surface p-6 shadow-card ${className}`}>
+    <div className={`glass fade-in-up rounded-lg p-6 ${className}`}>
       {children}
     </div>
   );
@@ -67,7 +70,8 @@ export function Card({ children, className = "" }: { children: React.ReactNode; 
 
 export function Eyebrow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className={`font-mono text-xs uppercase tracking-[0.15em] text-ink-faint ${className}`}>
+    <span className={`inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-ink-faint ${className}`}>
+      <span className="h-1 w-1 rounded-full bg-usd shadow-glow-sm" />
       {children}
     </span>
   );
@@ -76,7 +80,7 @@ export function Eyebrow({ children, className = "" }: { children: React.ReactNod
 export function ErrorNote({ children }: { children: React.ReactNode }) {
   if (!children) return null;
   return (
-    <div className="rounded border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
+    <div className="rounded-md border border-danger/30 bg-danger-soft/70 px-3 py-2 text-sm text-danger backdrop-blur-sm">
       {children}
     </div>
   );
@@ -84,7 +88,7 @@ export function ErrorNote({ children }: { children: React.ReactNode }) {
 
 export function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="text-sm text-ink-soft transition hover:text-ink">
+    <Link href={href} className="text-sm text-ink-soft transition duration-150 hover:text-usd">
       {children}
     </Link>
   );
@@ -133,7 +137,7 @@ export function Dropdown({
       {open && (
         <div
           onClick={() => setOpen(false)}
-          className={`absolute z-50 mt-2 min-w-[14rem] overflow-hidden rounded-md border border-line bg-surface py-1 shadow-card ${
+          className={`glass fade-in-up absolute z-50 mt-2 min-w-[14rem] overflow-hidden rounded-lg py-1 ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >
@@ -169,12 +173,12 @@ export function DropdownItem({
   danger?: boolean;
   children: ReactNode;
 }) {
-  const className = `block w-full truncate px-3 py-2 text-left text-sm transition ${
+  const className = `block w-full truncate px-3 py-2 text-left text-sm transition duration-150 ${
     danger
       ? "text-danger hover:bg-danger-soft"
       : active
       ? "bg-usd-soft text-usd"
-      : "text-ink-soft hover:bg-paper hover:text-ink"
+      : "text-ink-soft hover:bg-paper/60 hover:text-ink"
   }`;
   if (href) {
     return (
@@ -263,11 +267,11 @@ export function Modal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-10 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-ink/50 px-4 py-10 backdrop-blur-md"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`fade-in-up w-full max-w-lg rounded-md border border-line bg-surface p-6 shadow-card ${className}`}
+        className={`glass fade-in-up w-full max-w-lg rounded-lg p-6 ${className}`}
       >
         {title && (
           <div className="mb-4 flex items-center justify-between gap-4">
@@ -276,7 +280,7 @@ export function Modal({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="rounded p-1.5 text-ink-faint transition hover:bg-paper hover:text-ink"
+              className="rounded-md p-1.5 text-ink-faint transition duration-150 hover:bg-paper/60 hover:text-ink"
             >
               <CloseIcon />
             </button>
@@ -298,7 +302,7 @@ export function Badge({
 }) {
   const className =
     variant === "solid"
-      ? "rounded-full bg-ink px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-paper"
-      : "rounded-full border border-usd px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-usd";
+      ? "rounded-full bg-signal-gradient px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-paper shadow-glow-sm"
+      : "rounded-full border border-usd/60 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-usd";
   return <span className={className}>{children}</span>;
 }

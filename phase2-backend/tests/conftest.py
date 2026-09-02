@@ -15,12 +15,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
 
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy import event  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from app.core.limiter import limiter  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app import models  # noqa: E402,F401  (registers all tables on Base.metadata)
+
+
+def _enable_sqlite_fk_enforcement(dbapi_connection, connection_record):
+    """SQLite ignores FOREIGN KEY / ON DELETE CASCADE clauses unless this
+    pragma is set on every connection. Without it, the test suite can pass
+    even when a real foreign key (and its cascade behaviour) is broken - see
+    scripts/fix_cascade_constraints.py for the production bug this class of
+    gap let through undetected."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -57,6 +69,7 @@ async def db_engine():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    event.listen(engine.sync_engine, "connect", _enable_sqlite_fk_enforcement)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
