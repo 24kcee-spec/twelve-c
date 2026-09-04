@@ -154,26 +154,26 @@ function DashboardContent() {
   return (
     <main className="min-h-screen bg-paper">
       <TopBar />
-      <div className="mx-auto max-w-4xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
         <OverdueDigest items={digestItems} />
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Eyebrow>Your businesses</Eyebrow>
-            <h1 className="mt-1 font-display text-3xl text-ink">Dashboard</h1>
+            <h1 className="mt-1 font-display text-3xl text-ink sm:text-4xl">Dashboard</h1>
           </div>
-          <Button variant="primary" onClick={() => setShowForm((s) => !s)}>
-            {showForm ? "Cancel" : "Add a business"}
+          <Button variant="primary" onClick={() => setShowForm((s) => !s)} className="w-full sm:w-auto">
+            {showForm ? "Cancel" : "+ Add a business"}
           </Button>
         </div>
 
         <ErrorNote>{error}</ErrorNote>
 
         {showForm && (
-          <Card className="mt-6">
+          <Card className="mt-6 border-usd/30 shadow-glow-usd">
             <h2 className="font-display text-xl text-ink">New business</h2>
-            <form className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={onCreate}>
-              <div className="md:col-span-2">
+            <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={onCreate}>
+              <div className="sm:col-span-2">
                 <Field label="Business name" required value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <Field
@@ -202,19 +202,25 @@ function DashboardContent() {
                 onChange={(e) => setAidsLevy(e.target.value)}
                 hint="0.03 = 3% of tax payable"
               />
-              <div className="md:col-span-2">
-                <Button type="submit" variant="primary" disabled={submitting}>
-                  {submitting ? "Creating..." : "Create business"}
+              <div className="sm:col-span-2">
+                <Button type="submit" variant="primary" disabled={submitting} className="w-full sm:w-auto">
+                  {submitting ? "Creating…" : "Create business"}
                 </Button>
               </div>
             </form>
           </Card>
         )}
 
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-          {businesses === null && <p className="text-sm text-ink-faint">Loading businesses...</p>}
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {businesses === null && (
+            <>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="glass h-44 animate-pulse rounded-lg" />
+              ))}
+            </>
+          )}
           {businesses?.length === 0 && (
-            <Card className="md:col-span-2">
+            <Card className="sm:col-span-2 xl:col-span-3">
               <p className="text-sm text-ink-soft">
                 No businesses yet. Add one above to run your first QPD calculation.
               </p>
@@ -222,70 +228,84 @@ function DashboardContent() {
           )}
           {businesses?.map((b) => {
             const badge = nextDueBadge(calcByBusiness.get(b.id));
+            const initials = b.name
+              .split(/\s+/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((w) => w[0]?.toUpperCase())
+              .join("");
             return (
-            <Card key={b.id} className="h-full transition hover:border-usd">
-              <Link href={`/dashboard/${b.id}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-display text-lg text-ink">{b.name}</h3>
-                  {badge && (
-                    <span
-                      className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ${BADGE_STYLES[badge.tone]}`}
+              <Card
+                key={b.id}
+                className="group flex h-full flex-col transition duration-200 ease-snap hover:-translate-y-0.5 hover:border-usd/60 hover:shadow-glow-usd"
+              >
+                <Link href={`/dashboard/${b.id}`} className="flex flex-1 flex-col">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-signal-gradient font-mono text-sm font-semibold text-paper shadow-glow-sm">
+                        {initials || "?"}
+                      </span>
+                      <h3 className="font-display text-lg text-ink transition group-hover:text-usd">{b.name}</h3>
+                    </div>
+                    {badge && (
+                      <span
+                        className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${BADGE_STYLES[badge.tone]}`}
+                      >
+                        {badge.label}
+                      </span>
+                    )}
+                  </div>
+                  {badge?.amount && (
+                    <p className="mt-2 font-mono text-sm tabular-nums text-ink-soft">{badge.amount}</p>
+                  )}
+                  <dl className="mt-4 grid grid-cols-3 gap-2 text-xs text-ink-soft">
+                    <div className="rounded-md border border-line bg-paper/50 px-2 py-1.5 text-center">
+                      <dt className="text-[10px] uppercase tracking-wide text-ink-faint">Rate</dt>
+                      <dd className="mt-0.5 font-mono tabular-nums text-ink">{b.default_exchange_rate}</dd>
+                    </div>
+                    <div className="rounded-md border border-line bg-paper/50 px-2 py-1.5 text-center">
+                      <dt className="text-[10px] uppercase tracking-wide text-ink-faint">Tax</dt>
+                      <dd className="mt-0.5 font-mono tabular-nums text-ink">{(b.default_tax_rate * 100).toFixed(0)}%</dd>
+                    </div>
+                    <div className="rounded-md border border-line bg-paper/50 px-2 py-1.5 text-center">
+                      <dt className="text-[10px] uppercase tracking-wide text-ink-faint">AIDS</dt>
+                      <dd className="mt-0.5 font-mono tabular-nums text-ink">{(b.default_aids_levy_rate * 100).toFixed(0)}%</dd>
+                    </div>
+                  </dl>
+                </Link>
+
+                <div className="mt-4 border-t border-line pt-3">
+                  {confirmingDeleteId === b.id ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-danger">
+                        {`Delete "${b.name}" and all its calculations? This can't be undone.`}
+                      </span>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          onClick={() => onDelete(b.id)}
+                          disabled={deletingId === b.id}
+                          className="rounded-md bg-danger px-2.5 py-1 text-xs font-semibold text-paper transition disabled:opacity-50"
+                        >
+                          {deletingId === b.id ? "Deleting…" : "Yes, delete"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmingDeleteId(null)}
+                          className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-soft transition hover:text-ink"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmingDeleteId(b.id)}
+                      className="text-xs text-ink-faint transition duration-150 hover:text-danger"
                     >
-                      {badge.label}
-                    </span>
+                      Delete business
+                    </button>
                   )}
                 </div>
-                {badge?.amount && (
-                  <p className="mt-1 font-mono text-sm tabular-nums text-ink-soft">{badge.amount}</p>
-                )}
-                <dl className="mt-3 space-y-1 text-sm text-ink-soft">
-                  <div className="flex justify-between">
-                    <dt>Exchange rate</dt>
-                    <dd className="font-mono tabular-nums">{b.default_exchange_rate}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt>Tax rate</dt>
-                    <dd className="font-mono tabular-nums">{(b.default_tax_rate * 100).toFixed(0)}%</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt>AIDS levy</dt>
-                    <dd className="font-mono tabular-nums">{(b.default_aids_levy_rate * 100).toFixed(0)}%</dd>
-                  </div>
-                </dl>
-              </Link>
-
-              <div className="mt-4 border-t border-line pt-3">
-                {confirmingDeleteId === b.id ? (
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-danger">
-                      {`Delete "${b.name}" and all its calculations? This can't be undone.`}
-                    </span>
-                    <div className="flex shrink-0 gap-2">
-                      <button
-                        onClick={() => onDelete(b.id)}
-                        disabled={deletingId === b.id}
-                        className="rounded bg-danger px-2 py-1 text-xs font-semibold text-paper disabled:opacity-50"
-                      >
-                        {deletingId === b.id ? "Deleting..." : "Yes, delete"}
-                      </button>
-                      <button
-                        onClick={() => setConfirmingDeleteId(null)}
-                        className="rounded border border-line px-2 py-1 text-xs text-ink-soft"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setConfirmingDeleteId(b.id)}
-                    className="text-xs text-ink-faint transition hover:text-danger"
-                  >
-                    Delete business
-                  </button>
-                )}
-              </div>
-            </Card>
+              </Card>
             );
           })}
         </div>

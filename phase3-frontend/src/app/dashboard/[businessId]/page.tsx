@@ -192,9 +192,14 @@ function BusinessContent({ businessId }: { businessId: string }) {
     return (
       <main className="min-h-screen bg-paper">
         <TopBar />
-        <div className="mx-auto max-w-5xl px-6 py-12">
+        <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
           <ErrorNote>{error}</ErrorNote>
-          {!error && <p className="text-sm text-ink-faint">Loading...</p>}
+          {!error && (
+            <div className="space-y-4">
+              <div className="glass h-32 animate-pulse rounded-lg" />
+              <div className="glass h-64 animate-pulse rounded-lg" />
+            </div>
+          )}
         </div>
       </main>
     );
@@ -203,20 +208,32 @@ function BusinessContent({ businessId }: { businessId: string }) {
   return (
     <main className="min-h-screen bg-paper">
       <TopBar />
-      <div className="mx-auto max-w-5xl px-6 py-12">
-        <Eyebrow>Business</Eyebrow>
-        <h1 className="mt-1 font-display text-3xl text-ink">{business.name}</h1>
-        <p className="mt-1 text-sm text-ink-faint">
-          Default rate ZiG {business.default_exchange_rate} / USD · {(business.default_tax_rate * 100).toFixed(0)}% tax
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-signal-gradient font-mono text-base font-semibold text-paper shadow-glow-sm">
+            {business.name
+              .split(/\s+/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((w) => w[0]?.toUpperCase())
+              .join("") || "?"}
+          </span>
+          <div>
+            <Eyebrow>Business</Eyebrow>
+            <h1 className="mt-0.5 font-display text-2xl text-ink sm:text-3xl">{business.name}</h1>
+          </div>
+        </div>
+        <p className="mt-2 font-mono text-xs text-ink-faint sm:text-sm">
+          ZiG {business.default_exchange_rate} / USD · {(business.default_tax_rate * 100).toFixed(0)}% tax
           + {(business.default_aids_levy_rate * 100).toFixed(0)}% AIDS levy
         </p>
 
-        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
           <div className="space-y-6">
             <Card>
               <Eyebrow>New QPD calculation</Eyebrow>
               <form className="mt-4 space-y-4" onSubmit={onCalculate}>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field
                     label="Tax year"
                     type="number"
@@ -234,24 +251,24 @@ function BusinessContent({ businessId }: { businessId: string }) {
                 </div>
 
                 <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-ink-soft">QPD quarter</span>
+                  <span className="mb-1.5 block text-sm font-medium text-ink-soft">QPD quarter</span>
                   <select
                     value={quarter}
                     onChange={(e) => setQuarter(parseInt(e.target.value, 10))}
-                    className="w-full rounded border border-line bg-surface px-3 py-2 font-mono text-sm text-ink outline-none transition focus:border-usd"
+                    className="w-full rounded-md border border-line bg-surface/60 px-3 py-2.5 font-mono text-sm text-ink outline-none backdrop-blur-sm transition duration-150 ease-snap focus:border-usd focus:shadow-glow-sm"
                   >
                     <option value={1}>QPD1 - due 25 March (10% cumulative)</option>
                     <option value={2}>QPD2 - due 25 June (35% cumulative)</option>
                     <option value={3}>QPD3 - due 25 September (65% cumulative)</option>
                     <option value={4}>QPD4 - due 20 December (100% cumulative)</option>
                   </select>
-                  <span className="mt-1 block text-xs text-ink-faint">
+                  <span className="mt-1.5 block text-xs text-ink-faint">
                     Which QPD you&apos;re filing for - the amount actually due nets this quarter&apos;s
                     cumulative target against what you&apos;ve confirmed paying in earlier quarters.
                   </span>
                 </label>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field
                     label="USD sales"
                     type="number"
@@ -274,7 +291,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
 
                 <div>
                   <p className="mb-1 text-sm font-medium text-ink-soft">Deductions</p>
-                  <div className="rounded border border-line px-3">
+                  <div className="rounded-md border border-line bg-paper/30 px-3">
                     <CurrencyPairInput
                       label="Cost of sales"
                       usdValue={usdExpenses.cost_of_sales}
@@ -315,23 +332,23 @@ function BusinessContent({ businessId }: { businessId: string }) {
                   }}
                 />
 
-                <div className="rounded border border-line px-3 py-2">
+                <div className="rounded-md border border-line bg-paper/30 px-3 py-2 transition duration-150 hover:border-usd/40">
                   <button
                     type="button"
                     onClick={() => setShowRateSettings((s) => !s)}
-                    className="flex w-full items-center justify-between text-left text-sm font-medium text-ink-soft"
+                    className="flex w-full items-center justify-between gap-3 text-left text-sm font-medium text-ink-soft"
                   >
-                    <span>
+                    <span className="min-w-0">
                       Rate settings
-                      <span className="ml-2 font-mono text-xs font-normal text-ink-faint">
+                      <span className="ml-2 block font-mono text-xs font-normal text-ink-faint sm:inline sm:truncate">
                         ZiG {exchangeRate ?? "-"}/USD - {taxRatePct ?? "-"}% tax + {aidsLevyPct ?? "-"}% AIDS levy
                       </span>
                     </span>
-                    <span className="text-ink-faint">{showRateSettings ? "Hide" : "Edit"}</span>
+                    <span className="shrink-0 text-usd">{showRateSettings ? "Hide" : "Edit"}</span>
                   </button>
 
                   {showRateSettings && (
-                    <div className="mt-3 grid grid-cols-3 gap-3 border-t border-line pt-3">
+                    <div className="mt-3 grid grid-cols-1 gap-3 border-t border-line pt-3 sm:grid-cols-3">
                       <Field
                         label="Exchange rate"
                         type="number"
@@ -361,7 +378,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                         value={aidsLevyPct ?? ""}
                         onChange={(e) => setAidsLevyPct(parseFloat(e.target.value) || 0)}
                       />
-                      <p className="col-span-3 text-xs text-ink-faint">
+                      <p className="col-span-1 text-xs text-ink-faint sm:col-span-3">
                         These carry over from this business&apos;s saved defaults. Change them here for a
                         one-off recalculation (e.g. a new ZIMRA budget rate) without editing the business
                         itself.
@@ -370,19 +387,19 @@ function BusinessContent({ businessId }: { businessId: string }) {
                   )}
                 </div>
 
-                <div className="rounded border border-line px-3 py-2">
+                <div className="rounded-md border border-line bg-paper/30 px-3 py-2 transition duration-150 hover:border-usd/40">
                   <button
                     type="button"
                     onClick={() => setShowAdjustments((s) => !s)}
-                    className="flex w-full items-center justify-between text-left text-sm font-medium text-ink-soft"
+                    className="flex w-full items-center justify-between gap-3 text-left text-sm font-medium text-ink-soft"
                   >
                     <span>
                       Adjustments
                       {(assessedLossUsd > 0 || assessedLossZig > 0 || withholdingCreditsUsd > 0 || withholdingCreditsZig > 0) && (
-                        <span className="ml-2 font-mono text-xs font-normal text-ink-faint">active</span>
+                        <span className="ml-2 font-mono text-xs font-normal text-usd">active</span>
                       )}
                     </span>
-                    <span className="text-ink-faint">{showAdjustments ? "Hide" : "Edit"}</span>
+                    <span className="shrink-0 text-usd">{showAdjustments ? "Hide" : "Edit"}</span>
                   </button>
 
                   {showAdjustments && (
@@ -411,8 +428,8 @@ function BusinessContent({ businessId }: { businessId: string }) {
                 </div>
 
                 <ErrorNote>{error}</ErrorNote>
-                <Button type="submit" variant="primary" disabled={calculating}>
-                  {calculating ? "Calculating..." : "Calculate QPD"}
+                <Button type="submit" variant="primary" disabled={calculating} className="w-full sm:w-auto">
+                  {calculating ? "Calculating…" : "Calculate QPD"}
                 </Button>
               </form>
             </Card>
@@ -435,13 +452,13 @@ function BusinessContent({ businessId }: { businessId: string }) {
                 {groupedCalculations.map((group) => {
                   const isExpanded = expandedYears.has(group.year);
                   return (
-                    <div key={group.year} className="overflow-hidden rounded border border-line">
+                    <div key={group.year} className="overflow-hidden rounded-md border border-line">
                       <button
                         type="button"
                         onClick={() => toggleYear(group.year)}
                         aria-expanded={isExpanded}
-                        className={`flex w-full items-center justify-between px-3 py-2 text-left transition ${
-                          isExpanded ? "bg-paper" : "bg-surface hover:bg-paper"
+                        className={`flex w-full items-center justify-between px-3 py-2.5 text-left transition duration-150 ${
+                          isExpanded ? "bg-usd-soft" : "bg-surface/40 hover:bg-paper/60"
                         }`}
                       >
                         <span className="flex items-center gap-2">
@@ -463,7 +480,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                             if (isConfirming) {
                               return (
                                 <li key={c.id}>
-                                  <div className="flex items-center justify-between gap-2 rounded bg-danger-soft px-3 py-2">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-danger-soft px-3 py-2">
                                     <span className="text-xs text-danger">
                                       Delete this calculation? This can&apos;t be undone.
                                     </span>
@@ -472,14 +489,14 @@ function BusinessContent({ businessId }: { businessId: string }) {
                                         type="button"
                                         onClick={() => onDeleteCalculation(c)}
                                         disabled={deletingCalcId === c.id}
-                                        className="rounded bg-danger px-2 py-1 text-xs font-semibold text-paper disabled:opacity-50"
+                                        className="rounded-md bg-danger px-2.5 py-1 text-xs font-semibold text-paper disabled:opacity-50"
                                       >
-                                        {deletingCalcId === c.id ? "Deleting..." : "Yes, delete"}
+                                        {deletingCalcId === c.id ? "Deleting…" : "Yes, delete"}
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => setConfirmingDeleteCalcId(null)}
-                                        className="rounded border border-line px-2 py-1 text-xs text-ink-soft"
+                                        className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-soft"
                                       >
                                         Cancel
                                       </button>
@@ -492,8 +509,8 @@ function BusinessContent({ businessId }: { businessId: string }) {
                             return (
                               <li key={c.id}>
                                 <div
-                                  className={`flex items-center gap-1 rounded text-sm transition ${
-                                    isSelected ? "bg-usd-soft text-usd" : "text-ink-soft hover:bg-paper hover:text-ink"
+                                  className={`flex items-center gap-1 rounded-md text-sm transition duration-150 ${
+                                    isSelected ? "bg-usd-soft text-usd shadow-glow-sm" : "text-ink-soft hover:bg-paper/60 hover:text-ink"
                                   }`}
                                 >
                                   <button
@@ -519,7 +536,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                                     type="button"
                                     onClick={() => setConfirmingDeleteCalcId(c.id)}
                                     aria-label="Delete calculation"
-                                    className="mr-1.5 shrink-0 rounded p-1.5 text-ink-faint/60 transition hover:bg-danger-soft hover:text-danger"
+                                    className="mr-1.5 shrink-0 rounded-md p-1.5 text-ink-faint/60 transition duration-150 hover:bg-danger-soft hover:text-danger"
                                   >
                                     <TrashIcon />
                                   </button>
@@ -544,6 +561,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                     variant="secondary"
                     type="button"
                     onClick={() => downloadTaxSummaryPdf(business, selected)}
+                    className="w-full sm:w-auto"
                   >
                     Download PDF summary
                   </Button>
