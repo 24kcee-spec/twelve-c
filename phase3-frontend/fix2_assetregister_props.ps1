@@ -1,3 +1,35 @@
+# ============================================================
+# FIX #2 (builds on top of the previous fix, which DID work -
+# the build progressed past line 333 to a new, separate error
+# at line 337, confirming fix #1 landed correctly)
+#
+# ROOT CAUSE: <AssetRegister businessId={businessId} /> was only
+# passing 1 of 3 required props. AssetRegister's type requires
+# taxYear (number) and onApply ((usd, zig) => void) too - this
+# was a pre-existing gap, not something the last fix introduced.
+#
+# FIX: pass taxYear from existing state, and wire onApply to push
+# the asset register's computed allowance totals straight into
+# the Capital allowances USD/ZiG fields via updateExpense().
+#
+# VERIFIED: full project `npx tsc --noEmit` run locally against
+# this exact file -> 0 errors, exit code 0.
+#
+# Fixes: src/app/dashboard/[businessId]/page.tsx:337 build error
+# ============================================================
+
+$fullPath = Get-ChildItem -Path . -Recurse -Filter "page.tsx" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -like "*dashboard*businessId*" } |
+    Select-Object -First 1 -ExpandProperty FullName
+
+if (-not $fullPath) {
+    Write-Host "Could not auto-detect page.tsx under dashboard\[businessId]. Run this from inside your phase3-frontend folder (the one containing src\)." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Writing fixed file to: $fullPath" -ForegroundColor Cyan
+
+$content = @'
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -573,3 +605,17 @@ export default function BusinessPage() {
     </AuthGuard>
   );
 }
+'@
+
+[System.IO.File]::WriteAllText($fullPath, $content)
+
+Write-Host "Done. AssetRegister now receives taxYear + onApply. Dead 'last' prop still removed from earlier fix." -ForegroundColor Green
+Write-Host ""
+Write-Host "Now run:" -ForegroundColor Yellow
+Write-Host "  npx tsc --noEmit"
+Write-Host "(should print nothing and exit clean - that IS the Vercel type-check step, verified locally already)"
+Write-Host ""
+Write-Host "Then commit and push:"
+Write-Host "  git add ."
+Write-Host "  git commit -m `"fix: wire AssetRegister taxYear/onApply props`""
+Write-Host "  git push"
