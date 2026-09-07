@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { LogoMark } from "@/components/LogoMark";
 import Link from "next/link";
@@ -62,8 +62,50 @@ export function Button({
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`glass fade-in-up rounded-lg p-6 ${className}`}>
+    <div className={`glass fade-in-up rounded-lg p-5 sm:p-6 ${className}`}>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Segmented tab control. Deliberately dumb/stateless - the parent owns
+ * `active` and receives `onChange`, so it can be paired with any content
+ * area (a single Card whose body swaps per tab) without this component
+ * knowing anything about what it's switching between.
+ */
+export function TabBar<T extends string>({
+  tabs,
+  active,
+  onChange,
+  className = "",
+}: {
+  tabs: { id: T; label: string }[];
+  active: T;
+  onChange: (id: T) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      className={`inline-flex w-full gap-0.5 overflow-x-auto rounded-md border border-line bg-paper/40 p-1 backdrop-blur-sm sm:w-auto ${className}`}
+    >
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={active === tab.id}
+          onClick={() => onChange(tab.id)}
+          className={`shrink-0 whitespace-nowrap rounded px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] transition duration-150 ease-snap ${
+            active === tab.id
+              ? "bg-signal-gradient text-paper shadow-glow-sm"
+              : "text-ink-faint hover:bg-surface/60 hover:text-ink-soft"
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
     </div>
   );
 }

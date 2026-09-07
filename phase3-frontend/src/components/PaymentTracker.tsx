@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
-import { Button, Card, ErrorNote, Eyebrow } from "@/components/ui";
+import { Button, ErrorNote } from "@/components/ui";
 import { money } from "@/lib/format";
 import { QpdCalculationOut } from "@/lib/types";
 
@@ -50,12 +50,11 @@ export function PaymentTracker({
   }
 
   return (
-    <Card>
-      <Eyebrow>Payments made</Eyebrow>
-      <p className="mt-1 text-sm text-ink-soft">
+    <div>
+      <p className="text-sm text-ink-soft">
         Record what&apos;s actually been paid to ZIMRA for each instalment.
       </p>
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 max-h-[26rem] space-y-3 overflow-y-auto pr-1 scrollbar-thin">
         {schedule.map((inst, i) => {
           const usdBalance = inst.usd - usdPaid[i];
           const zigBalance = inst.zig - zigPaid[i];
@@ -104,9 +103,9 @@ export function PaymentTracker({
         })}
       </div>
       <ErrorNote>{error}</ErrorNote>
-      <Button variant="primary" className="mt-4" onClick={save} disabled={saving}>
+      <Button variant="primary" className="mt-4 w-full sm:w-auto" onClick={save} disabled={saving}>
         {saving ? "Saving..." : "Save payments"}
       </Button>
-    </Card>
+    </div>
   );
 }

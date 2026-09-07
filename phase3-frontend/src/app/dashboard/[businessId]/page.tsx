@@ -57,6 +57,12 @@ function BusinessContent({ businessId }: { businessId: string }) {
   const [aidsLevyPct, setAidsLevyPct] = useState<number | null>(null);
   const [showRateSettings, setShowRateSettings] = useState(false);
 
+  // Results column - scrolled into view after a successful calculation on
+  // narrow viewports, where the results sit below the form instead of
+  // beside it, so the person isn't left staring at the form wondering
+  // whether anything happened.
+  const resultsRef = useRef<HTMLDivElement>(null);
+
   async function loadAll() {
     try {
       const [b, calcs] = await Promise.all([
@@ -171,6 +177,11 @@ function BusinessContent({ businessId }: { businessId: string }) {
       setCalculations(refreshed);
       setSelected(result);
       setExpandedYears((prev) => new Set(prev).add(result.tax_year));
+      if (typeof window !== "undefined" && window.innerWidth < 1024) {
+        requestAnimationFrame(() => {
+          resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
     } catch {
       setError("Couldn't run that calculation. Check the figures and try again.");
     } finally {
@@ -228,7 +239,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
           + {(business.default_aids_levy_rate * 100).toFixed(0)}% AIDS levy
         </p>
 
-        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+        <div className="mt-8 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8">
           <div className="space-y-6">
             <Card>
               <Eyebrow>New QPD calculation</Eyebrow>
@@ -319,104 +330,60 @@ function BusinessContent({ businessId }: { businessId: string }) {
                       zigValue={zigExpenses.capital_allowances}
                       onUsdChange={(v) => updateExpense("usd", "capital_allowances", v)}
                       onZigChange={(v) => updateExpense("zig", "capital_allowances", v)}
+                      last
                     />
                   </div>
                 </div>
 
-                <AssetRegister
-                  businessId={businessId}
-                  taxYear={taxYear}
-                  onApply={(usd, zig) => {
-                    updateExpense("usd", "capital_allowances", usd);
-                    updateExpense("zig", "capital_allowances", zig);
-                  }}
-                />
+                <AssetRegister businessId={businessId} />
 
-                <div className="rounded-md border border-line bg-paper/30 px-3 py-2 transition duration-150 hover:border-usd/40">
+                <div className="rounded-md border border-line p-3">
                   <button
                     type="button"
-                    onClick={() => setShowRateSettings((s) => !s)}
-                    className="flex w-full items-center justify-between gap-3 text-left text-sm font-medium text-ink-soft"
-                  >
-                    <span className="min-w-0">
-                      Rate settings
-                      <span className="ml-2 block font-mono text-xs font-normal text-ink-faint sm:inline sm:truncate">
-                        ZiG {exchangeRate ?? "-"}/USD - {taxRatePct ?? "-"}% tax + {aidsLevyPct ?? "-"}% AIDS levy
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-usd">{showRateSettings ? "Hide" : "Edit"}</span>
-                  </button>
-
-                  {showRateSettings && (
-                    <div className="mt-3 grid grid-cols-1 gap-3 border-t border-line pt-3 sm:grid-cols-3">
-                      <Field
-                        label="Exchange rate"
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        hint="ZiG per USD"
-                        value={exchangeRate ?? ""}
-                        onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
-                      />
-                      <Field
-                        label="Tax rate"
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        max={100}
-                        hint="% of taxable profit"
-                        value={taxRatePct ?? ""}
-                        onChange={(e) => setTaxRatePct(parseFloat(e.target.value) || 0)}
-                      />
-                      <Field
-                        label="AIDS levy"
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        max={100}
-                        hint="% of tax payable"
-                        value={aidsLevyPct ?? ""}
-                        onChange={(e) => setAidsLevyPct(parseFloat(e.target.value) || 0)}
-                      />
-                      <p className="col-span-1 text-xs text-ink-faint sm:col-span-3">
-                        These carry over from this business&apos;s saved defaults. Change them here for a
-                        one-off recalculation (e.g. a new ZIMRA budget rate) without editing the business
-                        itself.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-md border border-line bg-paper/30 px-3 py-2 transition duration-150 hover:border-usd/40">
-                  <button
-                    type="button"
-                    onClick={() => setShowAdjustments((s) => !s)}
-                    className="flex w-full items-center justify-between gap-3 text-left text-sm font-medium text-ink-soft"
+                    onClick={() => setShowRateSettings(true)}
+                    className="flex w-full items-center justify-between text-left text-sm"
                   >
                     <span>
-                      Adjustments
-                      {(assessedLossUsd > 0 || assessedLossZig > 0 || withholdingCreditsUsd > 0 || withholdingCreditsZig > 0) && (
-                        <span className="ml-2 font-mono text-xs font-normal text-usd">active</span>
-                      )}
+                      <span className="font-medium text-ink">Rate settings</span>
+                      <span className="ml-2 text-ink-faint">
+                        ZiG {exchangeRate ?? business.default_exchange_rate}/USD ·{" "}
+                        {((taxRatePct ?? business.default_tax_rate * 100)).toFixed(0)}% tax + {" "}
+                        {((aidsLevyPct ?? business.default_aids_levy_rate * 100)).toFixed(0)}% AIDS levy
+                      </span>
                     </span>
-                    <span className="shrink-0 text-usd">{showAdjustments ? "Hide" : "Edit"}</span>
+                    <span className="text-usd">Edit</span>
                   </button>
+                </div>
 
+                <div className="rounded-md border border-line p-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdjustments((v) => !v)}
+                    className="flex w-full items-center justify-between text-left text-sm"
+                  >
+                    <span className="font-medium text-ink">Adjustments</span>
+                    <span className="text-usd">{showAdjustments ? "Hide" : "Edit"}</span>
+                  </button>
                   {showAdjustments && (
-                    <div className="mt-3 space-y-1 border-t border-line pt-3">
+                    <div className="mt-3 space-y-3 border-t border-line pt-3">
+                      <p className="text-xs text-ink-faint">
+                        Optional. Leave at 0 if these don&apos;t apply.
+                      </p>
                       <CurrencyPairInput
                         label="Assessed loss b/f"
                         usdValue={assessedLossUsd}
                         zigValue={assessedLossZig}
                         onUsdChange={setAssessedLossUsd}
                         onZigChange={setAssessedLossZig}
+                        last
                       />
                       <CurrencyPairInput
-                        label="Withholding tax credits"
+                        label="Withholding credits"
                         usdValue={withholdingCreditsUsd}
                         zigValue={withholdingCreditsZig}
                         onUsdChange={setWithholdingCreditsUsd}
                         onZigChange={setWithholdingCreditsZig}
+                        last
                       />
                       <p className="pt-2 text-xs text-ink-faint">
                         Assessed loss reduces the taxable base before tax is computed. Withholding
@@ -553,22 +520,30 @@ function BusinessContent({ businessId }: { businessId: string }) {
             </Card>
           </div>
 
-          <div className="space-y-6">
+          <div
+            ref={resultsRef}
+            className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 scrollbar-thin"
+          >
             {selected ? (
               <>
-                <div className="flex justify-end">
+                <div className="flex items-center justify-between gap-3">
+                  <Eyebrow>Results</Eyebrow>
                   <Button
                     variant="secondary"
                     type="button"
                     onClick={() => downloadTaxSummaryPdf(business, selected)}
-                    className="w-full sm:w-auto"
                   >
-                    Download PDF summary
+                    Download PDF
                   </Button>
                 </div>
                 <NextPaymentDue calculation={selected} />
-                <ResultsPanel result={selected.result_json} taxYear={selected.tax_year} />
-                <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
+                <ResultsPanel
+                  result={selected.result_json}
+                  taxYear={selected.tax_year}
+                  paymentsSlot={
+                    <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
+                  }
+                />
               </>
             ) : (
               <Card>

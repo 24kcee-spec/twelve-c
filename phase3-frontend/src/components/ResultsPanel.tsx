@@ -1,10 +1,10 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { InstalmentStatus, QuarterWheel, WheelSegment } from "@/components/QuarterWheel";
 import { CurrencySplitBars } from "@/components/CurrencySplitBars";
-import { Card, Eyebrow } from "@/components/ui";
-import { money, percent } from "@/lib/format";
+import { Card, Eyebrow, TabBar } from "@/components/ui";
+import { money } from "@/lib/format";
 import { useCountUp } from "@/lib/useCountUp";
 import { QpdResultJson } from "@/lib/types";
 
@@ -39,8 +39,21 @@ function AnimatedPercent({ value, colorClass }: { value: number; colorClass: str
   return <span className={`font-mono text-2xl tabular-nums ${colorClass}`}>{anim.toFixed(0)}%</span>;
 }
 
-export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYear: number }) {
+type TabId = "breakdown" | "split" | "schedule" | "payments";
+
+export function ResultsPanel({
+  result,
+  taxYear,
+  paymentsSlot,
+}: {
+  result: QpdResultJson;
+  taxYear: number;
+  /** Rendered inside the "Payments" tab - owned by the parent since saving
+   *  payments needs page-level state (the calculation record, the API call). */
+  paymentsSlot?: ReactNode;
+}) {
   const [currency, setCurrency] = useState<"USD" | "ZIG">("USD");
+  const [tab, setTab] = useState<TabId>("breakdown");
 
   const today = startOfDay(new Date());
   const withDates = result.schedule.map((inst, i) => {
@@ -76,21 +89,28 @@ export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYe
 
   const isCapped = result.payment_ratio_usd === 0.5 && result.usd_ratio !== 0.5;
 
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "breakdown", label: "Breakdown" },
+    { id: "split", label: "Currency split" },
+    { id: "schedule", label: "Schedule" },
+    ...(paymentsSlot ? [{ id: "payments" as TabId, label: "Payments" }] : []),
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card className="border-2 border-ink/10 bg-ink text-surface">
         <Eyebrow className="text-surface/60">
           Net payable · Q{result.quarter} due {result.due_date} {taxYear}
         </Eyebrow>
         <div className="mt-3 flex flex-wrap items-end gap-6">
           <div>
-            <div className="font-mono text-4xl tabular-nums text-usd">{money(result.net_payable_usd, "USD")}</div>
+            <div className="font-mono text-3xl tabular-nums text-usd sm:text-4xl">{money(result.net_payable_usd, "USD")}</div>
             <div className="mt-1 text-xs text-surface/60">
               {(result.cumulative_percentage * 100).toFixed(0)}% cumulative due − {money(result.previous_paid_usd, "USD")} already paid
             </div>
           </div>
           <div>
-            <div className="font-mono text-4xl tabular-nums text-zig">{money(result.net_payable_zig, "ZIG")}</div>
+            <div className="font-mono text-3xl tabular-nums text-zig sm:text-4xl">{money(result.net_payable_zig, "ZIG")}</div>
             <div className="mt-1 text-xs text-surface/60">
               {(result.cumulative_percentage * 100).toFixed(0)}% cumulative due − {money(result.previous_paid_zig, "ZIG")} already paid
             </div>
@@ -98,70 +118,82 @@ export function ResultsPanel({ result, taxYear }: { result: QpdResultJson; taxYe
         </div>
         <p className="mt-4 text-xs text-surface/50">
           This is the actual amount ZIMRA expects for this quarter, netted against what you&apos;ve confirmed
-          paying so far this tax year. The schedule below is a full-year projection at today&apos;s estimate,
+          paying so far this tax year. The schedule tab is a full-year projection at today&apos;s estimate,
           not a bill for future quarters — it will change if you revise your estimate next quarter.
         </p>
       </Card>
 
       <Card>
-        <Eyebrow>Trading currency split</Eyebrow>
-        <div className="mt-3 flex flex-wrap gap-8 text-sm">
-          <div>
-            <AnimatedPercent value={result.usd_ratio} colorClass="text-usd" />
-            <div className="text-ink-faint">of trade in USD</div>
-          </div>
-          <div>
-            <AnimatedPercent value={result.zig_ratio} colorClass="text-zig" />
-            <div className="text-ink-faint">of trade in ZiG</div>
-          </div>
-        </div>
-        <CurrencySplitBars
-          rawUsd={result.usd_ratio}
-          rawZig={result.zig_ratio}
-          paymentUsd={result.payment_ratio_usd}
-          paymentZig={result.payment_ratio_zig}
-          capped={isCapped}
-        />
-      </Card>
+        <TabBar tabs={tabs} active={tab} onChange={setTab} />
 
-      <Card>
-        <Eyebrow>Adjusted computation</Eyebrow>
-        <div className="mt-3">
-          <Row label="Adjusted income" usd={result.adjusted_income_usd} zig={result.adjusted_income_zig} />
-          <Row label="Adjusted deductions" usd={result.adjusted_deductions_usd} zig={result.adjusted_deductions_zig} />
-          <Row label="Taxable profit" usd={result.taxable_profit_usd} zig={result.taxable_profit_zig} />
-          <Row label="Tax payable" usd={result.tax_payable_usd} zig={result.tax_payable_zig} />
-          <Row label="AIDS levy" usd={result.aids_levy_usd} zig={result.aids_levy_zig} />
-          <Row label="Total tax due" usd={result.total_tax_usd} zig={result.total_tax_zig} />
-        </div>
-      </Card>
-
-      <Card>
-        <div className="flex items-center justify-between">
-          <Eyebrow>Full-year projection (at today&apos;s estimate)</Eyebrow>
-          <div className="flex overflow-hidden rounded border border-line text-xs">
-            <button
-              onClick={() => setCurrency("USD")}
-              className={`px-3 py-1 ${currency === "USD" ? "bg-usd text-surface" : "text-ink-soft"}`}
-            >
-              USD
-            </button>
-            <button
-              onClick={() => setCurrency("ZIG")}
-              className={`px-3 py-1 ${currency === "ZIG" ? "bg-zig text-surface" : "text-ink-soft"}`}
-            >
-              ZiG
-            </button>
+        {tab === "breakdown" && (
+          <div className="mt-4 fade-in-up">
+            <Eyebrow>Adjusted computation</Eyebrow>
+            <div className="mt-3">
+              <Row label="Adjusted income" usd={result.adjusted_income_usd} zig={result.adjusted_income_zig} />
+              <Row label="Adjusted deductions" usd={result.adjusted_deductions_usd} zig={result.adjusted_deductions_zig} />
+              <Row label="Taxable profit" usd={result.taxable_profit_usd} zig={result.taxable_profit_zig} />
+              <Row label="Tax payable" usd={result.tax_payable_usd} zig={result.tax_payable_zig} />
+              <Row label="AIDS levy" usd={result.aids_levy_usd} zig={result.aids_levy_zig} />
+              <Row label="Total tax due" usd={result.total_tax_usd} zig={result.total_tax_zig} />
+            </div>
           </div>
-        </div>
-        <div className="mt-5">
-          <QuarterWheel
-            segments={wheelSegments}
-            currency={currency}
-            totalUsd={result.total_tax_usd}
-            totalZig={result.total_tax_zig}
-          />
-        </div>
+        )}
+
+        {tab === "split" && (
+          <div className="mt-4 fade-in-up">
+            <Eyebrow>Trading currency split</Eyebrow>
+            <div className="mt-3 flex flex-wrap gap-8 text-sm">
+              <div>
+                <AnimatedPercent value={result.usd_ratio} colorClass="text-usd" />
+                <div className="text-ink-faint">of trade in USD</div>
+              </div>
+              <div>
+                <AnimatedPercent value={result.zig_ratio} colorClass="text-zig" />
+                <div className="text-ink-faint">of trade in ZiG</div>
+              </div>
+            </div>
+            <CurrencySplitBars
+              rawUsd={result.usd_ratio}
+              rawZig={result.zig_ratio}
+              paymentUsd={result.payment_ratio_usd}
+              paymentZig={result.payment_ratio_zig}
+              capped={isCapped}
+            />
+          </div>
+        )}
+
+        {tab === "schedule" && (
+          <div className="mt-4 fade-in-up">
+            <div className="flex items-center justify-between">
+              <Eyebrow>Full-year projection (at today&apos;s estimate)</Eyebrow>
+              <div className="flex overflow-hidden rounded border border-line text-xs">
+                <button
+                  onClick={() => setCurrency("USD")}
+                  className={`px-3 py-1 ${currency === "USD" ? "bg-usd text-surface" : "text-ink-soft"}`}
+                >
+                  USD
+                </button>
+                <button
+                  onClick={() => setCurrency("ZIG")}
+                  className={`px-3 py-1 ${currency === "ZIG" ? "bg-zig text-surface" : "text-ink-soft"}`}
+                >
+                  ZiG
+                </button>
+              </div>
+            </div>
+            <div className="mt-5">
+              <QuarterWheel
+                segments={wheelSegments}
+                currency={currency}
+                totalUsd={result.total_tax_usd}
+                totalZig={result.total_tax_zig}
+              />
+            </div>
+          </div>
+        )}
+
+        {tab === "payments" && paymentsSlot && <div className="mt-4 fade-in-up">{paymentsSlot}</div>}
       </Card>
     </div>
   );
