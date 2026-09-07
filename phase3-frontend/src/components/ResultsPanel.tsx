@@ -99,28 +99,10 @@ export function ResultsPanel({
   return (
     <div className="space-y-4">
       <Card className="border-2 border-ink/10 bg-ink text-surface">
-        <Eyebrow className="text-surface/60">
-          Net payable · Q{result.quarter} due {result.due_date} {taxYear}
-        </Eyebrow>
-        <div className="mt-3 flex flex-wrap items-end gap-6">
-          <div>
-            <div className="font-mono text-3xl tabular-nums text-usd sm:text-4xl">{money(result.net_payable_usd, "USD")}</div>
-            <div className="mt-1 text-xs text-surface/60">
-              {(result.cumulative_percentage * 100).toFixed(0)}% cumulative due − {money(result.previous_paid_usd, "USD")} already paid
-            </div>
-          </div>
-          <div>
-            <div className="font-mono text-3xl tabular-nums text-zig sm:text-4xl">{money(result.net_payable_zig, "ZIG")}</div>
-            <div className="mt-1 text-xs text-surface/60">
-              {(result.cumulative_percentage * 100).toFixed(0)}% cumulative due − {money(result.previous_paid_zig, "ZIG")} already paid
-            </div>
-          </div>
+        <div className="flex flex-wrap items-end gap-6">
+          <div className="font-mono text-3xl tabular-nums text-usd sm:text-4xl">{money(result.net_payable_usd, "USD")}</div>
+          <div className="font-mono text-3xl tabular-nums text-zig sm:text-4xl">{money(result.net_payable_zig, "ZIG")}</div>
         </div>
-        <p className="mt-4 text-xs text-surface/50">
-          This is the actual amount ZIMRA expects for this quarter, netted against what you&apos;ve confirmed
-          paying so far this tax year. The schedule tab is a full-year projection at today&apos;s estimate,
-          not a bill for future quarters — it will change if you revise your estimate next quarter.
-        </p>
       </Card>
 
       <Card>
