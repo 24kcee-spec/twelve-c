@@ -1,3 +1,26 @@
+# ============================================================
+# FIX: Remove orphan "last" prop on CurrencyPairInput (3x)
+# Root cause: CurrencyPairInput's props type never declared
+# "last" and never used it. Border removal on the final row is
+# already handled by Tailwind's last:border-b-0 on the wrapper
+# div (:last-child CSS), so the prop was dead code left over
+# from an earlier session. TS correctly rejected it.
+# Fixes: src/app/dashboard/[businessId]/page.tsx:333 build error
+# ============================================================
+
+$path = "src\app\dashboard\[businessId]\page.tsx"
+$fullPath = Get-ChildItem -Path . -Recurse -Filter "page.tsx" |
+    Where-Object { $_.FullName -like "*dashboard*businessId*" } |
+    Select-Object -First 1 -ExpandProperty FullName
+
+if (-not $fullPath) {
+    Write-Host "Could not auto-detect page.tsx under dashboard/[businessId]. Aborting."
+    exit 1
+}
+
+Write-Host "Writing fixed file to: $fullPath"
+
+$content = @'
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -566,3 +589,14 @@ export default function BusinessPage() {
     </AuthGuard>
   );
 }
+'@
+
+[System.IO.File]::WriteAllText($fullPath, $content)
+
+Write-Host "Done. 'last' prop removed from all 3 CurrencyPairInput call sites."
+Write-Host "Now run:"
+Write-Host "  npm run build"
+Write-Host "If it compiles clean, commit and push:"
+Write-Host "  git add ."
+Write-Host "  git commit -m `"fix: remove dead last prop causing TS build failure`""
+Write-Host "  git push"
