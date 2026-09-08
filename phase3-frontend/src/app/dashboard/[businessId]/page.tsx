@@ -207,8 +207,8 @@ function BusinessContent({ businessId }: { businessId: string }) {
           <ErrorNote>{error}</ErrorNote>
           {!error && (
             <div className="space-y-4">
-              <div className="glass h-32 animate-pulse rounded-lg" />
-              <div className="glass h-64 animate-pulse rounded-lg" />
+              <div className="h-32 animate-pulse rounded-lg border border-line bg-surface" />
+              <div className="h-64 animate-pulse rounded-lg border border-line bg-surface" />
             </div>
           )}
         </div>
@@ -221,7 +221,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
       <TopBar />
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-signal-gradient font-mono text-base font-semibold text-paper shadow-glow-sm">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-base font-semibold text-ink">
             {business.name
               .split(/\s+/)
               .filter(Boolean)
@@ -266,7 +266,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                   <select
                     value={quarter}
                     onChange={(e) => setQuarter(parseInt(e.target.value, 10))}
-                    className="w-full rounded-md border border-line bg-surface/60 px-3 py-2.5 font-mono text-sm text-ink outline-none backdrop-blur-sm transition duration-150 ease-snap focus:border-usd focus:shadow-glow-sm"
+                    className="w-full rounded-md border border-line bg-surface px-3 py-2.5 font-mono text-sm text-ink outline-none transition duration-150 ease-snap focus:border-seal"
                   >
                     <option value={1}>QPD1 - due 25 March (10% cumulative)</option>
                     <option value={2}>QPD2 - due 25 June (35% cumulative)</option>
@@ -481,7 +481,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                               <li key={c.id}>
                                 <div
                                   className={`flex items-center gap-1 rounded-md text-sm transition duration-150 ${
-                                    isSelected ? "bg-usd-soft text-usd shadow-glow-sm" : "text-ink-soft hover:bg-paper/60 hover:text-ink"
+                                    isSelected ? "bg-usd-soft text-usd" : "text-ink-soft hover:bg-surface-2 hover:text-ink"
                                   }`}
                                 >
                                   <button

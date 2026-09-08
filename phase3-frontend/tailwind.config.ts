@@ -8,6 +8,7 @@ const config: Config = {
       colors: {
         paper: "rgb(var(--color-paper) / <alpha-value>)",
         surface: "rgb(var(--color-surface) / <alpha-value>)",
+        "surface-2": "rgb(var(--color-surface-2) / <alpha-value>)",
         ink: {
           DEFAULT: "rgb(var(--color-ink) / <alpha-value>)",
           soft: "rgb(var(--color-ink-soft) / <alpha-value>)",
@@ -22,6 +23,10 @@ const config: Config = {
           DEFAULT: "rgb(var(--color-zig) / <alpha-value>)",
           soft: "rgb(var(--color-zig-soft) / <alpha-value>)",
         },
+        seal: {
+          DEFAULT: "rgb(var(--color-seal) / <alpha-value>)",
+          soft: "rgb(var(--color-seal-soft) / <alpha-value>)",
+        },
         danger: {
           DEFAULT: "rgb(var(--color-danger) / <alpha-value>)",
           soft: "rgb(var(--color-danger-soft) / <alpha-value>)",
@@ -33,20 +38,15 @@ const config: Config = {
         mono: ["var(--font-plex-mono)", "ui-monospace", "monospace"],
       },
       borderRadius: {
-        sm: "4px",
-        DEFAULT: "8px",
-        md: "12px",
-        lg: "18px",
-        xl: "24px",
+        sm: "3px",
+        DEFAULT: "4px",
+        md: "6px",
+        lg: "10px",
+        xl: "14px",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 0 rgba(255, 255, 255, 0.03)",
-        "glow-usd": "0 0 0 1px rgb(var(--glow-usd) / 0.4), 0 0 24px rgb(var(--glow-usd) / 0.35)",
-        "glow-zig": "0 0 0 1px rgb(var(--glow-zig) / 0.4), 0 0 24px rgb(var(--glow-zig) / 0.35)",
-        "glow-sm": "0 0 12px rgb(var(--glow-usd) / 0.25)",
-      },
-      backgroundImage: {
-        "signal-gradient": "linear-gradient(135deg, rgb(var(--color-usd)), rgb(var(--color-zig)))",
+        card: "0 1px 2px rgba(20, 16, 8, 0.06), 0 1px 0 rgba(20, 16, 8, 0.04)",
+        "card-raised": "0 2px 8px rgba(20, 16, 8, 0.08), 0 1px 0 rgba(20, 16, 8, 0.05)",
       },
       transitionTimingFunction: {
         snap: "cubic-bezier(0.16, 1, 0.3, 1)",

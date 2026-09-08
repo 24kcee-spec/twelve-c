@@ -355,17 +355,9 @@ export function AnimatedScheduleReveal() {
 
       <style jsx>{`
         .aqs-glow {
-          background: radial-gradient(
-              circle at 15% 20%,
-              rgb(var(--color-usd) / 0.14),
-              transparent 55%
-            ),
-            radial-gradient(
-              circle at 88% 75%,
-              rgb(var(--color-zig) / 0.16),
-              transparent 55%
-            );
-          filter: blur(28px);
+          /* Flat parchment wash, not a glow - stays in keeping with the
+             ruled-ledger surface instead of a lit panel. */
+          background: rgb(var(--color-seal-soft) / 0.4);
         }
         .aqs-sheen {
           background: linear-gradient(

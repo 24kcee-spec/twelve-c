@@ -170,7 +170,7 @@ function DashboardContent() {
         <ErrorNote>{error}</ErrorNote>
 
         {showForm && (
-          <Card className="mt-6 border-usd/30 shadow-glow-usd">
+          <Card className="mt-6" letterhead>
             <h2 className="font-display text-xl text-ink">New business</h2>
             <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={onCreate}>
               <div className="sm:col-span-2">
@@ -215,7 +215,7 @@ function DashboardContent() {
           {businesses === null && (
             <>
               {[0, 1, 2].map((i) => (
-                <div key={i} className="glass h-44 animate-pulse rounded-lg" />
+                <div key={i} className="h-44 animate-pulse rounded-lg border border-line bg-surface" />
               ))}
             </>
           )}
@@ -237,12 +237,12 @@ function DashboardContent() {
             return (
               <Card
                 key={b.id}
-                className="group flex h-full flex-col transition duration-200 ease-snap hover:-translate-y-0.5 hover:border-usd/60 hover:shadow-glow-usd"
+                className="group flex h-full flex-col transition duration-200 ease-snap hover:-translate-y-0.5 hover:border-seal/60 hover:shadow-card-raised"
               >
                 <Link href={`/dashboard/${b.id}`} className="flex flex-1 flex-col">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-signal-gradient font-mono text-sm font-semibold text-paper shadow-glow-sm">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-sm font-semibold text-ink">
                         {initials || "?"}
                       </span>
                       <h3 className="font-display text-lg text-ink transition group-hover:text-usd">{b.name}</h3>

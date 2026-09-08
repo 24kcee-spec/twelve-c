@@ -108,7 +108,7 @@ function ThemeToggle() {
               setTheme(opt.value);
             }}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition duration-150 ${
-              theme === opt.value ? "bg-signal-gradient text-paper shadow-glow-sm" : "text-ink-soft hover:text-ink"
+              theme === opt.value ? "bg-seal text-ink" : "text-ink-soft hover:text-ink"
             }`}
           >
             {opt.icon}
@@ -199,7 +199,7 @@ export function TopBar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 glass border-x-0 border-t-0">
+    <header className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2">
           <Link href="/dashboard" className="mr-4">
@@ -244,7 +244,7 @@ export function TopBar() {
           align="right"
           trigger={({ open }) => (
             <span
-              className={`flex h-8 w-8 items-center justify-center rounded-full bg-signal-gradient font-mono text-xs font-semibold text-paper shadow-glow-sm transition ${
+              className={`flex h-8 w-8 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink transition ${
                 open ? "ring-2 ring-usd ring-offset-2 ring-offset-surface" : ""
               }`}
             >

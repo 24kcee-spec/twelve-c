@@ -35,7 +35,7 @@ const STEPS = [
 
 function LandingHeader() {
   return (
-    <header className="glass sticky top-0 z-40 border-x-0 border-t-0">
+    <header className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
         <Logo />
         <nav className="hidden items-center gap-6 md:flex">
@@ -113,7 +113,7 @@ export default function LandingPage() {
             <Eyebrow>ZIMRA provisional tax, calculated properly</Eyebrow>
             <h1 className="mt-3 font-display text-4xl leading-[1.1] text-ink md:text-5xl">
               QPD tax,{" "}
-              <span className="bg-signal-gradient bg-clip-text text-transparent">
+              <span className="text-seal">
                 without the spreadsheet.
               </span>
             </h1>
@@ -146,7 +146,7 @@ export default function LandingPage() {
 
       {/* The cumulative rhythm, visualised */}
       <div className="trace" />
-      <section className="border-y border-line bg-surface/40 backdrop-blur-sm">
+      <section className="border-y border-line bg-surface-2">
         <div className="mx-auto max-w-5xl px-6 py-14">
           <Eyebrow>How the year is structured</Eyebrow>
           <h2 className="mt-2 font-display text-2xl text-ink md:text-3xl">

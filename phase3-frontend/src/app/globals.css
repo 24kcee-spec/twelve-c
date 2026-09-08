@@ -3,46 +3,47 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------
-   Design tokens as CSS variables (RGB triplets so Tailwind can apply
-   opacity via rgb(var(--x) / <alpha-value>)). "Terminal" register:
-   deep near-black void with a faint blue-graphite undertone, glass
-   panels, and two signal colours - emerald (USD) and cyan (ZIG) - that
-   glow rather than sit flat. Switching themes is just toggling the
-   "dark" class on <html> - every bg-paper/text-ink/etc. utility in the
-   app repaints automatically, nothing else has to change.
+   "The Ledger" - a ruled passbook aesthetic, not a glass panel. Warm
+   parchment paper, aged-gold seal reserved for the logo and confirmed/
+   verified states, and a faint ruled-line body texture. Dark mode
+   ("Night Ledger") uses a three-step surface hierarchy - paper, surface,
+   surface-2 - so nested elements (asset register rows, modals) read as
+   physically stacked rather than just a lighter blur.
    --------------------------------------------------------------------- */
 :root {
-  --color-paper: 250 251 253;
-  --color-surface: 255 255 255;
-  --color-ink: 13 18 28;
-  --color-ink-soft: 71 84 105;
-  --color-ink-faint: 130 141 158;
-  --color-line: 222 227 235;
-  --color-usd: 5 150 105;
-  --color-usd-soft: 220 245 235;
-  --color-zig: 8 145 178;
-  --color-zig-soft: 219 244 250;
-  --color-danger: 220 38 38;
-  --color-danger-soft: 254 226 226;
-  --glow-usd: 5 150 105;
-  --glow-zig: 34 211 238;
+  --color-paper: 245 240 227;
+  --color-surface: 253 250 242;
+  --color-surface-2: 245 240 227;
+  --color-ink: 36 29 20;
+  --color-ink-soft: 91 82 66;
+  --color-ink-faint: 140 129 108;
+  --color-line: 214 202 172;
+  --color-usd: 31 111 84;
+  --color-usd-soft: 226 239 231;
+  --color-zig: 45 90 120;
+  --color-zig-soft: 224 233 240;
+  --color-seal: 163 116 30;
+  --color-seal-soft: 243 232 205;
+  --color-danger: 168 65 47;
+  --color-danger-soft: 243 227 222;
 }
 
 html.dark {
-  --color-paper: 8 11 18;
-  --color-surface: 17 22 34;
-  --color-ink: 237 241 248;
-  --color-ink-soft: 165 176 196;
-  --color-ink-faint: 110 121 142;
-  --color-line: 38 47 66;
-  --color-usd: 52 211 153;
-  --color-usd-soft: 10 38 32;
-  --color-zig: 56 209 235;
-  --color-zig-soft: 10 36 44;
-  --color-danger: 248 113 113;
-  --color-danger-soft: 46 17 17;
-  --glow-usd: 52 211 153;
-  --glow-zig: 56 209 235;
+  --color-paper: 23 19 16;
+  --color-surface: 32 26 20;
+  --color-surface-2: 41 34 26;
+  --color-ink: 237 229 214;
+  --color-ink-soft: 184 173 149;
+  --color-ink-faint: 138 128 105;
+  --color-line: 58 50 38;
+  --color-usd: 79 174 138;
+  --color-usd-soft: 27 45 38;
+  --color-zig: 111 160 196;
+  --color-zig-soft: 25 40 51;
+  --color-seal: 212 169 76;
+  --color-seal-soft: 46 37 20;
+  --color-danger: 226 133 122;
+  --color-danger-soft: 51 27 22;
 }
 
 html {
@@ -59,52 +60,39 @@ body {
   position: relative;
 }
 
-/* Futuristic backdrop: a faint drifting grid + two soft glow blooms.
-   Fixed and behind everything, purely decorative, ignored by
-   prefers-reduced-motion and never intercepts pointer events. */
+/* Faint ruled-line texture, like feint-ruled ledger paper. Fixed behind
+   everything, purely decorative. */
 body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgb(var(--color-line) / 0.35) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(var(--color-line) / 0.35) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 90%);
-  opacity: 0.5;
-}
-html.dark body::before {
-  opacity: 0.2;
-}
-
-body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(680px 420px at 8% -6%, rgb(var(--glow-usd) / 0.16), transparent 65%),
-    radial-gradient(680px 420px at 96% 8%, rgb(var(--glow-zig) / 0.14), transparent 65%);
+  background-image: repeating-linear-gradient(
+    rgb(var(--color-line) / 0.32) 0px,
+    rgb(var(--color-line) / 0.32) 1px,
+    transparent 1px,
+    transparent 28px
+  );
 }
-html.dark body::after {
-  background:
-    radial-gradient(680px 420px at 8% -6%, rgb(var(--glow-usd) / 0.08), transparent 65%),
-    radial-gradient(680px 420px at 96% 8%, rgb(var(--glow-zig) / 0.07), transparent 65%);
+html.dark body::before {
+  background-image: repeating-linear-gradient(
+    rgb(var(--color-line) / 0.22) 0px,
+    rgb(var(--color-line) / 0.22) 1px,
+    transparent 1px,
+    transparent 28px
+  );
 }
 
 ::selection {
-  background-color: rgb(var(--color-zig));
-  color: rgb(var(--color-paper));
+  background-color: rgb(var(--color-seal) / 0.35);
+  color: rgb(var(--color-ink));
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Hairline rule used throughout instead of drop shadows */
 .rule {
   border-color: rgb(var(--color-line));
 }
@@ -120,15 +108,12 @@ html.dark body::after {
   }
 }
 
-/* Focus ring: visible, on-brand, never suppressed */
 :focus-visible {
-  outline: 2px solid rgb(var(--color-usd));
+  outline: 2px solid rgb(var(--color-seal));
   outline-offset: 2px;
   border-radius: 2px;
 }
 
-/* Remove native spinner arrows from number inputs across the whole app -
-   they read as clunky/default-browser rather than a designed product. */
 input[type="number"] {
   -moz-appearance: textfield;
 }
@@ -138,10 +123,6 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
-/* Tax summary PDF export - triggered by window.print() on the "Download PDF
-   summary" button. Everything else on the page carries print:hidden so only
-   the TaxSummaryPrint component renders in the printed/PDF output. The PDF
-   always prints light/white regardless of the app's current theme. */
 @media print {
   @page {
     margin: 1.5cm;
@@ -150,8 +131,7 @@ input[type="number"]::-webkit-inner-spin-button {
     background: white;
     color: black;
   }
-  body::before,
-  body::after {
+  body::before {
     display: none;
   }
 }
@@ -164,41 +144,34 @@ input[type="number"]::-webkit-inner-spin-button {
   animation: fadeInUp 400ms ease-out both;
 }
 
-@keyframes glowPulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
-}
-.glow-pulse {
-  animation: glowPulse 2.4s ease-in-out infinite;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .fade-in-up,
-  .glow-pulse { animation: none; }
+  .fade-in-up { animation: none; }
 }
 
-/* ---------------------------------------------------------------------
-   Glass panel utility - the core "futuristic" surface used by Card,
-   Modal, TopBar, and dropdowns. Translucent, blurred, hairline-bordered,
-   with an inner top highlight to read as a physical pane of glass.
-   --------------------------------------------------------------------- */
-.glass {
-  background: rgb(var(--color-surface) / 0.72);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border: 1px solid rgb(var(--color-line) / 0.8);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.04),
-    0 1px 2px rgb(0 0 0 / 0.04);
-}
-html.dark .glass {
-  background: rgb(var(--color-surface) / 0.92);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 8px 30px rgb(0 0 0 / 0.45);
+/* Letterhead rule - a seal-gold top border used on cards and headers in
+   place of drop shadows / glow. Reads as a stamped ledger sheet. */
+.letterhead {
+  border-top: 2px solid rgb(var(--color-seal));
 }
 
-/* Thin, unobtrusive scrollbar for the sticky results rail on desktop */
+/* Stamp-style badge for confirmed/verified states (MFA enabled, payment
+   recorded, email verified). Deliberately the only place besides the
+   logo that uses seal gold, so it always signals "this is official". */
+.seal-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid rgb(var(--color-seal) / 0.5);
+  background: rgb(var(--color-seal-soft));
+  color: rgb(var(--color-seal));
+  border-radius: 999px;
+  padding: 0.125rem 0.625rem;
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--color-line)) transparent;
@@ -215,10 +188,4 @@ html.dark .glass {
 }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: rgb(var(--color-ink-faint));
-}
-
-/* Thin glowing rule used as a section divider / circuit-trace accent */
-.trace {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgb(var(--color-usd) / 0.6), rgb(var(--color-zig) / 0.6), transparent);
 }
