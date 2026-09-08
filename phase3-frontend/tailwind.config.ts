@@ -45,8 +45,9 @@ const config: Config = {
         xl: "14px",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(20, 16, 8, 0.06), 0 1px 0 rgba(20, 16, 8, 0.04)",
-        "card-raised": "0 2px 8px rgba(20, 16, 8, 0.08), 0 1px 0 rgba(20, 16, 8, 0.05)",
+        card: "0 1px 3px rgba(20, 16, 8, 0.08), 0 1px 0 rgba(20, 16, 8, 0.04)",
+        "card-raised": "0 12px 28px -16px rgba(20, 16, 8, 0.25), 0 2px 6px rgba(20, 16, 8, 0.08)",
+        hero: "0 24px 48px -28px rgba(20, 15, 6, 0.55), 0 2px 6px rgba(20, 15, 6, 0.25)",
       },
       transitionTimingFunction: {
         snap: "cubic-bezier(0.16, 1, 0.3, 1)",

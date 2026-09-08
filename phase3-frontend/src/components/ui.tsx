@@ -92,11 +92,7 @@ export function SealMark({ children }: { children: React.ReactNode }) {
 }
 
 export function Eyebrow({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="font-mono text-xs uppercase tracking-[0.15em] text-ink-faint">
-      {children}
-    </span>
-  );
+  return <span className="text-sm font-medium text-ink-faint">{children}</span>;
 }
 
 export function ErrorNote({ children }: { children: React.ReactNode }) {
@@ -139,7 +135,7 @@ export function TabBar<T extends string>({
           role="tab"
           aria-selected={active === tab.id}
           onClick={() => onChange(tab.id)}
-          className={`shrink-0 whitespace-nowrap rounded px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] transition duration-150 ease-snap ${
+          className={`shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium transition duration-150 ease-snap ${
             active === tab.id
               ? "bg-seal text-ink"
               : "text-ink-faint hover:bg-surface hover:text-ink-soft"
@@ -208,7 +204,7 @@ export function Dropdown({
 
 export function DropdownLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="truncate px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+    <div className="truncate px-3 py-1.5 text-xs font-medium text-ink-faint">
       {children}
     </div>
   );
@@ -360,7 +356,7 @@ export function Badge({
 }) {
   const className =
     variant === "solid"
-      ? "rounded-full bg-seal px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-ink"
-      : "rounded-full border border-usd/60 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-usd";
+      ? "rounded-full bg-seal px-2.5 py-0.5 text-xs font-medium text-ink"
+      : "rounded-full border border-usd/60 px-2.5 py-0.5 text-xs font-medium text-usd";
   return <span className={className}>{children}</span>;
 }

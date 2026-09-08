@@ -1,11 +1,11 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { TopBar } from "@/components/TopBar";
 import { OverdueDigest, DigestItem } from "@/components/OverdueDigest";
-import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
+import { Button, Card, ErrorNote, Eyebrow, Field, TrashIcon } from "@/components/ui";
 import { api } from "@/lib/api";
 import { Business, QpdCalculationOut } from "@/lib/types";
 import { money } from "@/lib/format";
@@ -28,7 +28,7 @@ interface NextDueBadge {
 }
 
 // Compact version of the logic in NextPaymentDue/OverdueDigest, sized for a
-// one-line badge on each dashboard business card rather than a full panel.
+// one-line status on each dashboard ledger row rather than a full panel.
 function nextDueBadge(calc: QpdCalculationOut | null | undefined): NextDueBadge | null {
   if (!calc) return null;
   const today = startOfDay(new Date());
@@ -68,11 +68,24 @@ function nextDueBadge(calc: QpdCalculationOut | null | undefined): NextDueBadge 
   return { tone: "ok", label: "All instalments paid", amount: null };
 }
 
-const BADGE_STYLES: Record<NextDueBadge["tone"], string> = {
-  danger: "border-danger/30 bg-danger-soft text-danger",
-  warn: "border-zig/40 bg-zig-soft text-zig",
-  ok: "border-usd/30 bg-usd-soft text-usd",
+const STATUS_DOT: Record<NextDueBadge["tone"], string> = {
+  danger: "bg-danger",
+  warn: "bg-zig",
+  ok: "bg-usd",
 };
+const STATUS_TEXT: Record<NextDueBadge["tone"], string> = {
+  danger: "text-danger font-medium",
+  warn: "text-zig",
+  ok: "text-usd",
+};
+
+function ChevronRight() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" className="shrink-0 text-ink-faint">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 function DashboardContent() {
   const [businesses, setBusinesses] = useState<Business[] | null>(null);
@@ -157,10 +170,10 @@ function DashboardContent() {
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
         <OverdueDigest items={digestItems} />
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Eyebrow>Your businesses</Eyebrow>
-            <h1 className="mt-1 font-display text-3xl text-ink sm:text-4xl">Dashboard</h1>
+            <h1 className="font-display text-3xl text-ink sm:text-4xl">Dashboard</h1>
+            <p className="mt-1.5 text-sm text-ink-soft">Track and file every business&rsquo;s QPD in one place.</p>
           </div>
           <Button variant="primary" onClick={() => setShowForm((s) => !s)} className="w-full sm:w-auto">
             {showForm ? "Cancel" : "+ Add a business"}
@@ -211,103 +224,166 @@ function DashboardContent() {
           </Card>
         )}
 
-        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-8">
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="font-display text-xl text-ink">Your businesses</h2>
+            {businesses && businesses.length > 0 && (
+              <Eyebrow>{businesses.length === 1 ? "1 business" : `${businesses.length} businesses`}</Eyebrow>
+            )}
+          </div>
+
           {businesses === null && (
-            <>
+            <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-44 animate-pulse rounded-lg border border-line bg-surface" />
+                <div key={i} className={`border-b border-line p-5 last:border-b-0 ${i > 0 ? "" : ""}`}>
+                  <div className="h-4 w-40 animate-pulse rounded bg-paper" />
+                  <div className="mt-3 h-3 w-24 animate-pulse rounded bg-paper" />
+                </div>
               ))}
-            </>
+            </div>
           )}
+
           {businesses?.length === 0 && (
-            <Card className="sm:col-span-2 xl:col-span-3">
+            <Card>
               <p className="text-sm text-ink-soft">
                 No businesses yet. Add one above to run your first QPD calculation.
               </p>
             </Card>
           )}
-          {businesses?.map((b) => {
-            const badge = nextDueBadge(calcByBusiness.get(b.id));
-            const initials = b.name
-              .split(/\s+/)
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((w) => w[0]?.toUpperCase())
-              .join("");
-            return (
-              <Card
-                key={b.id}
-                className="group flex h-full flex-col transition duration-200 ease-snap hover:-translate-y-0.5 hover:border-seal/60 hover:shadow-card-raised"
-              >
-                <Link href={`/dashboard/${b.id}`} className="flex flex-1 flex-col">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-sm font-semibold text-ink">
-                        {initials || "?"}
-                      </span>
-                      <h3 className="font-display text-lg text-ink transition group-hover:text-usd">{b.name}</h3>
-                    </div>
-                    {badge && (
-                      <span
-                        className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${BADGE_STYLES[badge.tone]}`}
-                      >
-                        {badge.label}
-                      </span>
-                    )}
-                  </div>
-                  {badge?.amount && (
-                    <p className="mt-2 font-mono text-sm tabular-nums text-ink-soft">{badge.amount}</p>
-                  )}
-                  <dl className="mt-4 grid grid-cols-3 gap-2 text-xs text-ink-soft">
-                    <div className="rounded-md border border-line bg-paper/50 px-2 py-1.5 text-center">
-                      <dt className="text-[10px] uppercase tracking-wide text-ink-faint">Rate</dt>
-                      <dd className="mt-0.5 font-mono tabular-nums text-ink">{b.default_exchange_rate}</dd>
-                    </div>
-                    <div className="rounded-md border border-line bg-paper/50 px-2 py-1.5 text-center">
-                      <dt className="text-[10px] uppercase tracking-wide text-ink-faint">Tax</dt>
-                      <dd className="mt-0.5 font-mono tabular-nums text-ink">{(b.default_tax_rate * 100).toFixed(0)}%</dd>
-                    </div>
-                    <div className="rounded-md border border-line bg-paper/50 px-2 py-1.5 text-center">
-                      <dt className="text-[10px] uppercase tracking-wide text-ink-faint">AIDS</dt>
-                      <dd className="mt-0.5 font-mono tabular-nums text-ink">{(b.default_aids_levy_rate * 100).toFixed(0)}%</dd>
-                    </div>
-                  </dl>
-                </Link>
 
-                <div className="mt-4 border-t border-line pt-3">
-                  {confirmingDeleteId === b.id ? (
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs text-danger">
+          {businesses && businesses.length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card-raised">
+              <div className={`hidden grid-cols-[2.2fr_1.1fr_1.8fr_1.4fr_18px_26px] gap-4 px-6 py-3 text-xs font-medium text-ink-faint sm:grid`}>
+                <span>Business</span>
+                <span>Status</span>
+                <span>Rate</span>
+                <span className="text-right">Amount due</span>
+                <span />
+                <span />
+              </div>
+
+              {businesses.map((b, idx) => {
+                const badge = nextDueBadge(calcByBusiness.get(b.id));
+                const initials = b.name
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((w) => w[0]?.toUpperCase())
+                  .join("");
+                const isConfirming = confirmingDeleteId === b.id;
+
+                if (isConfirming) {
+                  return (
+                    <div
+                      key={b.id}
+                      className={`flex flex-wrap items-center justify-between gap-3 px-6 py-4 ${
+                        idx > 0 ? "border-t border-line" : ""
+                      }`}
+                    >
+                      <span className="text-sm text-danger">
                         {`Delete "${b.name}" and all its calculations? This can't be undone.`}
                       </span>
                       <div className="flex shrink-0 gap-2">
                         <button
                           onClick={() => onDelete(b.id)}
                           disabled={deletingId === b.id}
-                          className="rounded-md bg-danger px-2.5 py-1 text-xs font-semibold text-paper transition disabled:opacity-50"
+                          className="rounded-md bg-danger px-3 py-1.5 text-xs font-semibold text-paper transition disabled:opacity-50"
                         >
                           {deletingId === b.id ? "Deleting…" : "Yes, delete"}
                         </button>
                         <button
                           onClick={() => setConfirmingDeleteId(null)}
-                          className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-soft transition hover:text-ink"
+                          className="rounded-md border border-line px-3 py-1.5 text-xs text-ink-soft transition hover:text-ink"
                         >
                           Cancel
                         </button>
                       </div>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmingDeleteId(b.id)}
-                      className="text-xs text-ink-faint transition duration-150 hover:text-danger"
-                    >
-                      Delete business
-                    </button>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
+                  );
+                }
+
+                return (
+                  <div key={b.id} className={`group transition duration-150 hover:bg-seal-soft ${idx > 0 ? "border-t border-line" : ""}`}>
+                    {/* Mobile: stacked */}
+                    <div className="flex flex-col gap-2 px-6 py-4 sm:hidden">
+                      <div className="flex items-center justify-between gap-3">
+                        <Link href={`/dashboard/${b.id}`} className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
+                            {initials || "?"}
+                          </span>
+                          <span className="truncate font-display text-base text-ink">{b.name}</span>
+                        </Link>
+                        <button
+                          onClick={() => setConfirmingDeleteId(b.id)}
+                          aria-label={`Delete ${b.name}`}
+                          className="shrink-0 rounded-md p-1.5 text-ink-faint transition duration-150 hover:bg-danger-soft hover:text-danger"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                      {badge && (
+                        <Link href={`/dashboard/${b.id}`} className={`flex items-center gap-2 text-sm ${STATUS_TEXT[badge.tone]}`}>
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[badge.tone]}`} />
+                          {badge.label}
+                        </Link>
+                      )}
+                      <Link
+                        href={`/dashboard/${b.id}`}
+                        className={`font-mono text-sm ${badge?.tone === "danger" ? "font-semibold text-danger" : "text-ink"}`}
+                      >
+                        {badge?.amount ?? <span className="text-ink-faint">No balance due</span>}
+                      </Link>
+                    </div>
+
+                    {/* Desktop: ledger row */}
+                    <div className="hidden grid-cols-[2.2fr_1.1fr_1.8fr_1.4fr_18px_26px] items-center gap-4 px-6 py-4 sm:grid">
+                      <Link href={`/dashboard/${b.id}`} className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
+                          {initials || "?"}
+                        </span>
+                        <span className="truncate font-display text-base text-ink transition group-hover:text-usd">
+                          {b.name}
+                        </span>
+                      </Link>
+
+                      {badge ? (
+                        <Link href={`/dashboard/${b.id}`} className={`flex items-center gap-2 text-sm ${STATUS_TEXT[badge.tone]}`}>
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[badge.tone]}`} />
+                          {badge.label}
+                        </Link>
+                      ) : (
+                        <span />
+                      )}
+
+                      <Link href={`/dashboard/${b.id}`} className="text-sm text-ink-soft">
+                        ZiG {b.default_exchange_rate}/USD, {(b.default_tax_rate * 100).toFixed(0)}% tax +{" "}
+                        {(b.default_aids_levy_rate * 100).toFixed(0)}% AIDS levy
+                      </Link>
+
+                      <Link
+                        href={`/dashboard/${b.id}`}
+                        className={`text-right font-mono text-sm ${badge?.tone === "danger" ? "font-semibold text-danger" : "text-ink"}`}
+                      >
+                        {badge?.amount ?? <span className="text-ink-faint">No balance due</span>}
+                      </Link>
+
+                      <Link href={`/dashboard/${b.id}`}>
+                        <ChevronRight />
+                      </Link>
+
+                      <button
+                        onClick={() => setConfirmingDeleteId(b.id)}
+                        aria-label={`Delete ${b.name}`}
+                        className="justify-self-end rounded-md p-1.5 text-ink-faint opacity-0 transition duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </main>

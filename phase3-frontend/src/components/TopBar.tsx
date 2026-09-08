@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -95,7 +95,7 @@ function ThemeToggle() {
   ];
   return (
     <div className="px-3 py-2">
-      <span className="mb-1.5 block font-mono text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+      <span className="mb-1.5 block text-xs font-medium text-ink-faint">
         Appearance
       </span>
       <div className="flex gap-1 rounded-md border border-line bg-paper/60 p-1">
@@ -200,6 +200,7 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95">
+      <div className="h-[3px] bg-gradient-to-r from-seal via-[#E4C368] to-seal" />
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2">
           <Link href="/dashboard" className="mr-4">
