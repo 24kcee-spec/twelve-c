@@ -9,11 +9,20 @@ import { CurrencyPairInput } from "@/components/CurrencyPairInput";
 import { ResultsPanel } from "@/components/ResultsPanel";
 import { PaymentTracker } from "@/components/PaymentTracker";
 import { NextPaymentDue } from "@/components/NextPaymentDue";
+import { StepIndicator } from "@/components/StepIndicator";
 import { downloadTaxSummaryPdf } from "@/lib/generatePdf";
 import { Badge, Button, Card, ChevronDown, ErrorNote, Eyebrow, Field, TrashIcon } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDateTime, money } from "@/lib/format";
 import { Business, emptyExpenses, QpdCalculationOut, CurrencyExpensesIn } from "@/lib/types";
+
+// The New QPD calculation form used to be one long scroll (period label,
+// income, four deduction rows, the asset register, rate settings,
+// adjustments) all stacked in a single card. Split into a short wizard so
+// each screen asks for one kind of thing at a time; the submit logic and
+// every state variable below are untouched from the single-form version -
+// only how the fields are grouped and revealed has changed.
+const CALCULATION_STEPS = ["Period", "Income", "Deductions", "Review"] as const;
 
 function BusinessContent({ businessId }: { businessId: string }) {
   const [business, setBusiness] = useState<Business | null>(null);
@@ -57,6 +66,14 @@ function BusinessContent({ businessId }: { businessId: string }) {
   const [aidsLevyPct, setAidsLevyPct] = useState<number | null>(null);
   const [showRateSettings, setShowRateSettings] = useState(false);
 
+  // Wizard step. maxStepReached lets someone jump back to re-check an
+  // earlier step without letting them skip ahead of where they've actually
+  // gotten to - Review is only reachable once Period/Income/Deductions have
+  // each been passed through at least once.
+  const [wizardStep, setWizardStep] = useState(0);
+  const [maxStepReached, setMaxStepReached] = useState(0);
+  const [stepError, setStepError] = useState("");
+
   // Results column - scrolled into view after a successful calculation on
   // narrow viewports, where the results sit below the form instead of
   // beside it, so the person isn't left staring at the form wondering
@@ -93,6 +110,9 @@ function BusinessContent({ businessId }: { businessId: string }) {
     setExpandedYears(new Set());
     setConfirmingDeleteCalcId(null);
     setDeletingCalcId(null);
+    setWizardStep(0);
+    setMaxStepReached(0);
+    setStepError("");
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId]);
@@ -148,6 +168,43 @@ function BusinessContent({ businessId }: { businessId: string }) {
     else setZigExpenses((prev) => ({ ...prev, [field]: value }));
   }
 
+  // Only the Period step has anything worth blocking on - a missing label
+  // or year makes the calculation hard to find again later. Income and
+  // Deductions are legitimately all-zero (a new business's first quarter,
+  // spent before selling anything), so nothing there is required.
+  function validateWizardStep(index: number): string | null {
+    if (index === 0) {
+      if (!quarterLabel.trim()) return "Give this calculation a label, e.g. \u201cQ3 re-estimate\u201d.";
+      if (!Number.isFinite(taxYear) || taxYear < 2000 || taxYear > 2100) {
+        return "Enter a valid tax year.";
+      }
+    }
+    return null;
+  }
+
+  function goToWizardStep(index: number) {
+    if (index > maxStepReached) return;
+    setStepError("");
+    setWizardStep(index);
+  }
+
+  function wizardNext() {
+    const err = validateWizardStep(wizardStep);
+    if (err) {
+      setStepError(err);
+      return;
+    }
+    setStepError("");
+    const next = Math.min(wizardStep + 1, CALCULATION_STEPS.length - 1);
+    setWizardStep(next);
+    setMaxStepReached((m) => Math.max(m, next));
+  }
+
+  function wizardBack() {
+    setStepError("");
+    setWizardStep((s) => Math.max(0, s - 1));
+  }
+
   async function onCalculate(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -177,6 +234,8 @@ function BusinessContent({ businessId }: { businessId: string }) {
       setCalculations(refreshed);
       setSelected(result);
       setExpandedYears((prev) => new Set(prev).add(result.tax_year));
+      setWizardStep(0);
+      setMaxStepReached(0);
       if (typeof window !== "undefined" && window.innerWidth < 1024) {
         requestAnimationFrame(() => {
           resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -242,166 +301,310 @@ function BusinessContent({ businessId }: { businessId: string }) {
         <div className="mt-8 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8">
           <div className="space-y-6">
             <Card>
-              <Eyebrow>New QPD calculation</Eyebrow>
-              <form className="mt-4 space-y-4" onSubmit={onCalculate}>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field
-                    label="Tax year"
-                    type="number"
-                    required
-                    value={taxYear}
-                    onChange={(e) => setTaxYear(parseInt(e.target.value, 10) || taxYear)}
-                  />
-                  <Field
-                    label="Label"
-                    required
-                    value={quarterLabel}
-                    onChange={(e) => setQuarterLabel(e.target.value)}
-                    hint="e.g. 'Q3 re-estimate'"
-                  />
-                </div>
+              <div className="flex items-center justify-between gap-3">
+                <Eyebrow>New QPD calculation</Eyebrow>
+                <span className="font-mono text-xs text-ink-faint">
+                  Step {wizardStep + 1} of {CALCULATION_STEPS.length}
+                </span>
+              </div>
 
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-ink-soft">QPD quarter</span>
-                  <select
-                    value={quarter}
-                    onChange={(e) => setQuarter(parseInt(e.target.value, 10))}
-                    className="w-full rounded-md border border-line bg-surface px-3 py-2.5 font-mono text-sm text-ink outline-none transition duration-150 ease-snap focus:border-seal"
-                  >
-                    <option value={1}>QPD1 - due 25 March (10% cumulative)</option>
-                    <option value={2}>QPD2 - due 25 June (35% cumulative)</option>
-                    <option value={3}>QPD3 - due 25 September (65% cumulative)</option>
-                    <option value={4}>QPD4 - due 20 December (100% cumulative)</option>
-                  </select>
-                  <span className="mt-1.5 block text-xs text-ink-faint">
-                    Which QPD you&apos;re filing for - the amount actually due nets this quarter&apos;s
-                    cumulative target against what you&apos;ve confirmed paying in earlier quarters.
-                  </span>
-                </label>
+              <div className="mt-3">
+                <StepIndicator
+                  steps={[...CALCULATION_STEPS]}
+                  current={wizardStep}
+                  maxReached={maxStepReached}
+                  onSelect={goToWizardStep}
+                />
+              </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field
-                    label="USD sales"
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    emptyIfZero
-                    value={usdSales}
-                    onChange={(e) => setUsdSales(parseFloat(e.target.value) || 0)}
-                  />
-                  <Field
-                    label="ZiG sales"
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    emptyIfZero
-                    value={zigSales}
-                    onChange={(e) => setZigSales(parseFloat(e.target.value) || 0)}
-                  />
-                </div>
+              <form
+                className="mt-5 space-y-4"
+                onSubmit={(e) => {
+                  // Enter/submit only actually files the calculation from
+                  // the last step - every earlier step, submitting just
+                  // advances the wizard (with the same validation as the
+                  // Next button) so pressing Enter in a field doesn't skip
+                  // straight to Calculate.
+                  e.preventDefault();
+                  if (wizardStep === CALCULATION_STEPS.length - 1) {
+                    onCalculate(e);
+                  } else {
+                    wizardNext();
+                  }
+                }}
+              >
+                {wizardStep === 0 && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Field
+                        label="Tax year"
+                        type="number"
+                        required
+                        value={taxYear}
+                        onChange={(e) => setTaxYear(parseInt(e.target.value, 10) || taxYear)}
+                      />
+                      <Field
+                        label="Label"
+                        required
+                        value={quarterLabel}
+                        onChange={(e) => setQuarterLabel(e.target.value)}
+                        hint="e.g. 'Q3 re-estimate'"
+                      />
+                    </div>
 
-                <div>
-                  <p className="mb-1 text-sm font-medium text-ink-soft">Deductions</p>
-                  <div className="rounded-md border border-line bg-paper/30 px-3">
-                    <CurrencyPairInput
-                      label="Cost of sales"
-                      usdValue={usdExpenses.cost_of_sales}
-                      zigValue={zigExpenses.cost_of_sales}
-                      onUsdChange={(v) => updateExpense("usd", "cost_of_sales", v)}
-                      onZigChange={(v) => updateExpense("zig", "cost_of_sales", v)}
-                    />
-                    <CurrencyPairInput
-                      label="Salaries"
-                      usdValue={usdExpenses.salaries}
-                      zigValue={zigExpenses.salaries}
-                      onUsdChange={(v) => updateExpense("usd", "salaries", v)}
-                      onZigChange={(v) => updateExpense("zig", "salaries", v)}
-                    />
-                    <CurrencyPairInput
-                      label="Other expenses"
-                      usdValue={usdExpenses.other_expenses}
-                      zigValue={zigExpenses.other_expenses}
-                      onUsdChange={(v) => updateExpense("usd", "other_expenses", v)}
-                      onZigChange={(v) => updateExpense("zig", "other_expenses", v)}
-                    />
-                    <CurrencyPairInput
-                      label="Capital allowances"
-                      usdValue={usdExpenses.capital_allowances}
-                      zigValue={zigExpenses.capital_allowances}
-                      onUsdChange={(v) => updateExpense("usd", "capital_allowances", v)}
-                      onZigChange={(v) => updateExpense("zig", "capital_allowances", v)}
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-medium text-ink-soft">QPD quarter</span>
+                      <select
+                        value={quarter}
+                        onChange={(e) => setQuarter(parseInt(e.target.value, 10))}
+                        className="w-full rounded-md border border-line bg-surface px-3 py-2.5 font-mono text-sm text-ink outline-none transition duration-150 ease-snap focus:border-seal"
+                      >
+                        <option value={1}>QPD1 - due 25 March (10% cumulative)</option>
+                        <option value={2}>QPD2 - due 25 June (35% cumulative)</option>
+                        <option value={3}>QPD3 - due 25 September (65% cumulative)</option>
+                        <option value={4}>QPD4 - due 20 December (100% cumulative)</option>
+                      </select>
+                      <span className="mt-1.5 block text-xs text-ink-faint">
+                        Which QPD you&apos;re filing for - the amount actually due nets this quarter&apos;s
+                        cumulative target against what you&apos;ve confirmed paying in earlier quarters.
+                      </span>
+                    </label>
+                  </div>
+                )}
+
+                {wizardStep === 1 && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Field
+                        label="USD sales"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        emptyIfZero
+                        value={usdSales}
+                        onChange={(e) => setUsdSales(parseFloat(e.target.value) || 0)}
+                      />
+                      <Field
+                        label="ZiG sales"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        emptyIfZero
+                        value={zigSales}
+                        onChange={(e) => setZigSales(parseFloat(e.target.value) || 0)}
+                      />
+                    </div>
+                    {(usdSales > 0 || zigSales > 0) && (() => {
+                      const effectiveRate = exchangeRate ?? business.default_exchange_rate;
+                      const totalUsdEquiv = usdSales + zigSales / (effectiveRate || 1);
+                      const usdSharePct = totalUsdEquiv > 0 ? (usdSales / totalUsdEquiv) * 100 : 0;
+                      return (
+                        <p className="text-xs text-ink-faint">
+                          At ZiG {effectiveRate}/USD, that&apos;s roughly {usdSharePct.toFixed(0)}% of trade
+                          in USD. The Public Notice 71 50/50 cap applies only when USD is dominant.
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-4">
+                    <div>
+                      <p className="mb-1 text-sm font-medium text-ink-soft">Deductions</p>
+                      <div className="rounded-md border border-line bg-paper/30 px-3">
+                        <CurrencyPairInput
+                          label="Cost of sales"
+                          usdValue={usdExpenses.cost_of_sales}
+                          zigValue={zigExpenses.cost_of_sales}
+                          onUsdChange={(v) => updateExpense("usd", "cost_of_sales", v)}
+                          onZigChange={(v) => updateExpense("zig", "cost_of_sales", v)}
+                        />
+                        <CurrencyPairInput
+                          label="Salaries"
+                          usdValue={usdExpenses.salaries}
+                          zigValue={zigExpenses.salaries}
+                          onUsdChange={(v) => updateExpense("usd", "salaries", v)}
+                          onZigChange={(v) => updateExpense("zig", "salaries", v)}
+                        />
+                        <CurrencyPairInput
+                          label="Other expenses"
+                          usdValue={usdExpenses.other_expenses}
+                          zigValue={zigExpenses.other_expenses}
+                          onUsdChange={(v) => updateExpense("usd", "other_expenses", v)}
+                          onZigChange={(v) => updateExpense("zig", "other_expenses", v)}
+                        />
+                        <CurrencyPairInput
+                          label="Capital allowances"
+                          usdValue={usdExpenses.capital_allowances}
+                          zigValue={zigExpenses.capital_allowances}
+                          onUsdChange={(v) => updateExpense("usd", "capital_allowances", v)}
+                          onZigChange={(v) => updateExpense("zig", "capital_allowances", v)}
+                        />
+                      </div>
+                    </div>
+
+                    <AssetRegister
+                      businessId={businessId}
+                      taxYear={taxYear}
+                      onApply={(usd, zig) => {
+                        updateExpense("usd", "capital_allowances", usd);
+                        updateExpense("zig", "capital_allowances", zig);
+                      }}
                     />
                   </div>
-                </div>
+                )}
 
-                <AssetRegister
-                  businessId={businessId}
-                  taxYear={taxYear}
-                  onApply={(usd, zig) => {
-                    updateExpense("usd", "capital_allowances", usd);
-                    updateExpense("zig", "capital_allowances", zig);
-                  }}
-                />
-
-                <div className="rounded-md border border-line p-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowRateSettings(true)}
-                    className="flex w-full items-center justify-between text-left text-sm"
-                  >
-                    <span>
-                      <span className="font-medium text-ink">Rate settings</span>
-                      <span className="ml-2 text-ink-faint">
-                        ZiG {exchangeRate ?? business.default_exchange_rate}/USD ·{" "}
-                        {((taxRatePct ?? business.default_tax_rate * 100)).toFixed(0)}% tax + {" "}
-                        {((aidsLevyPct ?? business.default_aids_levy_rate * 100)).toFixed(0)}% AIDS levy
-                      </span>
-                    </span>
-                    <span className="text-usd">Edit</span>
-                  </button>
-                </div>
-
-                <div className="rounded-md border border-line p-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowAdjustments((v) => !v)}
-                    className="flex w-full items-center justify-between text-left text-sm"
-                  >
-                    <span className="font-medium text-ink">Adjustments</span>
-                    <span className="text-usd">{showAdjustments ? "Hide" : "Edit"}</span>
-                  </button>
-                  {showAdjustments && (
-                    <div className="mt-3 space-y-3 border-t border-line pt-3">
-                      <p className="text-xs text-ink-faint">
-                        Optional. Leave at 0 if these don&apos;t apply.
-                      </p>
-                      <CurrencyPairInput
-                        label="Assessed loss b/f"
-                        usdValue={assessedLossUsd}
-                        zigValue={assessedLossZig}
-                        onUsdChange={setAssessedLossUsd}
-                        onZigChange={setAssessedLossZig}
-                      />
-                      <CurrencyPairInput
-                        label="Withholding credits"
-                        usdValue={withholdingCreditsUsd}
-                        zigValue={withholdingCreditsZig}
-                        onUsdChange={setWithholdingCreditsUsd}
-                        onZigChange={setWithholdingCreditsZig}
-                      />
-                      <p className="pt-2 text-xs text-ink-faint">
-                        Assessed loss reduces the taxable base before tax is computed. Withholding
-                        credits (e.g. 30% withheld by a client for lack of an ITF263 clearance) are
-                        netted off the amount still due this quarter, same as a confirmed payment.
-                      </p>
+                {wizardStep === 3 && (
+                  <div className="space-y-4">
+                    <div className="rounded-md border border-line bg-paper/30 p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">Period &amp; income</p>
+                      <dl className="mt-2 space-y-1.5 text-sm">
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-ink-soft">{taxYear} · {quarterLabel || "(no label)"}</dt>
+                          <dd className="shrink-0 font-mono text-ink-faint">QPD{quarter}</dd>
+                        </div>
+                        <div className="flex justify-between gap-3 font-mono tabular-nums">
+                          <dt className="text-ink-soft">USD sales</dt>
+                          <dd>{money(usdSales, "USD")}</dd>
+                        </div>
+                        <div className="flex justify-between gap-3 font-mono tabular-nums">
+                          <dt className="text-ink-soft">ZiG sales</dt>
+                          <dd>{money(zigSales, "ZIG")}</dd>
+                        </div>
+                      </dl>
+                      <button
+                        type="button"
+                        onClick={() => goToWizardStep(0)}
+                        className="mt-2 text-xs font-medium text-usd hover:underline"
+                      >
+                        Edit period &amp; income
+                      </button>
                     </div>
+
+                    <div className="rounded-md border border-line p-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowRateSettings((v) => !v)}
+                        className="flex w-full items-center justify-between text-left text-sm"
+                      >
+                        <span>
+                          <span className="font-medium text-ink">Rate settings</span>
+                          <span className="ml-2 text-ink-faint">
+                            ZiG {exchangeRate ?? business.default_exchange_rate}/USD ·{" "}
+                            {((taxRatePct ?? business.default_tax_rate * 100)).toFixed(0)}% tax +{" "}
+                            {((aidsLevyPct ?? business.default_aids_levy_rate * 100)).toFixed(0)}% AIDS levy
+                          </span>
+                        </span>
+                        <span className="text-usd">{showRateSettings ? "Hide" : "Edit"}</span>
+                      </button>
+                      {showRateSettings && (
+                        <div className="mt-3 space-y-3 border-t border-line pt-3">
+                          <p className="text-xs text-ink-faint">
+                            Overrides for this calculation only - the business&apos;s saved defaults
+                            aren&apos;t changed. Leave blank to use the defaults shown above.
+                          </p>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <Field
+                              label="Exchange rate"
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              placeholder={String(business.default_exchange_rate)}
+                              value={exchangeRate ?? ""}
+                              onChange={(e) =>
+                                setExchangeRate(e.target.value === "" ? null : parseFloat(e.target.value))
+                              }
+                              hint="ZiG per 1 USD"
+                            />
+                            <Field
+                              label="Tax rate %"
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              placeholder={String(business.default_tax_rate * 100)}
+                              value={taxRatePct ?? ""}
+                              onChange={(e) =>
+                                setTaxRatePct(e.target.value === "" ? null : parseFloat(e.target.value))
+                              }
+                            />
+                            <Field
+                              label="AIDS levy %"
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              placeholder={String(business.default_aids_levy_rate * 100)}
+                              value={aidsLevyPct ?? ""}
+                              onChange={(e) =>
+                                setAidsLevyPct(e.target.value === "" ? null : parseFloat(e.target.value))
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-md border border-line p-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowAdjustments((v) => !v)}
+                        className="flex w-full items-center justify-between text-left text-sm"
+                      >
+                        <span className="font-medium text-ink">Adjustments</span>
+                        <span className="text-usd">{showAdjustments ? "Hide" : "Edit"}</span>
+                      </button>
+                      {showAdjustments && (
+                        <div className="mt-3 space-y-3 border-t border-line pt-3">
+                          <p className="text-xs text-ink-faint">
+                            Optional. Leave at 0 if these don&apos;t apply.
+                          </p>
+                          <CurrencyPairInput
+                            label="Assessed loss b/f"
+                            usdValue={assessedLossUsd}
+                            zigValue={assessedLossZig}
+                            onUsdChange={setAssessedLossUsd}
+                            onZigChange={setAssessedLossZig}
+                          />
+                          <CurrencyPairInput
+                            label="Withholding credits"
+                            usdValue={withholdingCreditsUsd}
+                            zigValue={withholdingCreditsZig}
+                            onUsdChange={setWithholdingCreditsUsd}
+                            onZigChange={setWithholdingCreditsZig}
+                          />
+                          <p className="pt-2 text-xs text-ink-faint">
+                            Assessed loss reduces the taxable base before tax is computed. Withholding
+                            credits (e.g. 30% withheld by a client for lack of an ITF263 clearance) are
+                            netted off the amount still due this quarter, same as a confirmed payment.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <ErrorNote>{stepError || error}</ErrorNote>
+
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={wizardBack}
+                    disabled={wizardStep === 0}
+                    className={wizardStep === 0 ? "invisible" : ""}
+                  >
+                    Back
+                  </Button>
+                  {wizardStep < CALCULATION_STEPS.length - 1 ? (
+                    <Button type="submit" variant="primary">
+                      Next
+                    </Button>
+                  ) : (
+                    <Button type="submit" variant="primary" disabled={calculating}>
+                      {calculating ? "Calculating…" : "Calculate QPD"}
+                    </Button>
                   )}
                 </div>
-
-                <ErrorNote>{error}</ErrorNote>
-                <Button type="submit" variant="primary" disabled={calculating} className="w-full sm:w-auto">
-                  {calculating ? "Calculating…" : "Calculate QPD"}
-                </Button>
               </form>
             </Card>
 
