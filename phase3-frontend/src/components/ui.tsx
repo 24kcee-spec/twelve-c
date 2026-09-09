@@ -149,6 +149,68 @@ export function TabBar<T extends string>({
 }
 
 /**
+ * Numbered step indicator for a multi-step form. A step is only clickable
+ * once it's been reached (`index <= furthest`) - you can jump back to fix
+ * something, but not skip ahead of validation by clicking a future step
+ * that hasn't been unlocked yet.
+ */
+export function Stepper({
+  steps,
+  current,
+  furthest,
+  onStepClick,
+}: {
+  steps: string[];
+  current: number;
+  furthest: number;
+  onStepClick: (index: number) => void;
+}) {
+  return (
+    <ol className="flex w-full items-center">
+      {steps.map((label, i) => {
+        const reachable = i <= furthest;
+        const done = i < current;
+        const active = i === current;
+        return (
+          <li key={label} className={`flex items-center ${i < steps.length - 1 ? "flex-1" : ""}`}>
+            <button
+              type="button"
+              disabled={!reachable}
+              onClick={() => onStepClick(i)}
+              className="flex shrink-0 items-center gap-2 disabled:cursor-not-allowed"
+            >
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold transition duration-150 ${
+                  active
+                    ? "bg-ink text-paper"
+                    : done
+                    ? "bg-seal text-ink"
+                    : reachable
+                    ? "border border-line text-ink-soft"
+                    : "border border-line text-ink-faint/50"
+                }`}
+              >
+                {done ? "\u2713" : i + 1}
+              </span>
+              <span
+                className={`hidden text-sm font-medium sm:inline ${
+                  active ? "text-ink" : reachable ? "text-ink-soft" : "text-ink-faint/50"
+                }`}
+              >
+                {label}
+              </span>
+            </button>
+            {i < steps.length - 1 && (
+              <span className={`mx-3 h-px flex-1 ${i < current ? "bg-seal" : "bg-line"}`} />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/**
  * Generic dropdown menu primitive - closes on outside click, Escape, or any
  * click inside its panel (so DropdownItem links and action buttons both
  * close it automatically without each one needing its own handler).
