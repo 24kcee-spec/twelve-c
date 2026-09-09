@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { percent } from "@/lib/format";
@@ -68,7 +68,7 @@ export function CurrencySplitBars({
           <span className="flex items-center gap-1.5">
             Payment split
             {capped && (
-              <span className="rounded-full bg-ink px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-paper">
+              <span className="rounded-full bg-seal px-2 py-0.5 text-xs font-medium text-ink">
                 Capped
               </span>
             )}

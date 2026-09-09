@@ -167,6 +167,15 @@ function LegalSubmenu() {
   );
 }
 
+function LogoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 7V5.5A1.5 1.5 0 0 0 12.5 4h-6A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20h6a1.5 1.5 0 0 0 1.5-1.5V17" />
+      <path d="M9 12h11M17 8.5 20.5 12 17 15.5" />
+    </svg>
+  );
+}
+
 export function TopBar() {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -253,7 +262,17 @@ export function TopBar() {
             </span>
           )}
         >
-          {user && <DropdownLabel>{user.email}</DropdownLabel>}
+          {user && (
+            <div className="mb-1 flex items-center gap-3 bg-paper/50 px-3.5 py-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
+                {initials(user.email)}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-ink">{user.email}</p>
+                <p className="text-xs text-ink-faint">Signed in</p>
+              </div>
+            </div>
+          )}
           <DropdownItem href="/account">
             <span className="flex items-center gap-2.5">
               <GearIcon />
@@ -284,7 +303,10 @@ export function TopBar() {
           <LegalSubmenu />
           <DropdownDivider />
           <DropdownItem onClick={onLogout} danger>
-            Log out
+            <span className="flex items-center gap-2.5">
+              <LogoutIcon />
+              Log out
+            </span>
           </DropdownItem>
         </Dropdown>
       </div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { money } from "@/lib/format";
 
@@ -104,7 +104,7 @@ export function QuarterWheel({
           ))}
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-          <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-faint">Total due</span>
+          <span className="text-xs font-medium text-ink-faint">Total due</span>
           <span className="font-display text-2xl leading-tight text-ink tabular-nums">
             {money(currency === "USD" ? totalUsd : totalZig, currency)}
           </span>
@@ -127,7 +127,7 @@ export function QuarterWheel({
               <span className="font-mono text-xs font-semibold uppercase tracking-wide">{seg.label}</span>
               <span className="text-xs text-ink-faint">{seg.date}</span>
               {seg.status !== "upcoming" && (
-                <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+                <span className="text-xs font-medium">
                   {STATUS_TEXT[seg.status]}
                 </span>
               )}

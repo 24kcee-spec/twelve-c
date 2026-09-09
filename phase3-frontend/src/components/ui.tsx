@@ -191,7 +191,7 @@ export function Dropdown({
       {open && (
         <div
           onClick={() => setOpen(false)}
-          className={`fade-in-up absolute z-50 mt-2 min-w-[14rem] overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-card-raised ${
+          className={`fade-in-up absolute z-50 mt-2 min-w-[15.5rem] overflow-hidden rounded-xl border border-line bg-surface py-1.5 shadow-card-raised ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >
@@ -227,12 +227,12 @@ export function DropdownItem({
   danger?: boolean;
   children: ReactNode;
 }) {
-  const className = `block w-full truncate px-3 py-2 text-left text-sm transition duration-150 ${
+  const className = `block w-full truncate px-3.5 py-2.5 text-left text-sm transition duration-150 ${
     danger
       ? "text-danger hover:bg-danger-soft"
       : active
       ? "bg-usd-soft text-usd"
-      : "text-ink-soft hover:bg-surface-2 hover:text-ink"
+      : "text-ink-soft hover:bg-seal-soft hover:text-ink"
   }`;
   if (href) {
     return (

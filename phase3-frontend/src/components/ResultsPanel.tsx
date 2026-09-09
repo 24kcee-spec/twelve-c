@@ -98,12 +98,14 @@ export function ResultsPanel({
 
   return (
     <div className="space-y-4">
-      <Card className="border-2 border-ink/10 bg-ink text-surface">
-        <div className="flex flex-wrap items-end gap-6">
+      <div className="rounded-xl border border-line bg-surface p-6 shadow-card-raised">
+        <div className="h-[3px] w-10 rounded-full bg-seal" />
+        <p className="mt-3 text-sm font-medium text-ink-faint">Net payable for this calculation</p>
+        <div className="mt-2 flex flex-wrap items-end gap-6">
           <div className="font-mono text-3xl tabular-nums text-usd sm:text-4xl">{money(result.net_payable_usd, "USD")}</div>
           <div className="font-mono text-3xl tabular-nums text-zig sm:text-4xl">{money(result.net_payable_zig, "ZIG")}</div>
         </div>
-      </Card>
+      </div>
 
       <Card>
         <TabBar tabs={tabs} active={tab} onChange={setTab} />
