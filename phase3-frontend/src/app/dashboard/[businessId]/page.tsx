@@ -1,84 +1,35 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { AssetRegister } from "@/components/AssetRegister";
 import { AuthGuard } from "@/components/AuthGuard";
 import { TopBar } from "@/components/TopBar";
-import { CurrencyPairInput } from "@/components/CurrencyPairInput";
 import { ResultsPanel } from "@/components/ResultsPanel";
 import { PaymentTracker } from "@/components/PaymentTracker";
 import { NextPaymentDue } from "@/components/NextPaymentDue";
-import { StepIndicator } from "@/components/StepIndicator";
+import { QuarterStrip } from "@/components/QuarterStrip";
 import { downloadTaxSummaryPdf } from "@/lib/generatePdf";
-import { Badge, Button, Card, ChevronDown, ErrorNote, Eyebrow, Field, TrashIcon } from "@/components/ui";
+import { Badge, Button, Card, ChevronDown, ErrorNote, Eyebrow, TrashIcon } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDateTime, money } from "@/lib/format";
-import { Business, emptyExpenses, QpdCalculationOut, CurrencyExpensesIn } from "@/lib/types";
+import { Business, QpdCalculationOut } from "@/lib/types";
 
-// The New QPD calculation form used to be one long scroll (period label,
-// income, four deduction rows, the asset register, rate settings,
-// adjustments) all stacked in a single card. Split into a short wizard so
-// each screen asks for one kind of thing at a time; the submit logic and
-// every state variable below are untouched from the single-form version -
-// only how the fields are grouped and revealed has changed.
-const CALCULATION_STEPS = ["Period", "Income", "Deductions", "Review"] as const;
-
+// This page used to also hold the "New QPD calculation" wizard, with
+// results squeezed into a sticky column beside it. That form now lives at
+// /dashboard/[businessId]/new as its own page. This page is Overview only:
+// current status at a glance, full-width results, and history. Nothing
+// here scrolls past a single screen on a normal laptop viewport.
 function BusinessContent({ businessId }: { businessId: string }) {
   const [business, setBusiness] = useState<Business | null>(null);
   const [calculations, setCalculations] = useState<QpdCalculationOut[]>([]);
   const [selected, setSelected] = useState<QpdCalculationOut | null>(null);
   const [error, setError] = useState("");
 
-  // History grouping/delete state. Years start collapsed except the most
-  // recent one, which is expanded the first time calculations load.
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const yearsInitialized = useRef(false);
   const [confirmingDeleteCalcId, setConfirmingDeleteCalcId] = useState<string | null>(null);
   const [deletingCalcId, setDeletingCalcId] = useState<string | null>(null);
-
-  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
-  const [quarterLabel, setQuarterLabel] = useState("Annual estimate");
-  // Which QPD this run is FOR (1=25 Mar, 2=25 Jun, 3=25 Sep, 4=20 Dec) -
-  // drives the engine's cumulative net_payable, not just the schedule
-  // projection. Must be sent on every create - the backend defaults to 1
-  // when omitted, which silently mis-files anything past Q1 if this isn't wired up.
-  const [quarter, setQuarter] = useState(1);
-  const [usdSales, setUsdSales] = useState(0);
-  const [zigSales, setZigSales] = useState(0);
-  const [usdExpenses, setUsdExpenses] = useState<CurrencyExpensesIn>(emptyExpenses());
-  const [zigExpenses, setZigExpenses] = useState<CurrencyExpensesIn>(emptyExpenses());
-  const [calculating, setCalculating] = useState(false);
-
-  // Optional annual adjustments - assessed loss b/f reduces the taxable
-  // base; withholding credits net off the cumulative amount due. Both
-  // default to 0, which reproduces identical results to before these existed.
-  const [showAdjustments, setShowAdjustments] = useState(false);
-  const [assessedLossUsd, setAssessedLossUsd] = useState(0);
-  const [assessedLossZig, setAssessedLossZig] = useState(0);
-  const [withholdingCreditsUsd, setWithholdingCreditsUsd] = useState(0);
-  const [withholdingCreditsZig, setWithholdingCreditsZig] = useState(0);
-
-  // Rate overrides - default to the business's saved rates, but editable per
-  // calculation since ZIMRA rates and the exchange rate both change during the year.
-  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
-  const [taxRatePct, setTaxRatePct] = useState<number | null>(null);
-  const [aidsLevyPct, setAidsLevyPct] = useState<number | null>(null);
-  const [showRateSettings, setShowRateSettings] = useState(false);
-
-  // Wizard step. maxStepReached lets someone jump back to re-check an
-  // earlier step without letting them skip ahead of where they've actually
-  // gotten to - Review is only reachable once Period/Income/Deductions have
-  // each been passed through at least once.
-  const [wizardStep, setWizardStep] = useState(0);
-  const [maxStepReached, setMaxStepReached] = useState(0);
-  const [stepError, setStepError] = useState("");
-
-  // Results column - scrolled into view after a successful calculation on
-  // narrow viewports, where the results sit below the form instead of
-  // beside it, so the person isn't left staring at the form wondering
-  // whether anything happened.
-  const resultsRef = useRef<HTMLDivElement>(null);
 
   async function loadAll() {
     try {
@@ -87,9 +38,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
         api.listCalculations(businessId),
       ]);
       setBusiness(b);
-      setExchangeRate(b.default_exchange_rate);
-      setTaxRatePct(b.default_tax_rate * 100);
-      setAidsLevyPct(b.default_aids_levy_rate * 100);
       setCalculations(calcs);
       if (calcs.length > 0) setSelected(calcs[0]);
       if (!yearsInitialized.current && calcs.length > 0) {
@@ -102,24 +50,16 @@ function BusinessContent({ businessId }: { businessId: string }) {
   }
 
   useEffect(() => {
-    // Next.js reuses this component instance when navigating between
-    // businesses via the switcher (only the [businessId] param changes,
-    // no remount) - reset per-business UI state explicitly or it would
-    // leak across businesses.
     yearsInitialized.current = false;
     setExpandedYears(new Set());
     setConfirmingDeleteCalcId(null);
     setDeletingCalcId(null);
-    setWizardStep(0);
-    setMaxStepReached(0);
-    setStepError("");
+    setSelected(null);
+    setError("");
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId]);
 
-  // Calculations are already ordered by the API (tax_year desc, created_at
-  // desc), so same-year entries are contiguous - safe to fold into groups
-  // in a single pass without re-sorting on the client.
   const groupedCalculations = useMemo(() => {
     const groups: { year: number; items: QpdCalculationOut[] }[] = [];
     for (const c of calculations) {
@@ -159,95 +99,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
     }
   }
 
-  function updateExpense(
-    which: "usd" | "zig",
-    field: keyof CurrencyExpensesIn,
-    value: number
-  ) {
-    if (which === "usd") setUsdExpenses((prev) => ({ ...prev, [field]: value }));
-    else setZigExpenses((prev) => ({ ...prev, [field]: value }));
-  }
-
-  // Only the Period step has anything worth blocking on - a missing label
-  // or year makes the calculation hard to find again later. Income and
-  // Deductions are legitimately all-zero (a new business's first quarter,
-  // spent before selling anything), so nothing there is required.
-  function validateWizardStep(index: number): string | null {
-    if (index === 0) {
-      if (!quarterLabel.trim()) return "Give this calculation a label, e.g. \u201cQ3 re-estimate\u201d.";
-      if (!Number.isFinite(taxYear) || taxYear < 2000 || taxYear > 2100) {
-        return "Enter a valid tax year.";
-      }
-    }
-    return null;
-  }
-
-  function goToWizardStep(index: number) {
-    if (index > maxStepReached) return;
-    setStepError("");
-    setWizardStep(index);
-  }
-
-  function wizardNext() {
-    const err = validateWizardStep(wizardStep);
-    if (err) {
-      setStepError(err);
-      return;
-    }
-    setStepError("");
-    const next = Math.min(wizardStep + 1, CALCULATION_STEPS.length - 1);
-    setWizardStep(next);
-    setMaxStepReached((m) => Math.max(m, next));
-  }
-
-  function wizardBack() {
-    setStepError("");
-    setWizardStep((s) => Math.max(0, s - 1));
-  }
-
-  async function onCalculate(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setCalculating(true);
-    try {
-      const result = await api.createCalculation(businessId, {
-        tax_year: taxYear,
-        quarter_label: quarterLabel,
-        quarter,
-        usd_sales: usdSales,
-        zig_sales: zigSales,
-        usd_expenses: usdExpenses,
-        zig_expenses: zigExpenses,
-        exchange_rate: exchangeRate,
-        tax_rate: taxRatePct !== null ? taxRatePct / 100 : null,
-        aids_levy_rate: aidsLevyPct !== null ? aidsLevyPct / 100 : null,
-        assessed_loss_usd: assessedLossUsd,
-        assessed_loss_zig: assessedLossZig,
-        withholding_credits_usd: withholdingCreditsUsd,
-        withholding_credits_zig: withholdingCreditsZig,
-      });
-      // Re-fetch rather than prepend locally: the list must stay ordered by
-      // (tax_year desc, created_at desc) for the year-grouping above to
-      // stay correct, and a blind prepend would break that if the user
-      // calculates for an earlier tax year than what's already showing.
-      const refreshed = await api.listCalculations(businessId);
-      setCalculations(refreshed);
-      setSelected(result);
-      setExpandedYears((prev) => new Set(prev).add(result.tax_year));
-      setWizardStep(0);
-      setMaxStepReached(0);
-      if (typeof window !== "undefined" && window.innerWidth < 1024) {
-        requestAnimationFrame(() => {
-          resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      }
-    } catch {
-      setError("Couldn't run that calculation. Check the figures and try again.");
-    } finally {
-      setCalculating(false);
-    }
-  }
-
   async function onSavePayments(usdPaid: number[], zigPaid: number[]) {
     if (!selected) return;
     const updated = await api.applyPayments(businessId, selected.id, {
@@ -262,7 +113,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
     return (
       <main className="min-h-screen bg-paper">
         <TopBar />
-        <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
           <ErrorNote>{error}</ErrorNote>
           {!error && (
             <div className="space-y-4">
@@ -278,489 +129,178 @@ function BusinessContent({ businessId }: { businessId: string }) {
   return (
     <main className="min-h-screen bg-paper">
       <TopBar />
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-base font-semibold text-ink">
-            {business.name
-              .split(/\s+/)
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((w) => w[0]?.toUpperCase())
-              .join("") || "?"}
-          </span>
-          <div>
-            <Eyebrow>Business</Eyebrow>
-            <h1 className="mt-0.5 font-display text-2xl text-ink sm:text-3xl">{business.name}</h1>
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-12">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-base font-semibold text-ink">
+              {business.name
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((w) => w[0]?.toUpperCase())
+                .join("") || "?"}
+            </span>
+            <div>
+              <Eyebrow>Business</Eyebrow>
+              <h1 className="mt-0.5 font-display text-2xl text-ink sm:text-3xl">{business.name}</h1>
+            </div>
           </div>
+          <Link href={`/dashboard/${businessId}/new`}>
+            <Button variant="primary">New calculation</Button>
+          </Link>
         </div>
         <p className="mt-2 font-mono text-xs text-ink-faint sm:text-sm">
-          ZiG {business.default_exchange_rate} / USD · {(business.default_tax_rate * 100).toFixed(0)}% tax
+          ZiG {business.default_exchange_rate} / USD MIDDOT {(business.default_tax_rate * 100).toFixed(0)}% tax
           + {(business.default_aids_levy_rate * 100).toFixed(0)}% AIDS levy
         </p>
 
-        <div className="mt-8 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8">
-          <div className="space-y-6">
-            <Card>
-              <div className="flex items-center justify-between gap-3">
-                <Eyebrow>New QPD calculation</Eyebrow>
-                <span className="font-mono text-xs text-ink-faint">
-                  Step {wizardStep + 1} of {CALCULATION_STEPS.length}
-                </span>
-              </div>
+        <ErrorNote>{error}</ErrorNote>
 
-              <div className="mt-3">
-                <StepIndicator
-                  steps={[...CALCULATION_STEPS]}
-                  current={wizardStep}
-                  maxReached={maxStepReached}
-                  onSelect={goToWizardStep}
-                />
-              </div>
+        {selected ? (
+          <div className="mt-8 space-y-6">
+            <NextPaymentDue calculation={selected} />
+            <QuarterStrip calculation={selected} />
 
-              <form
-                className="mt-5 space-y-4"
-                onSubmit={(e) => {
-                  // Enter/submit only actually files the calculation from
-                  // the last step - every earlier step, submitting just
-                  // advances the wizard (with the same validation as the
-                  // Next button) so pressing Enter in a field doesn't skip
-                  // straight to Calculate.
-                  e.preventDefault();
-                  if (wizardStep === CALCULATION_STEPS.length - 1) {
-                    onCalculate(e);
-                  } else {
-                    wizardNext();
-                  }
-                }}
-              >
-                {wizardStep === 0 && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Field
-                        label="Tax year"
-                        type="number"
-                        required
-                        value={taxYear}
-                        onChange={(e) => setTaxYear(parseInt(e.target.value, 10) || taxYear)}
-                      />
-                      <Field
-                        label="Label"
-                        required
-                        value={quarterLabel}
-                        onChange={(e) => setQuarterLabel(e.target.value)}
-                        hint="e.g. 'Q3 re-estimate'"
-                      />
-                    </div>
-
-                    <label className="block">
-                      <span className="mb-1.5 block text-sm font-medium text-ink-soft">QPD quarter</span>
-                      <select
-                        value={quarter}
-                        onChange={(e) => setQuarter(parseInt(e.target.value, 10))}
-                        className="w-full rounded-md border border-line bg-surface px-3 py-2.5 font-mono text-sm text-ink outline-none transition duration-150 ease-snap focus:border-seal"
-                      >
-                        <option value={1}>QPD1 - due 25 March (10% cumulative)</option>
-                        <option value={2}>QPD2 - due 25 June (35% cumulative)</option>
-                        <option value={3}>QPD3 - due 25 September (65% cumulative)</option>
-                        <option value={4}>QPD4 - due 20 December (100% cumulative)</option>
-                      </select>
-                      <span className="mt-1.5 block text-xs text-ink-faint">
-                        Which QPD you&apos;re filing for - the amount actually due nets this quarter&apos;s
-                        cumulative target against what you&apos;ve confirmed paying in earlier quarters.
-                      </span>
-                    </label>
-                  </div>
-                )}
-
-                {wizardStep === 1 && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Field
-                        label="USD sales"
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        emptyIfZero
-                        value={usdSales}
-                        onChange={(e) => setUsdSales(parseFloat(e.target.value) || 0)}
-                      />
-                      <Field
-                        label="ZiG sales"
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        emptyIfZero
-                        value={zigSales}
-                        onChange={(e) => setZigSales(parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-                    {(usdSales > 0 || zigSales > 0) && (() => {
-                      const effectiveRate = exchangeRate ?? business.default_exchange_rate;
-                      const totalUsdEquiv = usdSales + zigSales / (effectiveRate || 1);
-                      const usdSharePct = totalUsdEquiv > 0 ? (usdSales / totalUsdEquiv) * 100 : 0;
-                      return (
-                        <p className="text-xs text-ink-faint">
-                          At ZiG {effectiveRate}/USD, that&apos;s roughly {usdSharePct.toFixed(0)}% of trade
-                          in USD. The Public Notice 71 50/50 cap applies only when USD is dominant.
-                        </p>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {wizardStep === 2 && (
-                  <div className="space-y-4">
-                    <div>
-                      <p className="mb-1 text-sm font-medium text-ink-soft">Deductions</p>
-                      <div className="rounded-md border border-line bg-paper/30 px-3">
-                        <CurrencyPairInput
-                          label="Cost of sales"
-                          usdValue={usdExpenses.cost_of_sales}
-                          zigValue={zigExpenses.cost_of_sales}
-                          onUsdChange={(v) => updateExpense("usd", "cost_of_sales", v)}
-                          onZigChange={(v) => updateExpense("zig", "cost_of_sales", v)}
-                        />
-                        <CurrencyPairInput
-                          label="Salaries"
-                          usdValue={usdExpenses.salaries}
-                          zigValue={zigExpenses.salaries}
-                          onUsdChange={(v) => updateExpense("usd", "salaries", v)}
-                          onZigChange={(v) => updateExpense("zig", "salaries", v)}
-                        />
-                        <CurrencyPairInput
-                          label="Other expenses"
-                          usdValue={usdExpenses.other_expenses}
-                          zigValue={zigExpenses.other_expenses}
-                          onUsdChange={(v) => updateExpense("usd", "other_expenses", v)}
-                          onZigChange={(v) => updateExpense("zig", "other_expenses", v)}
-                        />
-                        <CurrencyPairInput
-                          label="Capital allowances"
-                          usdValue={usdExpenses.capital_allowances}
-                          zigValue={zigExpenses.capital_allowances}
-                          onUsdChange={(v) => updateExpense("usd", "capital_allowances", v)}
-                          onZigChange={(v) => updateExpense("zig", "capital_allowances", v)}
-                        />
-                      </div>
-                    </div>
-
-                    <AssetRegister
-                      businessId={businessId}
-                      taxYear={taxYear}
-                      onApply={(usd, zig) => {
-                        updateExpense("usd", "capital_allowances", usd);
-                        updateExpense("zig", "capital_allowances", zig);
-                      }}
-                    />
-                  </div>
-                )}
-
-                {wizardStep === 3 && (
-                  <div className="space-y-4">
-                    <div className="rounded-md border border-line bg-paper/30 p-3">
-                      <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">Period &amp; income</p>
-                      <dl className="mt-2 space-y-1.5 text-sm">
-                        <div className="flex justify-between gap-3">
-                          <dt className="text-ink-soft">{taxYear} · {quarterLabel || "(no label)"}</dt>
-                          <dd className="shrink-0 font-mono text-ink-faint">QPD{quarter}</dd>
-                        </div>
-                        <div className="flex justify-between gap-3 font-mono tabular-nums">
-                          <dt className="text-ink-soft">USD sales</dt>
-                          <dd>{money(usdSales, "USD")}</dd>
-                        </div>
-                        <div className="flex justify-between gap-3 font-mono tabular-nums">
-                          <dt className="text-ink-soft">ZiG sales</dt>
-                          <dd>{money(zigSales, "ZIG")}</dd>
-                        </div>
-                      </dl>
-                      <button
-                        type="button"
-                        onClick={() => goToWizardStep(0)}
-                        className="mt-2 text-xs font-medium text-usd hover:underline"
-                      >
-                        Edit period &amp; income
-                      </button>
-                    </div>
-
-                    <div className="rounded-md border border-line p-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowRateSettings((v) => !v)}
-                        className="flex w-full items-center justify-between text-left text-sm"
-                      >
-                        <span>
-                          <span className="font-medium text-ink">Rate settings</span>
-                          <span className="ml-2 text-ink-faint">
-                            ZiG {exchangeRate ?? business.default_exchange_rate}/USD ·{" "}
-                            {((taxRatePct ?? business.default_tax_rate * 100)).toFixed(0)}% tax +{" "}
-                            {((aidsLevyPct ?? business.default_aids_levy_rate * 100)).toFixed(0)}% AIDS levy
-                          </span>
-                        </span>
-                        <span className="text-usd">{showRateSettings ? "Hide" : "Edit"}</span>
-                      </button>
-                      {showRateSettings && (
-                        <div className="mt-3 space-y-3 border-t border-line pt-3">
-                          <p className="text-xs text-ink-faint">
-                            Overrides for this calculation only - the business&apos;s saved defaults
-                            aren&apos;t changed. Leave blank to use the defaults shown above.
-                          </p>
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <Field
-                              label="Exchange rate"
-                              type="number"
-                              step="0.01"
-                              min={0}
-                              placeholder={String(business.default_exchange_rate)}
-                              value={exchangeRate ?? ""}
-                              onChange={(e) =>
-                                setExchangeRate(e.target.value === "" ? null : parseFloat(e.target.value))
-                              }
-                              hint="ZiG per 1 USD"
-                            />
-                            <Field
-                              label="Tax rate %"
-                              type="number"
-                              step="0.01"
-                              min={0}
-                              placeholder={String(business.default_tax_rate * 100)}
-                              value={taxRatePct ?? ""}
-                              onChange={(e) =>
-                                setTaxRatePct(e.target.value === "" ? null : parseFloat(e.target.value))
-                              }
-                            />
-                            <Field
-                              label="AIDS levy %"
-                              type="number"
-                              step="0.01"
-                              min={0}
-                              placeholder={String(business.default_aids_levy_rate * 100)}
-                              value={aidsLevyPct ?? ""}
-                              onChange={(e) =>
-                                setAidsLevyPct(e.target.value === "" ? null : parseFloat(e.target.value))
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-md border border-line p-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowAdjustments((v) => !v)}
-                        className="flex w-full items-center justify-between text-left text-sm"
-                      >
-                        <span className="font-medium text-ink">Adjustments</span>
-                        <span className="text-usd">{showAdjustments ? "Hide" : "Edit"}</span>
-                      </button>
-                      {showAdjustments && (
-                        <div className="mt-3 space-y-3 border-t border-line pt-3">
-                          <p className="text-xs text-ink-faint">
-                            Optional. Leave at 0 if these don&apos;t apply.
-                          </p>
-                          <CurrencyPairInput
-                            label="Assessed loss b/f"
-                            usdValue={assessedLossUsd}
-                            zigValue={assessedLossZig}
-                            onUsdChange={setAssessedLossUsd}
-                            onZigChange={setAssessedLossZig}
-                          />
-                          <CurrencyPairInput
-                            label="Withholding credits"
-                            usdValue={withholdingCreditsUsd}
-                            zigValue={withholdingCreditsZig}
-                            onUsdChange={setWithholdingCreditsUsd}
-                            onZigChange={setWithholdingCreditsZig}
-                          />
-                          <p className="pt-2 text-xs text-ink-faint">
-                            Assessed loss reduces the taxable base before tax is computed. Withholding
-                            credits (e.g. 30% withheld by a client for lack of an ITF263 clearance) are
-                            netted off the amount still due this quarter, same as a confirmed payment.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <ErrorNote>{stepError || error}</ErrorNote>
-
-                <div className="flex items-center justify-between gap-3 pt-1">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={wizardBack}
-                    disabled={wizardStep === 0}
-                    className={wizardStep === 0 ? "invisible" : ""}
-                  >
-                    Back
-                  </Button>
-                  {wizardStep < CALCULATION_STEPS.length - 1 ? (
-                    <Button type="submit" variant="primary">
-                      Next
-                    </Button>
-                  ) : (
-                    <Button type="submit" variant="primary" disabled={calculating}>
-                      {calculating ? "Calculating…" : "Calculate QPD"}
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between">
-                <Eyebrow>History</Eyebrow>
-                {calculations.length > 0 && (
-                  <span className="font-mono text-xs text-ink-faint">
-                    {calculations.length} {calculations.length === 1 ? "entry" : "entries"}
-                  </span>
-                )}
-              </div>
-
-              {calculations.length === 0 && (
-                <p className="mt-2 text-sm text-ink-faint">No calculations yet.</p>
-              )}
-
-              <div className="mt-3 space-y-2">
-                {groupedCalculations.map((group) => {
-                  const isExpanded = expandedYears.has(group.year);
-                  return (
-                    <div key={group.year} className="overflow-hidden rounded-md border border-line">
-                      <button
-                        type="button"
-                        onClick={() => toggleYear(group.year)}
-                        aria-expanded={isExpanded}
-                        className={`flex w-full items-center justify-between px-3 py-2.5 text-left transition duration-150 ${
-                          isExpanded ? "bg-usd-soft" : "bg-surface/40 hover:bg-paper/60"
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className="font-display text-base text-ink">{group.year}</span>
-                          <span className="rounded-full bg-ink-faint/15 px-2 py-0.5 font-mono text-[10px] text-ink-faint">
-                            {group.items.length}
-                          </span>
-                        </span>
-                        <ChevronDown open={isExpanded} />
-                      </button>
-
-                      {isExpanded && (
-                        <ul className="space-y-1 border-t border-line p-2">
-                          {group.items.map((c) => {
-                            const isSelected = selected?.id === c.id;
-                            const isLatest = c.id === latestCalculationId;
-                            const isConfirming = confirmingDeleteCalcId === c.id;
-
-                            if (isConfirming) {
-                              return (
-                                <li key={c.id}>
-                                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-danger-soft px-3 py-2">
-                                    <span className="text-xs text-danger">
-                                      Delete this calculation? This can&apos;t be undone.
-                                    </span>
-                                    <div className="flex shrink-0 gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => onDeleteCalculation(c)}
-                                        disabled={deletingCalcId === c.id}
-                                        className="rounded-md bg-danger px-2.5 py-1 text-xs font-semibold text-paper disabled:opacity-50"
-                                      >
-                                        {deletingCalcId === c.id ? "Deleting…" : "Yes, delete"}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setConfirmingDeleteCalcId(null)}
-                                        className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-soft"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </div>
-                                  </div>
-                                </li>
-                              );
-                            }
-
-                            return (
-                              <li key={c.id}>
-                                <div
-                                  className={`flex items-center gap-1 rounded-md text-sm transition duration-150 ${
-                                    isSelected ? "bg-usd-soft text-usd" : "text-ink-soft hover:bg-surface-2 hover:text-ink"
-                                  }`}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelected(c)}
-                                    className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-left"
-                                  >
-                                    <span className="flex min-w-0 flex-col items-start">
-                                      <span className="flex items-center gap-2">
-                                        <span className="truncate">{c.quarter_label}</span>
-                                        {isLatest && <Badge>Latest</Badge>}
-                                        {isSelected && <Badge variant="outline">Viewing</Badge>}
-                                      </span>
-                                      <span className="mt-0.5 font-mono text-[11px] text-ink-faint">
-                                        {formatDateTime(c.created_at)}
-                                      </span>
-                                    </span>
-                                    <span className="shrink-0 font-mono tabular-nums">
-                                      {money(c.result_json.total_tax_usd, "USD")}
-                                    </span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmingDeleteCalcId(c.id)}
-                                    aria-label="Delete calculation"
-                                    className="mr-1.5 shrink-0 rounded-md p-1.5 text-ink-faint/60 transition duration-150 hover:bg-danger-soft hover:text-danger"
-                                  >
-                                    <TrashIcon />
-                                  </button>
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
+            <div className="flex items-center justify-between gap-3">
+              <Eyebrow>Results MIDDOT {selected.quarter_label}</Eyebrow>
+              <Button variant="secondary" type="button" onClick={() => downloadTaxSummaryPdf(business, selected)}>
+                Download PDF
+              </Button>
+            </div>
+            <ResultsPanel
+              result={selected.result_json}
+              taxYear={selected.tax_year}
+              paymentsSlot={
+                <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
+              }
+            />
           </div>
+        ) : (
+          <Card className="mt-8">
+            <p className="text-sm text-ink-faint">No calculations yet for this business.</p>
+            <Link href={`/dashboard/${businessId}/new`} className="mt-3 inline-block">
+              <Button variant="primary">Run your first QPD calculation</Button>
+            </Link>
+          </Card>
+        )}
 
-          <div
-            ref={resultsRef}
-            className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 scrollbar-thin"
-          >
-            {selected ? (
-              <>
-                <div className="flex items-center justify-between gap-3">
-                  <Eyebrow>Results</Eyebrow>
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => downloadTaxSummaryPdf(business, selected)}
-                  >
-                    Download PDF
-                  </Button>
-                </div>
-                <NextPaymentDue calculation={selected} />
-                <ResultsPanel
-                  result={selected.result_json}
-                  taxYear={selected.tax_year}
-                  paymentsSlot={
-                    <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
-                  }
-                />
-              </>
-            ) : (
-              <Card>
-                <p className="text-sm text-ink-faint">
-                  Run a calculation on the left to see the breakdown and schedule here.
-                </p>
-              </Card>
+        <Card className="mt-6">
+          <div className="flex items-center justify-between">
+            <Eyebrow>History</Eyebrow>
+            {calculations.length > 0 && (
+              <span className="font-mono text-xs text-ink-faint">
+                {calculations.length} {calculations.length === 1 ? "entry" : "entries"}
+              </span>
             )}
           </div>
-        </div>
+
+          {calculations.length === 0 && (
+            <p className="mt-2 text-sm text-ink-faint">No calculations yet.</p>
+          )}
+
+          <div className="mt-3 space-y-2">
+            {groupedCalculations.map((group) => {
+              const isExpanded = expandedYears.has(group.year);
+              return (
+                <div key={group.year} className="overflow-hidden rounded-md border border-line">
+                  <button
+                    type="button"
+                    onClick={() => toggleYear(group.year)}
+                    aria-expanded={isExpanded}
+                    className={`flex w-full items-center justify-between px-3 py-2.5 text-left transition duration-150 ${
+                      isExpanded ? "bg-usd-soft" : "bg-surface/40 hover:bg-paper/60"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="font-display text-base text-ink">{group.year}</span>
+                      <span className="rounded-full bg-ink-faint/15 px-2 py-0.5 font-mono text-[10px] text-ink-faint">
+                        {group.items.length}
+                      </span>
+                    </span>
+                    <ChevronDown open={isExpanded} />
+                  </button>
+
+                  {isExpanded && (
+                    <ul className="space-y-1 border-t border-line p-2">
+                      {group.items.map((c) => {
+                        const isSelected = selected?.id === c.id;
+                        const isLatest = c.id === latestCalculationId;
+                        const isConfirming = confirmingDeleteCalcId === c.id;
+
+                        if (isConfirming) {
+                          return (
+                            <li key={c.id}>
+                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-danger-soft px-3 py-2">
+                                <span className="text-xs text-danger">
+                                  Delete this calculation? This can&apos;t be undone.
+                                </span>
+                                <div className="flex shrink-0 gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteCalculation(c)}
+                                    disabled={deletingCalcId === c.id}
+                                    className="rounded-md bg-danger px-2.5 py-1 text-xs font-semibold text-paper disabled:opacity-50"
+                                  >
+                                    {deletingCalcId === c.id ? "DeletingELLIPSIS" : "Yes, delete"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmingDeleteCalcId(null)}
+                                    className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-soft"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        }
+
+                        return (
+                          <li key={c.id}>
+                            <div
+                              className={`flex items-center gap-1 rounded-md text-sm transition duration-150 ${
+                                isSelected ? "bg-usd-soft text-usd" : "text-ink-soft hover:bg-surface-2 hover:text-ink"
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setSelected(c)}
+                                className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-left"
+                              >
+                                <span className="flex min-w-0 flex-col items-start">
+                                  <span className="flex items-center gap-2">
+                                    <span className="truncate">{c.quarter_label}</span>
+                                    {isLatest && <Badge>Latest</Badge>}
+                                    {isSelected && <Badge variant="outline">Viewing</Badge>}
+                                  </span>
+                                  <span className="mt-0.5 font-mono text-[11px] text-ink-faint">
+                                    {formatDateTime(c.created_at)}
+                                  </span>
+                                </span>
+                                <span className="shrink-0 font-mono tabular-nums">
+                                  {money(c.result_json.total_tax_usd, "USD")}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmingDeleteCalcId(c.id)}
+                                aria-label="Delete calculation"
+                                className="mr-1.5 shrink-0 rounded-md p-1.5 text-ink-faint/60 transition duration-150 hover:bg-danger-soft hover:text-danger"
+                              >
+                                <TrashIcon />
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
       </div>
     </main>
   );
