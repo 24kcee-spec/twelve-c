@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api.routes import assets, auth, businesses, qpd
+from app.api.routes import assets, auth, businesses, monthly_income, qpd
 from app.config import get_settings
 from app.core.limiter import limiter
 
@@ -65,6 +65,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(businesses.router, tags=["businesses"])
 app.include_router(qpd.router, tags=["qpd-calculations"])
 app.include_router(assets.router, tags=["capital-assets"])
+app.include_router(monthly_income.router, tags=["monthly-income"])
 
 
 @app.get("/")

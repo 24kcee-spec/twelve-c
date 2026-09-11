@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import uuid
 from datetime import datetime
@@ -46,5 +46,8 @@ class Business(Base):
         back_populates="business", cascade="all, delete-orphan", passive_deletes=True
     )
     capital_assets: Mapped[list["CapitalAsset"]] = relationship(  # noqa: F821
+        back_populates="business", cascade="all, delete-orphan", passive_deletes=True
+    )
+    monthly_income_entries: Mapped[list["MonthlyIncomeEntry"]] = relationship(  # noqa: F821
         back_populates="business", cascade="all, delete-orphan", passive_deletes=True
     )
