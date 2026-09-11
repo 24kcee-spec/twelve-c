@@ -188,6 +188,20 @@ export interface CapitalAllowanceTotals {
   total_allowance_zig: number;
 }
 
+export interface MonthlyIncomeEntry {
+  month: number;
+  usd_amount: number;
+  zig_amount: number;
+  is_estimate: boolean;
+}
+
+export interface MonthlyIncomeEntryOut extends MonthlyIncomeEntry {
+  id: string;
+  business_id: string;
+  tax_year: number;
+  updated_at: string;
+}
+
 export class ApiError extends Error {
   status: number;
   detail: unknown;

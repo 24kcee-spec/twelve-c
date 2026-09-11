@@ -1,4 +1,4 @@
-import {
+﻿import {
   AccessTokenResponse,
   ApplyPaymentsRequest,
   Business,
@@ -9,6 +9,8 @@ import {
   DeleteAccountRequest,
   MfaRequiredResponse,
   MfaSetupResponse,
+  MonthlyIncomeEntry,
+  MonthlyIncomeEntryOut,
   QpdCalculationCreate,
   QpdCalculationOut,
   TokenPair,
@@ -242,4 +244,13 @@ export const api = {
     request<void>(`/businesses/${businessId}/assets/${assetId}`, { method: "DELETE" }),
   getAllowanceTotals: (businessId: string, taxYear: number) =>
     request<CapitalAllowanceTotals>(`/businesses/${businessId}/assets/allowance?tax_year=${taxYear}`),
+
+  // --- Monthly rolling income ---
+  getMonthlyIncome: (businessId: string, taxYear: number) =>
+    request<MonthlyIncomeEntryOut[]>(`/businesses/${businessId}/monthly-income/${taxYear}`),
+  saveMonthlyIncome: (businessId: string, taxYear: number, entries: MonthlyIncomeEntry[]) =>
+    request<MonthlyIncomeEntryOut[]>(`/businesses/${businessId}/monthly-income/${taxYear}`, {
+      method: "PUT",
+      body: JSON.stringify({ tax_year: taxYear, entries }),
+    }),
 };

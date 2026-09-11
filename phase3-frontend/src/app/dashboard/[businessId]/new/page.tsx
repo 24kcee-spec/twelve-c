@@ -7,6 +7,7 @@ import { AssetRegister } from "@/components/AssetRegister";
 import { AuthGuard } from "@/components/AuthGuard";
 import { TopBar } from "@/components/TopBar";
 import { CurrencyPairInput } from "@/components/CurrencyPairInput";
+import { MonthlyIncomeCalculator } from "@/components/MonthlyIncomeCalculator";
 import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useBusinessData } from "@/lib/useBusinessData";
@@ -178,9 +179,16 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
           </SectionCard>
 
           <SectionCard eyebrow="Income">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <MonthlyIncomeCalculator
+              businessId={businessId}
+              taxYear={taxYear}
+              quarter={quarter}
+              onUsdChange={setUsdSales}
+              onZigChange={setZigSales}
+            />
+            <div className="grid grid-cols-1 gap-4 border-t border-line pt-4 sm:grid-cols-2">
               <Field
-                label="USD sales"
+                label="USD sales (annualized)"
                 type="number"
                 step="0.01"
                 min={0}
@@ -189,7 +197,7 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
                 onChange={(e) => setUsdSales(parseFloat(e.target.value) || 0)}
               />
               <Field
-                label="ZiG sales"
+                label="ZiG sales (annualized)"
                 type="number"
                 step="0.01"
                 min={0}
@@ -199,8 +207,8 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
               />
             </div>
             <p className="text-xs text-ink-faint">
-              Best estimate of full-year sales for this currency. A monthly actual-plus-estimate
-              breakdown is planned for a future update - for now, enter your own annualized figure.
+              These two fields are what actually gets sent to the calculation - filled in
+              automatically from the monthly breakdown above, or type directly in manual mode.
             </p>
           </SectionCard>
 
