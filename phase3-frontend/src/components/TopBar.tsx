@@ -1,206 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { useTheme, Theme } from "@/lib/theme-context";
-import { api } from "@/lib/api";
-import { Business } from "@/lib/types";
-import { RateSettingsModal } from "@/components/RateSettingsModal";
-import {
-  ChevronDown,
-  Dropdown,
-  DropdownDivider,
-  DropdownItem,
-  DropdownLabel,
-  Logo,
-} from "@/components/ui";
-
-function initials(email: string): string {
-  const name = email.split("@")[0] ?? email;
-  return name.slice(0, 2).toUpperCase();
-}
-
-function GearIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M19.4 13.5c.1-.5.1-1 0-1.5l1.6-1.2-1.6-2.8-1.9.6a6.9 6.9 0 0 0-1.3-.75L15.8 5h-3.2l-.4 2.15c-.47.18-.9.43-1.3.75l-1.9-.6-1.6 2.8 1.6 1.2c-.1.5-.1 1 0 1.5l-1.6 1.2 1.6 2.8 1.9-.6c.4.32.83.57 1.3.75L12.6 19h3.2l.4-2.15c.47-.18.9-.43 1.3-.75l1.9.6 1.6-2.8-1.6-1.2Z" />
-    </svg>
-  );
-}
-
-function HelpIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.5 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 1.7-2.4 3.4" />
-      <circle cx="12" cy="16.5" r="0.6" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function BookIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z" />
-      <path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5v-13Z" />
-    </svg>
-  );
-}
-
-function RatesIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3v18" />
-      <path d="M17 7.5c0-1.7-2-3-5-3s-5 1.3-5 3 2 2.3 5 2.7 5 1 5 2.8-2 3-5 3-5-1.3-5-3" />
-    </svg>
-  );
-}
-
-function SunIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="4.2" />
-      <path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z" />
-    </svg>
-  );
-}
-
-function MonitorIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4.5" width="18" height="12" rx="1.5" />
-      <path d="M8.5 20h7M12 16.5V20" />
-    </svg>
-  );
-}
-
-/** Appearance segmented control (Light / Dark / Auto) shown inside the account dropdown. */
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const options: { value: Theme; label: string; icon: JSX.Element }[] = [
-    { value: "light", label: "Light", icon: <SunIcon /> },
-    { value: "dark", label: "Dark", icon: <MoonIcon /> },
-    { value: "system", label: "Auto", icon: <MonitorIcon /> },
-  ];
-  return (
-    <div className="px-3 py-2">
-      <span className="mb-1.5 block text-xs font-medium text-ink-faint">
-        Appearance
-      </span>
-      <div className="flex gap-1 rounded-md border border-line bg-paper/60 p-1">
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setTheme(opt.value);
-            }}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition duration-150 ${
-              theme === opt.value ? "bg-seal text-ink" : "text-ink-soft hover:text-ink"
-            }`}
-          >
-            {opt.icon}
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LegalIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3v18" />
-      <path d="M5 7h14" />
-      <path d="M5 7 2.5 12a2.5 2.5 0 0 0 5 0Z" />
-      <path d="M19 7l-2.5 5a2.5 2.5 0 0 0 5 0Z" />
-      <path d="M8 21h8" />
-    </svg>
-  );
-}
-
-function LegalSubmenu() {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setExpanded((v) => !v);
-        }}
-        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-ink-soft transition hover:bg-paper hover:text-ink"
-      >
-        <span className="flex items-center gap-2.5">
-          <LegalIcon />
-          Legal
-        </span>
-        <ChevronDown open={expanded} />
-      </button>
-      {expanded && (
-        <div className="border-t border-line bg-paper/60 py-1">
-          <DropdownItem href="/legal/disclaimer">
-            <span className="pl-6">Disclaimer</span>
-          </DropdownItem>
-          <DropdownItem href="/legal/privacy-policy">
-            <span className="pl-6">Privacy Policy</span>
-          </DropdownItem>
-          <DropdownItem href="/legal/terms-of-service">
-            <span className="pl-6">Terms of Service</span>
-          </DropdownItem>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function LogoutIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 7V5.5A1.5 1.5 0 0 0 12.5 4h-6A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20h6a1.5 1.5 0 0 0 1.5-1.5V17" />
-      <path d="M9 12h11M17 8.5 20.5 12 17 15.5" />
-    </svg>
-  );
-}
+import { Logo, NavLink } from "@/components/ui";
 
 export function TopBar() {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
-
-  const [businesses, setBusinesses] = useState<Business[] | null>(null);
-  const [ratesOpen, setRatesOpen] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .listBusinesses()
-      .then((data) => {
-        if (!cancelled) setBusinesses(data);
-      })
-      .catch(() => {
-        if (!cancelled) setBusinesses([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const currentBusinessId = pathname?.match(/^\/dashboard\/([^/]+)/)?.[1];
-  const currentBusiness = businesses?.find((b) => b.id === currentBusinessId) ?? null;
 
   async function onLogout() {
     await logout();
@@ -208,114 +14,21 @@ export function TopBar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95">
-      <div className="h-[3px] bg-gradient-to-r from-seal via-[#E4C368] to-seal" />
+    <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard" className="mr-4">
-            <Logo />
-          </Link>
-
-          <Dropdown
-            align="left"
-            trigger={({ open }) => (
-              <span
-                className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition duration-150 ${
-                  open ? "bg-paper/60 text-ink" : "text-ink-soft hover:text-usd"
-                }`}
-              >
-                <span className="max-w-[10rem] truncate">
-                  {currentBusiness ? currentBusiness.name : "Businesses"}
-                </span>
-                <ChevronDown open={open} />
-              </span>
-            )}
-          >
-            <DropdownLabel>Your businesses</DropdownLabel>
-            {businesses === null && (
-              <div className="px-3 py-2 text-xs text-ink-faint">Loading...</div>
-            )}
-            {businesses?.length === 0 && (
-              <div className="px-3 py-2 text-xs text-ink-faint">
-                No businesses yet - add one from the dashboard.
-              </div>
-            )}
-            {businesses?.map((b) => (
-              <DropdownItem key={b.id} href={`/dashboard/${b.id}`} active={b.id === currentBusinessId}>
-                {b.name}
-              </DropdownItem>
-            ))}
-            <DropdownDivider />
-            <DropdownItem href="/dashboard">All businesses</DropdownItem>
-          </Dropdown>
-        </div>
-
-        <Dropdown
-          align="right"
-          trigger={({ open }) => (
-            <span
-              className={`flex h-8 w-8 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink transition ${
-                open ? "ring-2 ring-usd ring-offset-2 ring-offset-surface" : ""
-              }`}
-            >
-              {user ? initials(user.email) : "?"}
-            </span>
-          )}
-        >
-          {user && (
-            <div className="mb-1 flex items-center gap-3 bg-paper/50 px-3.5 py-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
-                {initials(user.email)}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">{user.email}</p>
-                <p className="text-xs text-ink-faint">Signed in</p>
-              </div>
-            </div>
-          )}
-          <DropdownItem href="/account">
-            <span className="flex items-center gap-2.5">
-              <GearIcon />
-              Account &amp; security
-            </span>
-          </DropdownItem>
-          <DropdownItem href="/tutorial">
-            <span className="flex items-center gap-2.5">
-              <HelpIcon />
-              How Twelve C works
-            </span>
-          </DropdownItem>
-          <DropdownItem href="/learn">
-            <span className="flex items-center gap-2.5">
-              <BookIcon />
-              Know your taxes
-            </span>
-          </DropdownItem>
-          <DropdownItem onClick={() => setRatesOpen(true)}>
-            <span className="flex items-center gap-2.5">
-              <RatesIcon />
-              Rate settings
-            </span>
-          </DropdownItem>
-          <DropdownDivider />
-          <ThemeToggle />
-          <DropdownDivider />
-          <LegalSubmenu />
-          <DropdownDivider />
-          <DropdownItem onClick={onLogout} danger>
-            <span className="flex items-center gap-2.5">
-              <LogoutIcon />
-              Log out
-            </span>
-          </DropdownItem>
-        </Dropdown>
+        <a href="/dashboard">
+          <Logo />
+        </a>
+        <nav className="flex items-center gap-6">
+          <NavLink href="/dashboard">Businesses</NavLink>
+          <NavLink href="/account">Account</NavLink>
+          <NavLink href="/methodology">Methodology</NavLink>
+          {user && <span className="text-sm text-ink-faint">{user.email}</span>}
+          <button onClick={onLogout} className="text-sm text-ink-soft hover:text-danger">
+            Log out
+          </button>
+        </nav>
       </div>
-
-      <RateSettingsModal
-        open={ratesOpen}
-        onClose={() => setRatesOpen(false)}
-        highlightBusinessId={currentBusinessId}
-      />
     </header>
   );
 }
