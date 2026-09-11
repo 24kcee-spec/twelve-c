@@ -27,10 +27,17 @@ function emptyRow(monthsElapsed: number): CurrencyRow {
   return { months: Array(monthsElapsed).fill(0), oneOff: 0, bufferPct: 0 };
 }
 
-function resizeMonths(months: number[], targetLength: number): number[] {
+function resizeMonths(months: number[], targetLength: number, canonical: number[]): number[] {
   if (months.length === targetLength) return months;
   if (months.length > targetLength) return months.slice(0, targetLength);
-  return [...months, ...Array(targetLength - months.length).fill(0)];
+  // Growing the window (e.g. QPD1 -> QPD2): restore each newly-revealed
+  // slot from the full 12-month canonical record instead of zero-filling.
+  // Zero-filling here used to mean "switch to a later quarter" silently
+  // wiped any actuals you'd already saved for those months, because the
+  // debounced autosave below would then push those zeros back to the
+  // server a moment later.
+  const extra = canonical.slice(months.length, targetLength);
+  return [...months, ...extra];
 }
 
 function computeAnnual(row: CurrencyRow, monthsElapsed: number) {
@@ -145,6 +152,12 @@ export function MonthlyIncomeCalculator({
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedKey = useRef<string | null>(null);
 
+  // The full 12-month year, independent of how many months the current
+  // quarter's window shows. This is what resizeMonths() reads from when
+  // the window grows - see the comment there for why that matters.
+  const savedUsdMonths = useRef<number[]>(Array(12).fill(0));
+  const savedZigMonths = useRef<number[]>(Array(12).fill(0));
+
   // Load whatever's already saved for this business/tax_year so actuals
   // entered while filing an earlier QPD this year carry forward instead
   // of being re-typed. Re-fetches whenever the tax year changes; the
@@ -166,6 +179,8 @@ export function MonthlyIncomeCalculator({
           usdMonths[e.month - 1] = e.usd_amount;
           zigMonths[e.month - 1] = e.zig_amount;
         }
+        savedUsdMonths.current = usdMonths;
+        savedZigMonths.current = zigMonths;
         setUsdRow((prev) => ({ ...prev, months: usdMonths.slice(0, prev.months.length) }));
         setZigRow((prev) => ({ ...prev, months: zigMonths.slice(0, prev.months.length) }));
       })
@@ -183,9 +198,25 @@ export function MonthlyIncomeCalculator({
   // overlaps (e.g. moving from QPD1 to QPD2 keeps Jan-Mar) and pad the
   // rest with zeros, rather than wiping entered data.
   useEffect(() => {
-    setUsdRow((prev) => ({ ...prev, months: resizeMonths(prev.months, monthsElapsed) }));
-    setZigRow((prev) => ({ ...prev, months: resizeMonths(prev.months, monthsElapsed) }));
+    setUsdRow((prev) => ({ ...prev, months: resizeMonths(prev.months, monthsElapsed, savedUsdMonths.current) }));
+    setZigRow((prev) => ({ ...prev, months: resizeMonths(prev.months, monthsElapsed, savedZigMonths.current) }));
   }, [monthsElapsed]);
+
+  // Keep the canonical 12-month record current with whatever's on screen,
+  // so if the window shrinks (e.g. QPD2 -> QPD1) and then grows again in
+  // the same session, growing restores your latest edits rather than the
+  // stale snapshot from when the page first loaded.
+  useEffect(() => {
+    usdRow.months.forEach((v, i) => {
+      savedUsdMonths.current[i] = v;
+    });
+  }, [usdRow.months]);
+
+  useEffect(() => {
+    zigRow.months.forEach((v, i) => {
+      savedZigMonths.current[i] = v;
+    });
+  }, [zigRow.months]);
 
   const usdAnnual = useMemo(() => computeAnnual(usdRow, monthsElapsed).buffered, [usdRow, monthsElapsed]);
   const zigAnnual = useMemo(() => computeAnnual(zigRow, monthsElapsed).buffered, [zigRow, monthsElapsed]);
