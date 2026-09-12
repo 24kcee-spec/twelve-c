@@ -25,6 +25,15 @@ from .tax_adjustments import (
     compute_deductible_other_expenses,
     to_currency_expenses,
 )
+from .compliance import (
+    ComplianceStatus,
+    ComplianceCheck,
+    DualCurrencyComplianceCheck,
+    ACCURACY_THRESHOLD,
+    BUFFER_TARGET,
+    assess_accuracy,
+    assess_accuracy_dual,
+)
 
 __all__ = [
     "CurrencyExpenses",
@@ -48,6 +57,13 @@ __all__ = [
     "compute_accounting_pbt",
     "compute_deductible_other_expenses",
     "to_currency_expenses",
+    "ComplianceStatus",
+    "ComplianceCheck",
+    "DualCurrencyComplianceCheck",
+    "ACCURACY_THRESHOLD",
+    "BUFFER_TARGET",
+    "assess_accuracy",
+    "assess_accuracy_dual",
 ]
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
