@@ -8,3 +8,16 @@ node_modules/
 .next/ 
 __pycache__/ 
 *.pyc 
+
+# --- added by apply_gitignore_cleanup.ps1 ---
+__pycache__/
+*.pyc
+*.pyo
+*.bak
+*.bak-*
+venv/
+.venv/
+node_modules/
+.next/
+.env
+.env.local
