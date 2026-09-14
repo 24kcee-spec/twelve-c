@@ -2,6 +2,7 @@
   AccessTokenResponse,
   ApplyPaymentsRequest,
   Business,
+  BusinessCompliance,
   CapitalAllowanceTotals,
   CapitalAssetCreate,
   CapitalAssetOut,
@@ -253,4 +254,8 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ tax_year: taxYear, entries }),
     }),
+
+  // --- Year-end reconciliation (Section 72(11) accuracy check) ---
+  getCompliance: (businessId: string, taxYear: number) =>
+    request<BusinessCompliance>(`/businesses/${businessId}/compliance?tax_year=${taxYear}`),
 };

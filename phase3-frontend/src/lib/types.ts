@@ -202,6 +202,56 @@ export interface MonthlyIncomeEntryOut extends MonthlyIncomeEntry {
   updated_at: string;
 }
 
+// --- Year-end reconciliation (Section 72(11) 90% accuracy check) ---
+
+export type ComplianceStatus = "fully_compliant" | "within_buffer" | "under_estimated" | "no_tax_due";
+
+export interface ComplianceCheck {
+  status: ComplianceStatus;
+  is_final: boolean;
+  reference_tax: number;
+  total_remitted: number;
+  accuracy_ratio: number | null;
+  shortfall_to_90pct: number;
+  shortfall_to_95pct: number;
+  max_penalty_exposure: number;
+  message: string;
+}
+
+export interface QuarterBreakdown {
+  quarter: number;
+  quarter_label: string;
+  due_date: string;
+  has_calculation: boolean;
+  calculation_id: string | null;
+  calculated_at: string | null;
+  projected_annual_profit_usd: number | null;
+  projected_annual_profit_zig: number | null;
+  total_projected_tax_usd: number | null;
+  total_projected_tax_zig: number | null;
+  cumulative_percentage: number | null;
+  required_cumulative_tax_usd: number | null;
+  required_cumulative_tax_zig: number | null;
+  previous_paid_usd: number | null;
+  previous_paid_zig: number | null;
+  net_due_usd: number | null;
+  net_due_zig: number | null;
+  actual_usd_paid: number | null;
+  actual_zig_paid: number | null;
+}
+
+export interface BusinessCompliance {
+  business_id: string;
+  tax_year: number;
+  has_data: boolean;
+  overall_status: ComplianceStatus | null;
+  usd: ComplianceCheck | null;
+  zig: ComplianceCheck | null;
+  latest_calculated_quarter: number | null;
+  quarters_missing: number[];
+  quarters: QuarterBreakdown[];
+}
+
 export class ApiError extends Error {
   status: number;
   detail: unknown;

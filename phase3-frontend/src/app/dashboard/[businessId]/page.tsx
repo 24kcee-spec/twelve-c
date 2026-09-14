@@ -9,6 +9,7 @@ import { ResultsPanel } from "@/components/ResultsPanel";
 import { PaymentTracker } from "@/components/PaymentTracker";
 import { NextPaymentDue } from "@/components/NextPaymentDue";
 import { QuarterStrip } from "@/components/QuarterStrip";
+import { ReconciliationPanel } from "@/components/ReconciliationPanel";
 import { downloadTaxSummaryPdf } from "@/lib/generatePdf";
 import { Badge, Button, Card, ChevronDown, ErrorNote, Eyebrow, TrashIcon } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -174,6 +175,8 @@ function BusinessContent({ businessId }: { businessId: string }) {
                 <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
               }
             />
+
+            <ReconciliationPanel businessId={businessId} taxYear={selected.tax_year} />
           </div>
         ) : (
           <Card className="mt-8">
