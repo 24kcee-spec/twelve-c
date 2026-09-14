@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { money } from "@/lib/format";
@@ -54,7 +54,7 @@ export function OverdueDigest({ items }: { items: DigestItem[] }) {
 
   return (
     <div className="fade-in-up relative mb-8 overflow-hidden rounded-xl bg-ink p-7 text-paper shadow-hero sm:p-8">
-      <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-seal via-[#E4C368] to-seal" />
+      <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-seal via-[#9EC494] to-seal" />
 
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -92,7 +92,7 @@ export function OverdueDigest({ items }: { items: DigestItem[] }) {
         </p>
         <Link
           href={`/dashboard/${worst.business.id}`}
-          className="inline-flex items-center justify-center rounded-md bg-seal px-4 py-2.5 text-sm font-semibold text-[#2A1D06] transition duration-150 hover:bg-[#B68627]"
+          className="inline-flex items-center justify-center rounded-md bg-seal px-4 py-2.5 text-sm font-semibold text-[#14261C] transition duration-150 hover:bg-[#28442C]"
         >
           Review {worst.business.name}
         </Link>

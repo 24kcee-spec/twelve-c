@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -219,7 +219,7 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95">
-      <div className="h-[3px] bg-gradient-to-r from-seal via-[#E4C368] to-seal" />
+      <div className="h-[3px] bg-gradient-to-r from-seal via-[#9EC494] to-seal" />
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2">
           <Link href="/dashboard" className="mr-4">

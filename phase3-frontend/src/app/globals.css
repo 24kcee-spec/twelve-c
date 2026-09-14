@@ -1,11 +1,11 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------
    "The Ledger" - a ruled passbook aesthetic, not a glass panel. Warm
-   parchment paper, aged-gold seal reserved for the logo and confirmed/
-   verified states, and a faint ruled-line body texture. Dark mode
+   parchment paper, deep forest-green seal reserved for the logo and
+   confirmed/verified states, and a faint ruled-line body texture. Dark mode
    ("Night Ledger") uses a three-step surface hierarchy - paper, surface,
    surface-2 - so nested elements (asset register rows, modals) read as
    physically stacked rather than just a lighter blur.
@@ -22,8 +22,8 @@
   --color-usd-soft: 226 239 231;
   --color-zig: 45 90 120;
   --color-zig-soft: 224 233 240;
-  --color-seal: 163 116 30;
-  --color-seal-soft: 243 232 205;
+  --color-seal: 53 90 59;
+  --color-seal-soft: 224 234 220;
   --color-danger: 168 65 47;
   --color-danger-soft: 243 227 222;
 }
@@ -40,8 +40,8 @@ html.dark {
   --color-usd-soft: 27 45 38;
   --color-zig: 111 160 196;
   --color-zig-soft: 25 40 51;
-  --color-seal: 212 169 76;
-  --color-seal-soft: 46 37 20;
+  --color-seal: 127 184 120;
+  --color-seal-soft: 35 48 31;
   --color-danger: 226 133 122;
   --color-danger-soft: 51 27 22;
 }
@@ -148,7 +148,7 @@ input[type="number"]::-webkit-inner-spin-button {
   .fade-in-up { animation: none; }
 }
 
-/* Letterhead rule - a seal-gold top border used on cards and headers in
+/* Letterhead rule - a forest-green top border used on cards and headers in
    place of drop shadows / glow. Reads as a stamped ledger sheet. */
 .letterhead {
   border-top: 2px solid rgb(var(--color-seal));
@@ -156,7 +156,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 /* Stamp-style badge for confirmed/verified states (MFA enabled, payment
    recorded, email verified). Deliberately the only place besides the
-   logo that uses seal gold, so it always signals "this is official". */
+   logo that uses the seal green, so it always signals "this is official". */
 .seal-mark {
   display: inline-flex;
   align-items: center;
