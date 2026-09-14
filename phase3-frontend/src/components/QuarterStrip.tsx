@@ -54,7 +54,7 @@ export function QuarterStrip({ calculation }: { calculation: QpdCalculationOut }
               </span>
             </div>
             <p className="mt-1 font-mono text-[11px] text-ink-faint">
-              {meta.short} MIDDOT {(inst.percentage * 100).toFixed(0)}% cumulative
+              {meta.short} · {(inst.percentage * 100).toFixed(0)}% cumulative
             </p>
             <p className="mt-2 font-mono text-sm text-ink">
               {paid ? money(inst.usd, "USD") : money(inst.usd_balance, "USD")}
