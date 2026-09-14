@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect } from "react";
@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 const FEATURES: { title: string; body: string }[] = [
   {
     title: "The cumulative method, not a shortcut",
-    body: "Each instalment is the required percentage of your current best estimate, minus what's confirmed paid so far â€” the way ZIMRA's Public Notice actually defines QPD, not a flat quarterly split.",
+    body: "Each instalment is the required percentage of your current best estimate, minus what's confirmed paid so far — the way ZIMRA's Public Notice actually defines QPD, not a flat quarterly split.",
   },
   {
     title: "USD and ZiG, side by side",
@@ -19,7 +19,7 @@ const FEATURES: { title: string; body: string }[] = [
   },
   {
     title: "Capital allowances built in",
-    body: "Add assets to a register once and their wear-and-tear and SIA allowances feed straight into the estimate â€” no separate spreadsheet to keep in sync.",
+    body: "Add assets to a register once and their wear-and-tear and SIA allowances feed straight into the estimate — no separate spreadsheet to keep in sync.",
   },
   {
     title: "A schedule you can hand to your accountant",
@@ -28,7 +28,7 @@ const FEATURES: { title: string; body: string }[] = [
 ];
 
 const STEPS = [
-  { n: "01", title: "Add a business", body: "Your entity's exchange rate, corporate tax rate, and AIDS levy rate â€” set once, editable per calculation." },
+  { n: "01", title: "Add a business", body: "Your entity's exchange rate, corporate tax rate, and AIDS levy rate — set once, editable per calculation." },
   { n: "02", title: "Enter this quarter", body: "USD and ZiG sales and expenses. Twelve C works out the cumulative instalment ZIMRA expects." },
   { n: "03", title: "Confirm and file", body: "Download the PDF summary, pay ZIMRA, then confirm what actually went through so next quarter nets correctly." },
 ];
@@ -103,7 +103,7 @@ export default function LandingPage() {
   if (loading || user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-paper">
-        <span className="font-mono text-sm text-ink-faint">Loadingâ€¦</span>
+        <span className="font-mono text-sm text-ink-faint">Loading…</span>
       </div>
     );
   }
@@ -125,7 +125,7 @@ export default function LandingPage() {
             </h1>
             <p className="mt-5 max-w-md text-base leading-relaxed text-ink-soft">
               Twelve C calculates your ZIMRA Quarterly Payment Date instalments the way
-              the law actually requires â€” cumulative, not flat â€” across USD and ZiG,
+              the law actually requires — cumulative, not flat — across USD and ZiG,
               so you can file with confidence instead of guesswork.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -156,7 +156,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-5xl px-6 py-14">
           <Eyebrow>How the year is structured</Eyebrow>
           <h2 className="mt-2 font-display text-2xl text-ink md:text-3xl">
-            10% Â· 25% Â· 30% Â· 35% of your best estimate
+            10% · 25% · 30% · 35% of your best estimate
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-soft">
             Each QPD instalment is a cumulative share of your current estimate for the
