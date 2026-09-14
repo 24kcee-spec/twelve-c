@@ -1,9 +1,13 @@
-from __future__ import annotations
+﻿from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
 
 import pyotp
 import pytest
+from sqlalchemy import select
 
-from tests.conftest import SENT_CODES
+from app.models.user import User
+from tests.conftest import SENT_CODES, SENT_RESET_CODES
 
 pytestmark = pytest.mark.asyncio
 
@@ -192,3 +196,137 @@ async def test_resend_verification_does_not_leak_account_existence(client):
     r = await client.post("/auth/resend-verification", json={"email": "nobody@example.com"})
     assert r.status_code == 200
     assert "exists" in r.json()["message"] or "on its way" in r.json()["message"]
+
+
+# ---------------------------------------------------------------------------
+# Password reset
+# ---------------------------------------------------------------------------
+
+
+async def test_forgot_password_issues_a_reset_code(client):
+    email = "forgot@example.com"
+    await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    await _verify(client, email)
+
+    r = await client.post("/auth/forgot-password", json={"email": email})
+    assert r.status_code == 200
+    assert email in SENT_RESET_CODES
+
+
+async def test_forgot_password_does_not_leak_account_existence(client):
+    # Registered, real account and a made-up email both get the same
+    # response - the account's existence is never revealed either way.
+    email = "forgot2@example.com"
+    await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    await _verify(client, email)
+
+    real = await client.post("/auth/forgot-password", json={"email": email})
+    fake = await client.post("/auth/forgot-password", json={"email": "nobody@example.com"})
+
+    assert real.status_code == 200
+    assert fake.status_code == 200
+    assert real.json()["message"] == fake.json()["message"]
+
+
+async def test_forgot_password_skips_google_only_accounts(client, db_session):
+    # A Google-only account has no password to reset (hashed_password is
+    # None) - forgot-password must still return the generic message, but
+    # must not actually issue a code for it.
+    email = "googleonly@example.com"
+    db_session.add(User(email=email, hashed_password=None, google_id="g-123", is_verified=True))
+    await db_session.commit()
+
+    r = await client.post("/auth/forgot-password", json={"email": email})
+    assert r.status_code == 200
+    assert email not in SENT_RESET_CODES
+
+
+async def test_reset_password_with_valid_code_succeeds_and_revokes_sessions(client):
+    email = "reset@example.com"
+    await _register_and_login(client, email=email)
+    old_refresh_cookie = client.cookies.get("refresh_token")
+    assert old_refresh_cookie is not None
+
+    await client.post("/auth/forgot-password", json={"email": email})
+    code = SENT_RESET_CODES[email]
+
+    new_password = "N3wStrongerPassw0rd!"
+    r = await client.post(
+        "/auth/reset-password", json={"email": email, "code": code, "new_password": new_password}
+    )
+    assert r.status_code == 200
+
+    # Old password no longer works...
+    old = await client.post("/auth/login", json={"email": email, "password": VALID_PASSWORD})
+    assert old.status_code == 401
+
+    # ...new password does.
+    new = await client.post("/auth/login", json={"email": email, "password": new_password})
+    assert new.status_code == 200
+
+    # A password reset is a compromise/recovery signal - the refresh token
+    # from the session that existed BEFORE the reset must be dead, not
+    # just superseded. Force it back in explicitly since login just issued
+    # a fresh one that's now sitting in the cookie jar instead.
+    reuse = await client.post("/auth/refresh", cookies={"refresh_token": old_refresh_cookie})
+    assert reuse.status_code == 401
+
+
+async def test_reset_password_wrong_code_rejected_but_real_code_still_works(client):
+    email = "resetwrong@example.com"
+    await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    await _verify(client, email)
+    await client.post("/auth/forgot-password", json={"email": email})
+    real_code = SENT_RESET_CODES[email]
+    wrong_code = "000000" if real_code != "000000" else "111111"
+
+    r = await client.post(
+        "/auth/reset-password", json={"email": email, "code": wrong_code, "new_password": "N3wPassw0rd!"}
+    )
+    assert r.status_code == 400
+
+    # One bad guess doesn't burn the real code.
+    r = await client.post(
+        "/auth/reset-password", json={"email": email, "code": real_code, "new_password": "N3wPassw0rd!"}
+    )
+    assert r.status_code == 200
+
+
+async def test_reset_password_locks_out_after_too_many_wrong_attempts(client):
+    email = "resetbruteforce@example.com"
+    await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    await _verify(client, email)
+    await client.post("/auth/forgot-password", json={"email": email})
+    real_code = SENT_RESET_CODES[email]
+    wrong_code = "000000" if real_code != "000000" else "111111"
+
+    for _ in range(5):
+        r = await client.post(
+            "/auth/reset-password", json={"email": email, "code": wrong_code, "new_password": "N3wPassw0rd!"}
+        )
+        assert r.status_code == 400
+
+    # 6th attempt (even with the correct code) is locked out.
+    r = await client.post(
+        "/auth/reset-password", json={"email": email, "code": real_code, "new_password": "N3wPassw0rd!"}
+    )
+    assert r.status_code == 429
+
+
+async def test_reset_password_expired_code_rejected(client, db_session):
+    email = "resetexpired@example.com"
+    await client.post("/auth/register", json={"email": email, "password": VALID_PASSWORD})
+    await _verify(client, email)
+    await client.post("/auth/forgot-password", json={"email": email})
+    code = SENT_RESET_CODES[email]
+
+    # Force the code to already be expired.
+    result = await db_session.execute(select(User).where(User.email == email))
+    user = result.scalars().one()
+    user.reset_code_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    await db_session.commit()
+
+    r = await client.post(
+        "/auth/reset-password", json={"email": email, "code": code, "new_password": "N3wPassw0rd!"}
+    )
+    assert r.status_code == 400

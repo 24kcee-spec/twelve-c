@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import sys
@@ -46,17 +46,26 @@ async def _reset_rate_limiter():
 # keyed by recipient email - see _capture_verification_codes below.
 SENT_CODES: dict[str, str] = {}
 
+# Password reset codes "sent" during tests - same idea, separate dict since
+# they're a different code with a different expiry/attempt counter.
+SENT_RESET_CODES: dict[str, str] = {}
+
 
 @pytest_asyncio.fixture(autouse=True)
 async def _capture_verification_codes(monkeypatch):
     import app.api.routes.auth as auth_routes
 
     SENT_CODES.clear()
+    SENT_RESET_CODES.clear()
 
     async def fake_send(to_email: str, code: str) -> None:
         SENT_CODES[to_email] = code
 
+    async def fake_send_reset(to_email: str, code: str) -> None:
+        SENT_RESET_CODES[to_email] = code
+
     monkeypatch.setattr(auth_routes, "send_verification_email", fake_send)
+    monkeypatch.setattr(auth_routes, "send_password_reset_email", fake_send_reset)
     yield
 
 
