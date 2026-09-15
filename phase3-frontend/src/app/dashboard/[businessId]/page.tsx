@@ -1,4 +1,4 @@
-﻿"use client";
+﻿﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -151,7 +151,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
           </Link>
         </div>
         <p className="mt-2 font-mono text-xs text-ink-faint sm:text-sm">
-          ZiG {business.default_exchange_rate} / USD MIDDOT {(business.default_tax_rate * 100).toFixed(0)}% tax
+          ZiG {business.default_exchange_rate} / USD · {(business.default_tax_rate * 100).toFixed(0)}% tax
           + {(business.default_aids_levy_rate * 100).toFixed(0)}% AIDS levy
         </p>
 
@@ -163,7 +163,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
             <QuarterStrip calculation={selected} />
 
             <div className="flex items-center justify-between gap-3">
-              <Eyebrow>Results MIDDOT {selected.quarter_label}</Eyebrow>
+              <Eyebrow>Results · {selected.quarter_label}</Eyebrow>
               <Button variant="secondary" type="button" onClick={() => downloadTaxSummaryPdf(business, selected)}>
                 Download PDF
               </Button>
@@ -244,7 +244,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                                     disabled={deletingCalcId === c.id}
                                     className="rounded-md bg-danger px-2.5 py-1 text-xs font-semibold text-paper disabled:opacity-50"
                                   >
-                                    {deletingCalcId === c.id ? "DeletingELLIPSIS" : "Yes, delete"}
+                                    {deletingCalcId === c.id ? "Deleting…" : "Yes, delete"}
                                   </button>
                                   <button
                                     type="button"

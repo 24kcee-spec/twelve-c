@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { percent } from "@/lib/format";
@@ -13,7 +13,7 @@ function Bar({
   mounted: boolean;
 }) {
   return (
-    <div className="flex h-6 w-full overflow-hidden rounded-full bg-line/40">
+    <div className="flex h-5 w-full overflow-hidden bg-line/40">
       <div
         className="h-full bg-usd"
         style={{
@@ -52,11 +52,11 @@ export function CurrencySplitBars({
   }, []);
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-3 space-y-4">
       <div>
-        <div className="mb-1.5 flex items-center justify-between text-xs text-ink-faint">
-          <span>Raw trade split</span>
-          <span className="font-mono tabular-nums">
+        <div className="mb-1.5 flex items-center justify-between font-mono text-[11px] text-ink-faint">
+          <span>RAW TRADE SPLIT</span>
+          <span className="tabular-nums">
             {percent(rawUsd, 1)} USD / {percent(rawZig, 1)} ZiG
           </span>
         </div>
@@ -64,16 +64,14 @@ export function CurrencySplitBars({
       </div>
 
       <div>
-        <div className="mb-1.5 flex items-center justify-between text-xs text-ink-faint">
+        <div className="mb-1.5 flex items-center justify-between font-mono text-[11px] text-ink-faint">
           <span className="flex items-center gap-1.5">
-            Payment split
+            PAYMENT SPLIT
             {capped && (
-              <span className="rounded-full bg-seal px-2 py-0.5 text-xs font-medium text-ink">
-                Capped
-              </span>
+              <span className="bg-seal px-1.5 py-0.5 text-[10px] font-medium text-ink">CAPPED</span>
             )}
           </span>
-          <span className="font-mono tabular-nums">
+          <span className="tabular-nums">
             {percent(paymentUsd, 1)} USD / {percent(paymentZig, 1)} ZiG
           </span>
         </div>
