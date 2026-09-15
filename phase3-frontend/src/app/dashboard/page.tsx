@@ -217,7 +217,7 @@ function DashboardContent() {
               />
               <div className="sm:col-span-2">
                 <Button type="submit" variant="primary" disabled={submitting} className="w-full sm:w-auto">
-                  {submitting ? "Creating…" : "Create business"}
+                  {submitting ? "Creatingâ€¦" : "Create business"}
                 </Button>
               </div>
             </form>
@@ -289,7 +289,7 @@ function DashboardContent() {
                           disabled={deletingId === b.id}
                           className="rounded-md bg-danger px-3 py-1.5 text-xs font-semibold text-paper transition disabled:opacity-50"
                         >
-                          {deletingId === b.id ? "Deleting…" : "Yes, delete"}
+                          {deletingId === b.id ? "Deletingâ€¦" : "Yes, delete"}
                         </button>
                         <button
                           onClick={() => setConfirmingDeleteId(null)}
@@ -303,7 +303,7 @@ function DashboardContent() {
                 }
 
                 return (
-                  <div key={b.id} className={`group transition duration-150 hover:bg-seal-soft ${idx > 0 ? "border-t border-line" : ""}`}>
+                  <div key={b.id} className={`fade-in-up group transition duration-150 hover:bg-seal-soft ${idx > 0 ? "border-t border-line" : ""}`}>
                     {/* Mobile: stacked */}
                     <div className="flex flex-col gap-2 px-6 py-4 sm:hidden">
                       <div className="flex items-center justify-between gap-3">

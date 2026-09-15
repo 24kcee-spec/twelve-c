@@ -13,3 +13,5 @@ tsconfig.tsbuildinfo
 .env.test.local
 .env.production.local
 .DS_Store
+*.bak
+*.bak-*
