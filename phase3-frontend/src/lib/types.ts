@@ -129,13 +129,37 @@ export interface QpdResultJson {
   net_payable_zig: number;
 }
 
+// What the backend actually persists in QpdCalculationOut.input_json: the
+// resolved *engine* input (zimra_qpd.calculator.QpdInput), not the request
+// payload (QpdCalculationCreate) - tax_year/quarter_label aren't part of
+// it (they're already top-level fields on QpdCalculationOut), and
+// exchange_rate/tax_rate/aids_levy_rate are always concrete numbers here
+// (already resolved against the business's defaults server-side), not the
+// optional/nullable overrides QpdCalculationCreate accepts.
+export interface QpdStoredInput {
+  usd_sales: number;
+  zig_sales: number;
+  usd_expenses: CurrencyExpensesIn;
+  zig_expenses: CurrencyExpensesIn;
+  exchange_rate: number;
+  tax_rate: number;
+  aids_levy_rate: number;
+  quarter: number;
+  previous_qpds_paid_usd: number;
+  previous_qpds_paid_zig: number;
+  assessed_loss_usd: number;
+  assessed_loss_zig: number;
+  withholding_credits_usd: number;
+  withholding_credits_zig: number;
+}
+
 export interface QpdCalculationOut {
   id: string;
   business_id: string;
   tax_year: number;
   quarter_label: string;
   quarter: number;
-  input_json: QpdCalculationCreate;
+  input_json: QpdStoredInput;
   result_json: QpdResultJson;
   actual_usd_paid: number | null;
   actual_zig_paid: number | null;

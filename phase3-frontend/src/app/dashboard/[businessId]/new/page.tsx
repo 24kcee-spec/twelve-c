@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AssetRegister } from "@/components/AssetRegister";
@@ -11,8 +11,8 @@ import { MonthlyIncomeCalculator } from "@/components/MonthlyIncomeCalculator";
 import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useBusinessData } from "@/lib/useBusinessData";
-import { money } from "@/lib/format";
-import { emptyExpenses, CurrencyExpensesIn } from "@/lib/types";
+import { formatDateTime, money } from "@/lib/format";
+import { emptyExpenses, ApiError, CurrencyExpensesIn, QpdCalculationOut } from "@/lib/types";
 
 // This used to be a 4-step wizard gated behind "Next" buttons. It's now one
 // continuous page, sectioned like an income statement (Period, Income,
@@ -70,6 +70,17 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
   const [showRateSettings, setShowRateSettings] = useState(false);
   const [ratesInitialized, setRatesInitialized] = useState(false);
 
+  // Existing calculations for this business - used to (a) prefill
+  // deductions/adjustments from the most recent run, since those have no
+  // other persistence (unlike sales, which the monthly calculator above
+  // already carries forward on its own), and (b) block resubmitting a
+  // quarter that's already been calculated until it's deleted.
+  const [calculations, setCalculations] = useState<QpdCalculationOut[] | null>(null);
+  const [calcsError, setCalcsError] = useState("");
+  const [inputsInitialized, setInputsInitialized] = useState(false);
+  const [quarterInitialized, setQuarterInitialized] = useState(false);
+  const [deletingDuplicate, setDeletingDuplicate] = useState(false);
+
   useEffect(() => {
     if (business && !ratesInitialized) {
       setExchangeRate(business.default_exchange_rate);
@@ -78,6 +89,88 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
       setRatesInitialized(true);
     }
   }, [business, ratesInitialized]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .listCalculations(businessId)
+      .then((data) => {
+        if (!cancelled) setCalculations(data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCalculations([]);
+          setCalcsError("Couldn't check for existing calculations - proceed carefully.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId]);
+
+  // Prefill deductions and adjustments from the most recent calculation
+  // (any quarter) once the list has loaded - runs once, so it doesn't
+  // fight with the person's own edits afterward.
+  useEffect(() => {
+    if (calculations && calculations.length > 0 && !inputsInitialized) {
+      const latest = calculations[0].input_json;
+      setUsdExpenses(latest.usd_expenses);
+      setZigExpenses(latest.zig_expenses);
+      setAssessedLossUsd(latest.assessed_loss_usd);
+      setAssessedLossZig(latest.assessed_loss_zig);
+      setWithholdingCreditsUsd(latest.withholding_credits_usd);
+      setWithholdingCreditsZig(latest.withholding_credits_zig);
+      if (
+        latest.assessed_loss_usd ||
+        latest.assessed_loss_zig ||
+        latest.withholding_credits_usd ||
+        latest.withholding_credits_zig
+      ) {
+        setShowAdjustments(true);
+      }
+      setInputsInitialized(true);
+    }
+  }, [calculations, inputsInitialized]);
+
+  // Default to the first quarter this tax year that hasn't been
+  // calculated yet, instead of always starting on QPD1.
+  useEffect(() => {
+    if (calculations && !quarterInitialized) {
+      const usedQuarters = new Set(
+        calculations.filter((c) => c.tax_year === taxYear).map((c) => c.quarter)
+      );
+      const nextQuarter = [1, 2, 3, 4].find((q) => !usedQuarters.has(q));
+      if (nextQuarter) setQuarter(nextQuarter);
+      setQuarterInitialized(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calculations, quarterInitialized]);
+
+  // A calculation already exists for the currently-selected tax year +
+  // quarter - block resubmitting until it's deleted, rather than silently
+  // adding a second entry for the same quarter.
+  const duplicateCalc = useMemo(() => {
+    if (!calculations) return null;
+    return calculations.find((c) => c.tax_year === taxYear && c.quarter === quarter) ?? null;
+  }, [calculations, taxYear, quarter]);
+
+  async function deleteDuplicate() {
+    if (!duplicateCalc) return;
+    setDeletingDuplicate(true);
+    setError("");
+    try {
+      await api.deleteCalculation(businessId, duplicateCalc.id);
+      setCalculations((prev) => prev?.filter((c) => c.id !== duplicateCalc.id) ?? null);
+    } catch (err) {
+      setError(
+        err instanceof ApiError && typeof err.detail === "string"
+          ? err.detail
+          : "Couldn't delete that calculation. Try again in a moment."
+      );
+    } finally {
+      setDeletingDuplicate(false);
+    }
+  }
 
   function updateExpense(which: "usd" | "zig", field: keyof CurrencyExpensesIn, value: number) {
     if (which === "usd") setUsdExpenses((prev) => ({ ...prev, [field]: value }));
@@ -89,10 +182,15 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
   const totalDeductionsZig =
     zigExpenses.cost_of_sales + zigExpenses.salaries + zigExpenses.other_expenses + zigExpenses.capital_allowances;
 
-  const canSubmit = Number.isFinite(taxYear) && taxYear >= 2000 && taxYear <= 2100;
+  const canSubmit =
+    Number.isFinite(taxYear) && taxYear >= 2000 && taxYear <= 2100 && !duplicateCalc;
 
   async function runCalculation(e: React.FormEvent) {
     e.preventDefault();
+    if (duplicateCalc) {
+      setError("Delete the existing calculation for this quarter before recalculating.");
+      return;
+    }
     if (!canSubmit) {
       setError("Enter a valid tax year.");
       return;
@@ -176,6 +274,28 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
                 cumulative target against what you&apos;ve confirmed paying in earlier quarters.
               </span>
             </label>
+
+            {duplicateCalc && (
+              <div className="rounded-md border border-danger/40 bg-danger-soft px-3 py-3 text-sm">
+                <p className="text-danger">
+                  {duplicateCalc.quarter_label} for {taxYear} was already calculated on{" "}
+                  {formatDateTime(duplicateCalc.created_at)} -{" "}
+                  {money(duplicateCalc.result_json.total_tax_usd, "USD")} /{" "}
+                  {money(duplicateCalc.result_json.total_tax_zig, "ZIG")}. Delete it to
+                  recalculate this quarter.
+                </p>
+                <button
+                  type="button"
+                  onClick={deleteDuplicate}
+                  disabled={deletingDuplicate}
+                  className="mt-2 rounded-md bg-danger px-3 py-1.5 text-xs font-semibold text-paper transition disabled:opacity-50"
+                >
+                  {deletingDuplicate ? "Deleting\u2026" : "Delete existing calculation"}
+                </button>
+              </div>
+            )}
+
+            {calcsError && <p className="text-xs text-danger">{calcsError}</p>}
           </SectionCard>
 
           <SectionCard eyebrow="Income">
