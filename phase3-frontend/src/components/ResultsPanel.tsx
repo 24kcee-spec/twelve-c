@@ -201,7 +201,7 @@ export function ResultsPanel({
                   <tr className="border-b border-line text-left font-mono text-[10px] tracking-wide text-ink-faint">
                     <th className="py-2 pr-3 font-medium">QTR</th>
                     <th className="py-2 pr-3 font-medium">DUE</th>
-                    <th className="py-2 pr-3 text-right font-medium">CUM%</th>
+                    <th className="py-2 pr-3 text-right font-medium">SHARE%</th>
                     <th className="py-2 pr-3 text-right font-medium">USD</th>
                     <th className="py-2 pr-3 text-right font-medium">ZIG</th>
                     <th className="py-2 pl-3 font-medium">STATUS</th>

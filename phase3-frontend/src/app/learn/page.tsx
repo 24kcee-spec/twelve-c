@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 
 export const metadata = { title: "Know Your Taxes | Twelve C" };
@@ -54,7 +54,7 @@ const TAX_TYPES: TaxType[] = [
     name: "Income Tax — QPDs",
     appliesTo: "Every registered company, PBC, and any individual with business or investment income outside formal employment. This is the tax Twelve C calculates.",
     rate: "25.75% effective for companies/PBCs (25% + 3% AIDS levy). Individuals use the progressive personal bands instead, also plus the 3% AIDS levy.",
-    due: "Four unequal instalments: 10% by 25 March, 25% by 25 June, 30% by 25 September, 35% by 20 December.",
+    due: "Cumulative instalments: 10% of your annual estimate by 25 March, 35% by 25 June, 65% by 25 September, 100% by 20 December.",
   },
   {
     name: "VAT (Value Added Tax)",
