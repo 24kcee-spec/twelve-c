@@ -7,7 +7,6 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme, Theme } from "@/lib/theme-context";
 import { api } from "@/lib/api";
 import { Business } from "@/lib/types";
-import { RateSettingsModal } from "@/components/RateSettingsModal";
 import {
   ChevronDown,
   Dropdown,
@@ -46,15 +45,6 @@ function BookIcon() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z" />
       <path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5v-13Z" />
-    </svg>
-  );
-}
-
-function RatesIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3v18" />
-      <path d="M17 7.5c0-1.7-2-3-5-3s-5 1.3-5 3 2 2.3 5 2.7 5 1 5 2.8-2 3-5 3-5-1.3-5-3" />
     </svg>
   );
 }
@@ -182,7 +172,6 @@ export function TopBar() {
   const pathname = usePathname();
 
   const [businesses, setBusinesses] = useState<Business[] | null>(null);
-  const [ratesOpen, setRatesOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -291,13 +280,6 @@ export function TopBar() {
               Know your taxes
             </span>
           </DropdownItem>
-          <DropdownItem onClick={() => setRatesOpen(true)}>
-            <span className="flex items-center gap-2.5">
-              <RatesIcon />
-              Rate settings
-            </span>
-          </DropdownItem>
-          <DropdownDivider />
           <ThemeToggle />
           <DropdownDivider />
           <LegalSubmenu />
@@ -310,12 +292,6 @@ export function TopBar() {
           </DropdownItem>
         </Dropdown>
       </div>
-
-      <RateSettingsModal
-        open={ratesOpen}
-        onClose={() => setRatesOpen(false)}
-        highlightBusinessId={currentBusinessId}
-      />
     </header>
   );
 }

@@ -101,12 +101,13 @@ function AccountContent() {
         <h1 className="mt-1 font-display text-3xl text-ink">{user?.email}</h1>
 
         <Card className="mt-8">
-          <Eyebrow>Rate settings &amp; appearance</Eyebrow>
+          <Eyebrow>Appearance</Eyebrow>
           <p className="mt-1 text-sm text-ink-soft">
-            Exchange rate, tax rate, AIDS levy rate, and light/dark mode have
-            moved into the account menu for quicker access — click your
-            initials in the top bar, then <strong className="text-ink">Rate settings</strong> or{" "}
-            <strong className="text-ink">Appearance</strong>.
+            Light/dark mode has moved into the account menu for quicker
+            access — click your initials in the top bar, then{" "}
+            <strong className="text-ink">Appearance</strong>. Exchange rate,
+            tax rate, and AIDS levy rate are set per calculation, on each
+            business&rsquo;s <strong className="text-ink">New calculation</strong> page.
           </p>
         </Card>
 

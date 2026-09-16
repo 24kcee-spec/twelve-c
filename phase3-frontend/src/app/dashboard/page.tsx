@@ -253,10 +253,9 @@ function DashboardContent() {
 
           {businesses && businesses.length > 0 && (
             <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card-raised">
-              <div className={`hidden grid-cols-[2.2fr_1.1fr_1.8fr_1.4fr_18px_26px] gap-4 px-6 py-3 text-xs font-medium text-ink-faint sm:grid`}>
+              <div className={`hidden grid-cols-[2.6fr_1.4fr_1.4fr_18px_26px] gap-4 px-6 py-3 text-xs font-medium text-ink-faint sm:grid`}>
                 <span>Business</span>
                 <span>Status</span>
-                <span>Rate</span>
                 <span className="text-right">Amount due</span>
                 <span />
                 <span />
@@ -336,7 +335,7 @@ function DashboardContent() {
                     </div>
 
                     {/* Desktop: ledger row */}
-                    <div className="hidden grid-cols-[2.2fr_1.1fr_1.8fr_1.4fr_18px_26px] items-center gap-4 px-6 py-4 sm:grid">
+                    <div className="hidden grid-cols-[2.6fr_1.4fr_1.4fr_18px_26px] items-center gap-4 px-6 py-4 sm:grid">
                       <Link href={`/dashboard/${b.id}`} className="flex min-w-0 items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
                           {initials || "?"}
@@ -354,11 +353,6 @@ function DashboardContent() {
                       ) : (
                         <span />
                       )}
-
-                      <Link href={`/dashboard/${b.id}`} className="text-sm text-ink-soft">
-                        ZiG {b.default_exchange_rate}/USD, {(b.default_tax_rate * 100).toFixed(0)}% tax +{" "}
-                        {(b.default_aids_levy_rate * 100).toFixed(0)}% AIDS levy
-                      </Link>
 
                       <Link
                         href={`/dashboard/${b.id}`}
