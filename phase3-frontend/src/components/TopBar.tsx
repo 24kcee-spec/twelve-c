@@ -120,16 +120,6 @@ function ThemeToggle() {
   );
 }
 
-function MethodologyIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
-      <path d="M15 3v4h4" />
-      <path d="M8.5 12.5h7M8.5 15.5h7M8.5 9.5h3" />
-    </svg>
-  );
-}
-
 function LegalIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -299,12 +289,6 @@ export function TopBar() {
             <span className="flex items-center gap-2.5">
               <BookIcon />
               Know your taxes
-            </span>
-          </DropdownItem>
-          <DropdownItem href="/methodology">
-            <span className="flex items-center gap-2.5">
-              <MethodologyIcon />
-              Methodology
             </span>
           </DropdownItem>
           <DropdownItem onClick={() => setRatesOpen(true)}>

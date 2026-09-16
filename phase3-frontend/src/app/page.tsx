@@ -43,10 +43,7 @@ function LandingHeader() {
             Know your taxes
           </Link>
           <Link href="/tutorial" className="text-sm text-ink-soft transition duration-150 hover:text-usd">
-            Tutorial
-          </Link>
-          <Link href="/methodology" className="text-sm text-ink-soft transition duration-150 hover:text-usd">
-            Methodology
+            How it works
           </Link>
         </nav>
         <div className="flex items-center gap-3">
@@ -68,8 +65,8 @@ function LandingFooter() {
       <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-4 px-6 py-8 text-sm text-ink-faint md:flex-row md:items-center">
         <Logo className="text-base" />
         <div className="flex flex-wrap gap-x-6 gap-y-2">
-          <Link href="/methodology" className="transition hover:text-ink">
-            Methodology
+          <Link href="/tutorial" className="transition hover:text-ink">
+            How it works
           </Link>
           <Link href="/legal/disclaimer" className="transition hover:text-ink">
             Disclaimer
@@ -156,7 +153,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-5xl px-6 py-14">
           <Eyebrow>How the year is structured</Eyebrow>
           <h2 className="mt-2 font-display text-2xl text-ink md:text-3xl">
-            10% · 25% · 30% · 35% of your best estimate
+            10% · 35% · 65% · 100% of your best estimate
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-soft">
             Each QPD instalment is a cumulative share of your current estimate for the

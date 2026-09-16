@@ -5,37 +5,42 @@ const STEPS = [
   {
     n: "01",
     title: "Add your business",
-    body: "Give it a name, and set your default exchange rate, corporate tax rate, and AIDS levy rate once. Twelve C remembers them, so you don't retype the same numbers every quarter. You can run more than one business under a single login.",
+    body: "Give it a name, and set your default exchange rate, corporate tax rate, and AIDS levy rate once. Twelve C remembers them, so you don't retype the same numbers every quarter. You can run more than one business under a single login, and rates can always be overridden for a one-off recalculation without touching the saved defaults.",
   },
   {
     n: "02",
-    title: "Enter what you actually earned and spent",
-    body: "For the period you're calculating, enter USD and ZiG sales, plus deductions (cost of sales, salaries, other expenses, capital allowances) in whichever currency they actually happened in. No conversion required on your end — Twelve C handles that.",
+    title: "Build up income month by month",
+    body: "Rather than guessing a full-year figure upfront, enter actual sales for each month that's closed and one estimate for the month still in progress. Twelve C annualizes it automatically, and you can add a buffer percentage for caution or a one-off adjustment for something like an asset sale. This carries forward as the year progresses, so QPD2 already remembers what you entered for QPD1.",
   },
   {
     n: "03",
-    title: "Understand your currency split",
-    body: "Twelve C works out what share of your trade was USD versus ZiG. There's one rule worth knowing: Public Notice 71 says if USD is your dominant currency, the payment split is capped at an even 50/50 rather than the raw percentage — Twelve C applies this automatically and shows you the before-and-after so you can see exactly what changed and why.",
+    title: "Add deductions and capital assets",
+    body: "Enter cost of sales, salaries, and other expenses in whichever currency they happened in. Capital assets go into a register once — Twelve C works out the wear-and-tear or Special Initial Allowance and feeds it into this year's capital allowances for you, and the same asset carries into next year automatically.",
   },
   {
     n: "04",
-    title: "Read your QPD schedule",
-    body: "ZIMRA doesn't split provisional tax into four equal chunks. It's 10% by 25 March, 25% by 25 June, 30% by 25 September, and 35% by 20 December — most of the year's bill lands in the second half. The schedule wheel shows you all four instalments, what's owed, and which one is coming up next.",
+    title: "Understand your currency split",
+    body: "Twelve C works out what share of your trade was USD versus ZiG, and keeps the two currencies as separate totals throughout — nothing is converted or netted between them. There's one rule worth knowing: if USD is your dominant currency, Public Notice 71 caps the payment split at an even 50/50 rather than the raw percentage. Twelve C applies this automatically.",
   },
   {
     n: "05",
+    title: "Read your QPD schedule",
+    body: "ZIMRA's provisional tax isn't four equal chunks — it's a running cumulative target: 10% of your annual estimate by 25 March, 35% by 25 June, 65% by 25 September, and 100% by 20 December. Each instalment due is that quarter's cumulative target minus what you've already confirmed paying, so a revised estimate mid-year adjusts the remaining instalments rather than throwing off what's already settled.",
+  },
+  {
+    n: "06",
     title: "Track what you've actually paid",
     body: "As you pay ZIMRA, record it against each instalment. Twelve C tells you in plain language whether you still owe something, you've paid in full, or you've overpaid — no confusing negative numbers to interpret.",
   },
   {
-    n: "06",
-    title: "Never miss a date",
-    body: "Every business page shows a banner telling you exactly what's due next and how many days you have. If anything across any of your businesses is overdue, it also shows up right at the top of your dashboard — so you never have to check each business separately to find out.",
+    n: "07",
+    title: "See where you stand for the year",
+    body: "The reconciliation view compares what you've paid so far against what you should have paid by now, per currency, and flags whether you're fully compliant, within a safe buffer, or under-estimated. Where relevant it also shows the maximum possible penalty exposure as a ceiling — never presented as an actual bill, since ZIMRA has discretion over what's ultimately charged.",
   },
   {
-    n: "07",
-    title: "Keep your records",
-    body: "Every calculation you run is saved to that business's history, grouped by tax year, so you always have a timestamped record of exactly what numbers and rates were used — useful if ZIMRA or your accountant ever asks how you arrived at a figure.",
+    n: "08",
+    title: "Never miss a date, and keep your records",
+    body: "Every business page shows a banner telling you exactly what's due next and how many days you have, and anything overdue surfaces at the top of your dashboard too. Every calculation is saved to that business's history by tax year and can be downloaded as a clean PDF summary — a timestamped record of exactly what numbers and rates were used, ready to hand to your accountant or produce for ZIMRA.",
   },
 ];
 
@@ -58,7 +63,9 @@ export default function TutorialPage() {
         </h1>
         <p className="mt-3 max-w-xl text-sm text-ink-soft">
           You don't need to be an accountant to use this. Here's everything
-          it does, step by step, in the order you'll actually use it.
+          it does, step by step, in the order you'll actually use it — the
+          rates and rules behind every number are checked against ZIMRA's
+          own published figures.
         </p>
 
         <div className="mt-10 space-y-4">
