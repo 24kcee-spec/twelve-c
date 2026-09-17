@@ -26,6 +26,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
   const [calculations, setCalculations] = useState<QpdCalculationOut[]>([]);
   const [selected, setSelected] = useState<QpdCalculationOut | null>(null);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<"overview" | "reconciliation" | "history">("overview");
 
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const yearsInitialized = useRef(false);
@@ -57,6 +58,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
     setDeletingCalcId(null);
     setSelected(null);
     setError("");
+    setTab("overview");
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId]);
@@ -146,9 +148,12 @@ function BusinessContent({ businessId }: { businessId: string }) {
               <h1 className="mt-0.5 font-display text-2xl text-ink sm:text-3xl">{business.name}</h1>
             </div>
           </div>
-          <Link href={`/dashboard/${businessId}/new`}>
-            <Button variant="primary">New calculation</Button>
-          </Link>
+          {/* No standing "New calculation" button here any more - each
+              quarter card in the strip below is the entry point: an
+              uncalculated quarter links straight into the form scoped to
+              it, and a calculated one shows its result with an explicit
+              delete-to-recalculate action, rather than always offering a
+              button that could silently duplicate an already-run quarter. */}
         </div>
         <p className="mt-2 font-mono text-xs text-ink-faint sm:text-sm">
           ZiG {business.default_exchange_rate} / USD · {(business.default_tax_rate * 100).toFixed(0)}% tax
@@ -158,26 +163,220 @@ function BusinessContent({ businessId }: { businessId: string }) {
         <ErrorNote>{error}</ErrorNote>
 
         {selected ? (
-          <div className="mt-8 space-y-6">
-            <NextPaymentDue calculation={selected} />
-            <QuarterStrip calculation={selected} />
-
-            <div className="flex items-center justify-between gap-3">
-              <Eyebrow>Results · {selected.quarter_label}</Eyebrow>
-              <Button variant="secondary" type="button" onClick={() => downloadTaxSummaryPdf(business, selected)}>
-                Download PDF
-              </Button>
+          <>
+            <div className="mt-8 flex gap-5 border-b border-line">
+              {(
+                [
+                  { id: "overview", label: "Overview" },
+                  { id: "reconciliation", label: "Reconciliation" },
+                  { id: "history", label: "History" },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTab(t.id)}
+                  className={`-mb-px border-b-2 pb-2.5 text-sm font-medium transition duration-150 ${
+                    tab === t.id
+                      ? "border-seal text-ink"
+                      : "border-transparent text-ink-faint hover:text-ink-soft"
+                  }`}
+                >
+                  {t.label}
+                  {t.id === "history" && calculations.length > 0 && (
+                    <span className="ml-1.5 rounded-full bg-ink-faint/15 px-1.5 py-0.5 font-mono text-[10px] text-ink-faint">
+                      {calculations.length}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
-            <ResultsPanel
-              result={selected.result_json}
-              taxYear={selected.tax_year}
-              paymentsSlot={
-                <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
-              }
-            />
 
-            <ReconciliationPanel businessId={businessId} taxYear={selected.tax_year} />
-          </div>
+            {tab === "overview" && (
+              <div className="mt-6 space-y-6">
+                <NextPaymentDue calculation={selected} />
+                <QuarterStrip
+                  businessId={businessId}
+                  calculations={calculations}
+                  selected={selected}
+                  onSelectQuarter={setSelected}
+                />
+
+                <div className="flex items-center justify-between gap-3">
+                  <Eyebrow>Results · {selected.quarter_label}</Eyebrow>
+                  <div className="flex shrink-0 gap-2">
+                    <Button variant="secondary" type="button" onClick={() => downloadTaxSummaryPdf(business, selected)}>
+                      Download PDF
+                    </Button>
+                    {confirmingDeleteCalcId === selected.id ? (
+                      <div className="flex items-center gap-2 rounded-md bg-danger-soft px-2.5 py-1.5">
+                        <span className="text-xs text-danger">Delete this calculation?</span>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteCalculation(selected)}
+                          disabled={deletingCalcId === selected.id}
+                          className="rounded-md bg-danger px-2 py-1 text-xs font-semibold text-paper disabled:opacity-50"
+                        >
+                          {deletingCalcId === selected.id ? "Deleting…" : "Yes"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingDeleteCalcId(null)}
+                          className="rounded-md border border-line px-2 py-1 text-xs text-ink-soft"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingDeleteCalcId(selected.id)}
+                        className="rounded-md border border-line px-3 py-1.5 text-sm text-ink-faint transition duration-150 hover:border-danger/40 hover:bg-danger-soft hover:text-danger"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <ResultsPanel
+                  result={selected.result_json}
+                  taxYear={selected.tax_year}
+                  paymentsSlot={
+                    <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
+                  }
+                />
+              </div>
+            )}
+
+            {tab === "reconciliation" && (
+              <div className="mt-6">
+                <ReconciliationPanel businessId={businessId} taxYear={selected.tax_year} />
+              </div>
+            )}
+
+            {tab === "history" && (
+              <Card className="mt-6">
+                <div className="flex items-center justify-between">
+                  <Eyebrow>History</Eyebrow>
+                  {calculations.length > 0 && (
+                    <span className="font-mono text-xs text-ink-faint">
+                      {calculations.length} {calculations.length === 1 ? "entry" : "entries"}
+                    </span>
+                  )}
+                </div>
+
+                {calculations.length === 0 && (
+                  <p className="mt-2 text-sm text-ink-faint">No calculations yet.</p>
+                )}
+
+                <div className="mt-3 space-y-2">
+                  {groupedCalculations.map((group) => {
+                    const isExpanded = expandedYears.has(group.year);
+                    return (
+                      <div key={group.year} className="overflow-hidden rounded-md border border-line">
+                        <button
+                          type="button"
+                          onClick={() => toggleYear(group.year)}
+                          aria-expanded={isExpanded}
+                          className={`flex w-full items-center justify-between px-3 py-2.5 text-left transition duration-150 ${
+                            isExpanded ? "bg-usd-soft" : "bg-surface/40 hover:bg-paper/60"
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className="font-display text-base text-ink">{group.year}</span>
+                            <span className="rounded-full bg-ink-faint/15 px-2 py-0.5 font-mono text-[10px] text-ink-faint">
+                              {group.items.length}
+                            </span>
+                          </span>
+                          <ChevronDown open={isExpanded} />
+                        </button>
+
+                        {isExpanded && (
+                          <ul className="space-y-1 border-t border-line p-2">
+                            {group.items.map((c) => {
+                              const isSelected = selected?.id === c.id;
+                              const isLatest = c.id === latestCalculationId;
+                              const isConfirming = confirmingDeleteCalcId === c.id;
+
+                              if (isConfirming) {
+                                return (
+                                  <li key={c.id}>
+                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-danger-soft px-3 py-2">
+                                      <span className="text-xs text-danger">
+                                        Delete this calculation? This can&apos;t be undone.
+                                      </span>
+                                      <div className="flex shrink-0 gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => onDeleteCalculation(c)}
+                                          disabled={deletingCalcId === c.id}
+                                          className="rounded-md bg-danger px-2.5 py-1 text-xs font-semibold text-paper disabled:opacity-50"
+                                        >
+                                          {deletingCalcId === c.id ? "Deleting…" : "Yes, delete"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setConfirmingDeleteCalcId(null)}
+                                          className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-soft"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </li>
+                                );
+                              }
+
+                              return (
+                                <li key={c.id}>
+                                  <div
+                                    className={`flex items-center gap-1 rounded-md text-sm transition duration-150 ${
+                                      isSelected ? "bg-usd-soft text-usd" : "text-ink-soft hover:bg-surface-2 hover:text-ink"
+                                    }`}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelected(c);
+                                        setTab("overview");
+                                      }}
+                                      className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-left"
+                                    >
+                                      <span className="flex min-w-0 flex-col items-start">
+                                        <span className="flex items-center gap-2">
+                                          <span className="truncate">{c.quarter_label}</span>
+                                          {isLatest && <Badge>Latest</Badge>}
+                                          {isSelected && <Badge variant="outline">Viewing</Badge>}
+                                        </span>
+                                        <span className="mt-0.5 font-mono text-[11px] text-ink-faint">
+                                          {formatDateTime(c.created_at)}
+                                        </span>
+                                      </span>
+                                      <span className="shrink-0 font-mono tabular-nums">
+                                        {money(c.result_json.total_tax_usd, "USD")}
+                                      </span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmingDeleteCalcId(c.id)}
+                                      aria-label="Delete calculation"
+                                      className="mr-1.5 shrink-0 rounded-md p-1.5 text-ink-faint/60 transition duration-150 hover:bg-danger-soft hover:text-danger"
+                                    >
+                                      <TrashIcon />
+                                    </button>
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+          </>
         ) : (
           <Card className="mt-8">
             <p className="text-sm text-ink-faint">No calculations yet for this business.</p>
@@ -186,124 +385,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
             </Link>
           </Card>
         )}
-
-        <Card className="mt-6">
-          <div className="flex items-center justify-between">
-            <Eyebrow>History</Eyebrow>
-            {calculations.length > 0 && (
-              <span className="font-mono text-xs text-ink-faint">
-                {calculations.length} {calculations.length === 1 ? "entry" : "entries"}
-              </span>
-            )}
-          </div>
-
-          {calculations.length === 0 && (
-            <p className="mt-2 text-sm text-ink-faint">No calculations yet.</p>
-          )}
-
-          <div className="mt-3 space-y-2">
-            {groupedCalculations.map((group) => {
-              const isExpanded = expandedYears.has(group.year);
-              return (
-                <div key={group.year} className="overflow-hidden rounded-md border border-line">
-                  <button
-                    type="button"
-                    onClick={() => toggleYear(group.year)}
-                    aria-expanded={isExpanded}
-                    className={`flex w-full items-center justify-between px-3 py-2.5 text-left transition duration-150 ${
-                      isExpanded ? "bg-usd-soft" : "bg-surface/40 hover:bg-paper/60"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="font-display text-base text-ink">{group.year}</span>
-                      <span className="rounded-full bg-ink-faint/15 px-2 py-0.5 font-mono text-[10px] text-ink-faint">
-                        {group.items.length}
-                      </span>
-                    </span>
-                    <ChevronDown open={isExpanded} />
-                  </button>
-
-                  {isExpanded && (
-                    <ul className="space-y-1 border-t border-line p-2">
-                      {group.items.map((c) => {
-                        const isSelected = selected?.id === c.id;
-                        const isLatest = c.id === latestCalculationId;
-                        const isConfirming = confirmingDeleteCalcId === c.id;
-
-                        if (isConfirming) {
-                          return (
-                            <li key={c.id}>
-                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-danger-soft px-3 py-2">
-                                <span className="text-xs text-danger">
-                                  Delete this calculation? This can&apos;t be undone.
-                                </span>
-                                <div className="flex shrink-0 gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => onDeleteCalculation(c)}
-                                    disabled={deletingCalcId === c.id}
-                                    className="rounded-md bg-danger px-2.5 py-1 text-xs font-semibold text-paper disabled:opacity-50"
-                                  >
-                                    {deletingCalcId === c.id ? "Deleting…" : "Yes, delete"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmingDeleteCalcId(null)}
-                                    className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-soft"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            </li>
-                          );
-                        }
-
-                        return (
-                          <li key={c.id}>
-                            <div
-                              className={`flex items-center gap-1 rounded-md text-sm transition duration-150 ${
-                                isSelected ? "bg-usd-soft text-usd" : "text-ink-soft hover:bg-surface-2 hover:text-ink"
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => setSelected(c)}
-                                className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-left"
-                              >
-                                <span className="flex min-w-0 flex-col items-start">
-                                  <span className="flex items-center gap-2">
-                                    <span className="truncate">{c.quarter_label}</span>
-                                    {isLatest && <Badge>Latest</Badge>}
-                                    {isSelected && <Badge variant="outline">Viewing</Badge>}
-                                  </span>
-                                  <span className="mt-0.5 font-mono text-[11px] text-ink-faint">
-                                    {formatDateTime(c.created_at)}
-                                  </span>
-                                </span>
-                                <span className="shrink-0 font-mono tabular-nums">
-                                  {money(c.result_json.total_tax_usd, "USD")}
-                                </span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmingDeleteCalcId(c.id)}
-                                aria-label="Delete calculation"
-                                className="mr-1.5 shrink-0 rounded-md p-1.5 text-ink-faint/60 transition duration-150 hover:bg-danger-soft hover:text-danger"
-                              >
-                                <TrashIcon />
-                              </button>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Card>
       </div>
     </main>
   );

@@ -1,8 +1,8 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AssetRegister } from "@/components/AssetRegister";
 import { AuthGuard } from "@/components/AuthGuard";
 import { TopBar } from "@/components/TopBar";
@@ -44,13 +44,27 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
   const router = useRouter();
   const { business, error: loadError } = useBusinessData(businessId);
 
-  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
+  // A quarter card on the Overview tab can deep-link straight into a
+  // specific tax year/quarter ("+ Calculate" on an uncalculated quarter)
+  // via ?taxYear=&quarter= - when present, that explicit choice wins over
+  // the "first uncalculated quarter" smart default below.
+  const searchParams = useSearchParams();
+  const paramTaxYear = useMemo(() => {
+    const n = parseInt(searchParams.get("taxYear") ?? "", 10);
+    return Number.isFinite(n) ? n : null;
+  }, [searchParams]);
+  const paramQuarter = useMemo(() => {
+    const n = parseInt(searchParams.get("quarter") ?? "", 10);
+    return n >= 1 && n <= 4 ? n : null;
+  }, [searchParams]);
+
+  const [taxYear, setTaxYear] = useState(paramTaxYear ?? new Date().getFullYear());
   // Free-text note only - NOT a calculation-type selector. Previously
   // defaulted to the words "Annual estimate" while the hint below it said
   // "e.g. Q3 re-estimate", which read as two conflicting instructions.
   // It's just an optional label for this run, nothing more.
   const [quarterLabel, setQuarterLabel] = useState("");
-  const [quarter, setQuarter] = useState(1);
+  const [quarter, setQuarter] = useState(paramQuarter ?? 1);
   const [usdSales, setUsdSales] = useState(0);
   const [zigSales, setZigSales] = useState(0);
   const [usdExpenses, setUsdExpenses] = useState<CurrencyExpensesIn>(emptyExpenses());
@@ -78,7 +92,7 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
   const [calculations, setCalculations] = useState<QpdCalculationOut[] | null>(null);
   const [calcsError, setCalcsError] = useState("");
   const [inputsInitialized, setInputsInitialized] = useState(false);
-  const [quarterInitialized, setQuarterInitialized] = useState(false);
+  const [quarterInitialized, setQuarterInitialized] = useState(paramQuarter !== null);
   const [deletingDuplicate, setDeletingDuplicate] = useState(false);
 
   useEffect(() => {
@@ -495,7 +509,9 @@ export default function NewCalculationPage() {
 
   return (
     <AuthGuard>
-      <NewCalculationContent businessId={businessId} />
+      <Suspense fallback={null}>
+        <NewCalculationContent businessId={businessId} />
+      </Suspense>
     </AuthGuard>
   );
 }
