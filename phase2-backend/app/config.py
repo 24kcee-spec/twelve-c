@@ -27,6 +27,9 @@ class Settings(BaseSettings):
 
     # MFA
     mfa_issuer_name: str = "ZIMRA QPD Calculator"
+    # Fernet key for encrypting mfa_secret / mfa_secret_pending at rest.
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    mfa_encryption_key: str | None = None
 
     # App
     environment: str = "development"

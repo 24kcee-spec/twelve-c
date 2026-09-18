@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -14,6 +14,8 @@ from app.core.deps import get_current_user
 from app.core.email import send_password_reset_email, send_verification_email
 from app.core.limiter import limiter
 from app.core.mfa import (
+    decrypt_mfa_secret,
+    encrypt_mfa_secret,
     generate_qr_code_data_uri,
     generate_totp_secret,
     get_provisioning_uri,
@@ -316,7 +318,7 @@ async def mfa_login(request: Request, response: Response, payload: MfaLoginReque
     if user is None or not user.mfa_enabled or not user.mfa_secret:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="That code has expired, please log in again")
 
-    if not verify_totp_code(user.mfa_secret, payload.totp_code):
+    if not verify_totp_code(decrypt_mfa_secret(user.mfa_secret), payload.totp_code):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
 
     return await _issue_tokens(db, user, response)
@@ -424,7 +426,7 @@ async def google_login(request: Request, response: Response, payload: GoogleAuth
 @router.post("/mfa/setup", response_model=MfaSetupResponse)
 async def mfa_setup(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     secret = generate_totp_secret()
-    user.mfa_secret_pending = secret
+    user.mfa_secret_pending = encrypt_mfa_secret(secret)
     await db.commit()
 
     provisioning_uri = get_provisioning_uri(secret, user.email)
@@ -445,7 +447,7 @@ async def mfa_verify(
     if not user.mfa_secret_pending:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Start MFA setup first")
 
-    if not verify_totp_code(user.mfa_secret_pending, payload.totp_code):
+    if not verify_totp_code(decrypt_mfa_secret(user.mfa_secret_pending), payload.totp_code):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
 
     user.mfa_secret = user.mfa_secret_pending
@@ -464,7 +466,7 @@ async def mfa_disable(
     if not user.mfa_enabled or not user.mfa_secret:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA is not enabled")
 
-    if not verify_totp_code(user.mfa_secret, payload.totp_code):
+    if not verify_totp_code(decrypt_mfa_secret(user.mfa_secret), payload.totp_code):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
 
     user.mfa_enabled = False
@@ -494,7 +496,7 @@ async def delete_account(
 
     # MFA-enabled accounts must also re-confirm a fresh TOTP code.
     if user.mfa_enabled:
-        if not payload.totp_code or not verify_totp_code(user.mfa_secret, payload.totp_code):
+        if not payload.totp_code or not verify_totp_code(decrypt_mfa_secret(user.mfa_secret), payload.totp_code):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
 
     # Cascade deletes (set on the DB foreign keys) remove this user's

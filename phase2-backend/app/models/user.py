@@ -47,8 +47,11 @@ class User(Base):
     # /auth/mfa/verify). A secret being generated but never confirmed is kept
     # in mfa_secret_pending so a half-finished setup can't silently enable MFA.
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    mfa_secret_pending: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # 255 chars accommodates a Fernet-encrypted token (~140 chars for a 32-char
+    # base32 TOTP secret) with headroom - was String(64) when this held the raw
+    # secret; widened when encryption-at-rest was added.
+    mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mfa_secret_pending: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

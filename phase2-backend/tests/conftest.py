@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import sys
@@ -10,6 +10,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("DATABASE_URL_SYNC", "sqlite:///:memory:")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-not-for-production-use-only")
 os.environ.setdefault("MFA_ISSUER_NAME", "ZIMRA QPD Calculator (test)")
+os.environ.setdefault("MFA_ENCRYPTION_KEY", "Bj_h746HDaPsDM5sPHYrz0Sxg26g4b7cR1PCo3zLFSU=")  # test-only key, not a real secret
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
 
