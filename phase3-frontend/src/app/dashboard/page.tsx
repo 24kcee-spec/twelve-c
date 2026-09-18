@@ -9,17 +9,7 @@ import { Button, Card, ErrorNote, Eyebrow, Field, TrashIcon } from "@/components
 import { api } from "@/lib/api";
 import { Business, QpdCalculationOut } from "@/lib/types";
 import { money } from "@/lib/format";
-
-const QUARTER_DATES = [
-  { month: 2, day: 25 }, // Q1 - 25 March
-  { month: 5, day: 25 }, // Q2 - 25 June
-  { month: 8, day: 25 }, // Q3 - 25 September
-  { month: 11, day: 20 }, // Q4 - 20 December
-];
-
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
+import { evaluatedQuarterObligations, splitObligations, startOfDay } from "@/lib/qpdStatus";
 
 interface NextDueBadge {
   tone: "danger" | "warn" | "ok";
@@ -29,22 +19,19 @@ interface NextDueBadge {
 
 // Compact version of the logic in NextPaymentDue/OverdueDigest, sized for a
 // one-line status on each dashboard ledger row rather than a full panel.
-function nextDueBadge(calc: QpdCalculationOut | null | undefined): NextDueBadge | null {
-  if (!calc) return null;
+// Takes EVERY calculation for the business, not just the latest one - each
+// quarter's status must come from its own record (see lib/qpdStatus.ts);
+// reading only the latest calc's schedule was what let calculating QPD3
+// falsely flag QPD1/QPD2 as overdue.
+function nextDueBadge(calculations: QpdCalculationOut[] | undefined): NextDueBadge | null {
+  if (!calculations || calculations.length === 0) return null;
   const today = startOfDay(new Date());
-  const withDates = calc.result_json.schedule.map((inst, i) => {
-    const { month, day } = QUARTER_DATES[i];
-    return {
-      ...inst,
-      date: new Date(calc.tax_year, month, day),
-      paid: inst.usd_balance <= 0.01 && inst.zig_balance <= 0.01,
-    };
-  });
+  const taxYear = calculations[0].tax_year;
+  const { overdue, upcoming } = splitObligations(evaluatedQuarterObligations(calculations, taxYear), today);
 
-  const overdue = withDates.filter((i) => !i.paid && i.date < today);
   if (overdue.length > 0) {
-    const usdOwed = overdue.reduce((s, i) => s + i.usd_balance, 0);
-    const zigOwed = overdue.reduce((s, i) => s + i.zig_balance, 0);
+    const usdOwed = overdue.reduce((s, o) => s + o.usdBalance, 0);
+    const zigOwed = overdue.reduce((s, o) => s + o.zigBalance, 0);
     return {
       tone: "danger",
       label: overdue.length === 1 ? "1 instalment overdue" : `${overdue.length} instalments overdue`,
@@ -52,16 +39,13 @@ function nextDueBadge(calc: QpdCalculationOut | null | undefined): NextDueBadge 
     };
   }
 
-  const upcoming = withDates
-    .filter((i) => !i.paid && i.date >= today)
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
   if (upcoming.length > 0) {
     const next = upcoming[0];
-    const days = Math.round((next.date.getTime() - today.getTime()) / 86400000);
+    const days = Math.round((next.dueDate.getTime() - today.getTime()) / 86400000);
     return {
       tone: days <= 14 ? "warn" : "ok",
       label: days === 0 ? "Due today" : `Due in ${days}d`,
-      amount: `${money(next.usd_balance, "USD")} / ${money(next.zig_balance, "ZIG")}`,
+      amount: `${money(next.usdBalance, "USD")} / ${money(next.zigBalance, "ZIG")}`,
     };
   }
 
@@ -110,9 +94,9 @@ function DashboardContent() {
         data.map(async (business) => {
           try {
             const calcs = await api.listCalculations(business.id);
-            return { business, latestCalc: calcs[0] ?? null };
+            return { business, calculations: calcs };
           } catch {
-            return { business, latestCalc: null };
+            return { business, calculations: [] as QpdCalculationOut[] };
           }
         })
       );
@@ -141,7 +125,7 @@ function DashboardContent() {
     }
   }
 
-  const calcByBusiness = new Map(digestItems.map((d) => [d.business.id, d.latestCalc]));
+  const calcByBusiness = new Map(digestItems.map((d) => [d.business.id, d.calculations]));
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -217,7 +201,7 @@ function DashboardContent() {
               />
               <div className="sm:col-span-2">
                 <Button type="submit" variant="primary" disabled={submitting} className="w-full sm:w-auto">
-                  {submitting ? "Creatingâ€¦" : "Create business"}
+                  {submitting ? "Creating…" : "Create business"}
                 </Button>
               </div>
             </form>
@@ -288,7 +272,7 @@ function DashboardContent() {
                           disabled={deletingId === b.id}
                           className="rounded-md bg-danger px-3 py-1.5 text-xs font-semibold text-paper transition disabled:opacity-50"
                         >
-                          {deletingId === b.id ? "Deletingâ€¦" : "Yes, delete"}
+                          {deletingId === b.id ? "Deleting…" : "Yes, delete"}
                         </button>
                         <button
                           onClick={() => setConfirmingDeleteId(null)}

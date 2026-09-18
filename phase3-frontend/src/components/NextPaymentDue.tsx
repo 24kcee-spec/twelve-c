@@ -2,45 +2,42 @@
 
 import { money } from "@/lib/format";
 import { QpdCalculationOut } from "@/lib/types";
-
-const QUARTER_DATES = [
-  { month: 2, day: 25 }, // Q1 - 25 March
-  { month: 5, day: 25 }, // Q2 - 25 June
-  { month: 8, day: 25 }, // Q3 - 25 September
-  { month: 11, day: 20 }, // Q4 - 20 December
-];
-
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function instalmentDate(taxYear: number, index: number) {
-  const { month, day } = QUARTER_DATES[index];
-  return new Date(taxYear, month, day);
-}
+import { evaluatedQuarterObligations, splitObligations, startOfDay } from "@/lib/qpdStatus";
 
 function daysBetween(from: Date, to: Date) {
   return Math.round((to.getTime() - from.getTime()) / 86400000);
 }
 
-export function NextPaymentDue({ calculation }: { calculation: QpdCalculationOut }) {
+export function NextPaymentDue({
+  calculations,
+  taxYear,
+}: {
+  /** Every calculation for this business - NOT just the currently selected
+   *  one. Each quarter's status must come from its OWN record; see
+   *  lib/qpdStatus.ts for why borrowing another quarter's row is the bug
+   *  this component used to have. */
+  calculations: QpdCalculationOut[];
+  taxYear: number;
+}) {
   const today = startOfDay(new Date());
-  const schedule = calculation.result_json.schedule;
+  const obligations = evaluatedQuarterObligations(calculations, taxYear);
 
-  const withDates = schedule.map((inst, i) => ({
-    ...inst,
-    date: instalmentDate(calculation.tax_year, i),
-    paid: inst.usd_balance <= 0.01 && inst.zig_balance <= 0.01,
-  }));
+  if (obligations.length === 0) {
+    return (
+      <div className="rounded-xl border border-line bg-surface p-6 shadow-card-raised">
+        <p className="text-sm font-medium text-ink-soft">No calculations yet</p>
+        <p className="mt-1.5 text-sm text-ink-faint">
+          Run a QPD calculation for {taxYear} to see what&apos;s due.
+        </p>
+      </div>
+    );
+  }
 
-  const overdue = withDates.filter((i) => !i.paid && i.date < today);
-  const upcoming = withDates
-    .filter((i) => !i.paid && i.date >= today)
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  const { overdue, upcoming } = splitObligations(obligations, today);
 
   if (overdue.length > 0) {
-    const usdOwed = overdue.reduce((sum, i) => sum + i.usd_balance, 0);
-    const zigOwed = overdue.reduce((sum, i) => sum + i.zig_balance, 0);
+    const usdOwed = overdue.reduce((sum, o) => sum + o.usdBalance, 0);
+    const zigOwed = overdue.reduce((sum, o) => sum + o.zigBalance, 0);
     return (
       <div className="rounded-xl border border-danger/30 bg-danger-soft p-6 shadow-card-raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -55,7 +52,7 @@ export function NextPaymentDue({ calculation }: { calculation: QpdCalculationOut
           </span>
         </div>
         <p className="mt-4 border-t border-danger/20 pt-4 text-sm text-danger">
-          {overdue.map((i) => i.label.split(" - ")[0]).join(", ")} - pay as soon as possible to limit interest and penalties.
+          {overdue.map((o) => o.label.split(" - ")[0]).join(", ")} - pay as soon as possible to limit interest and penalties.
         </p>
       </div>
     );
@@ -63,7 +60,7 @@ export function NextPaymentDue({ calculation }: { calculation: QpdCalculationOut
 
   if (upcoming.length > 0) {
     const next = upcoming[0];
-    const days = daysBetween(today, next.date);
+    const days = daysBetween(today, next.dueDate);
     const urgent = days <= 14;
     return (
       <div
@@ -75,11 +72,11 @@ export function NextPaymentDue({ calculation }: { calculation: QpdCalculationOut
           Next payment, {next.label}
         </p>
         <p className={`mt-1.5 font-display text-3xl ${urgent ? "text-zig" : "text-usd"}`}>
-          {money(next.usd_balance, "USD")} <span className="text-lg opacity-70">/ {money(next.zig_balance, "ZIG")}</span>
+          {money(next.usdBalance, "USD")} <span className="text-lg opacity-70">/ {money(next.zigBalance, "ZIG")}</span>
         </p>
         <p className="mt-3 border-t border-line pt-3 text-sm text-ink-soft">
           Due{" "}
-          {next.date.toLocaleDateString("en-GB", {
+          {next.dueDate.toLocaleDateString("en-GB", {
             day: "numeric",
             month: "long",
             year: "numeric",
@@ -95,7 +92,7 @@ export function NextPaymentDue({ calculation }: { calculation: QpdCalculationOut
     <div className="rounded-xl border border-usd/30 bg-usd-soft p-6 shadow-card-raised">
       <p className="text-sm font-medium text-usd">All caught up</p>
       <p className="mt-1.5 text-sm text-ink-soft">
-        Every QPD instalment for {calculation.tax_year} is fully paid.
+        Every calculated QPD instalment for {taxYear} is fully paid.
       </p>
     </div>
   );

@@ -7,18 +7,20 @@ import { TabBar } from "@/components/ui";
 import { money, percent } from "@/lib/format";
 import { useCountUp } from "@/lib/useCountUp";
 import { QpdResultJson } from "@/lib/types";
+import { QUARTER_DATES, startOfDay } from "@/lib/qpdStatus";
 
 const DATES = ["25 Mar", "25 Jun", "25 Sep", "20 Dec"];
-const QUARTER_DATES = [
-  { month: 2, day: 25 },
-  { month: 5, day: 25 },
-  { month: 8, day: 25 },
-  { month: 11, day: 20 },
-];
 
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
+/** The schedule's other three rows are a flat-share, full-year PROJECTION,
+ *  not a record of what those quarters actually were (see the "Schedule"
+ *  tab header below, and the module docstring in zimra_qpd/calculator.py).
+ *  Only the row matching this calculation's own `quarter` has real
+ *  actual-payment data behind it, so only that row ever gets a genuine
+ *  paid/overdue/due verdict - the rest get a neutral "PROJECTED" label.
+ *  This is what used to make calculating QPD3 show QPD1/QPD2 as OVERDUE
+ *  right here in the Schedule tab, even when QPD1/QPD2 were never
+ *  calculated or confirmed at all. */
+type ScheduleRowStatus = InstalmentStatus | "projected";
 
 /** A dense two-currency line item row - the ledger-terminal replacement for
  *  the old rounded "card row". Border-bottom hairlines do the separating;
@@ -55,11 +57,12 @@ function Row({
   );
 }
 
-const STATUS_META: Record<InstalmentStatus, { label: string; className: string }> = {
+const STATUS_META: Record<ScheduleRowStatus, { label: string; className: string }> = {
   paid: { label: "PAID", className: "text-seal" },
   overdue: { label: "OVERDUE", className: "text-danger font-semibold" },
   active: { label: "DUE", className: "text-danger" },
   upcoming: { label: "—", className: "text-ink-faint" },
+  projected: { label: "PROJECTED", className: "text-ink-faint" },
 };
 
 type TabId = "breakdown" | "split" | "schedule" | "payments";
@@ -67,10 +70,20 @@ type TabId = "breakdown" | "split" | "schedule" | "payments";
 export function ResultsPanel({
   result,
   taxYear,
+  actualUsdPaid,
+  actualZigPaid,
   paymentsSlot,
 }: {
   result: QpdResultJson;
   taxYear: number;
+  /** What's actually been confirmed as remitted for THIS calculation's own
+   *  quarter (QpdCalculationOut.actual_usd_paid/actual_zig_paid) - falls
+   *  back to net_payable (i.e. "assume paid until told otherwise", the
+   *  same convention the backend uses) when not supplied. Used ONLY to
+   *  status the one schedule row that matches result.quarter; every other
+   *  row is a projection and is never given a paid/overdue verdict. */
+  actualUsdPaid?: number | null;
+  actualZigPaid?: number | null;
   /** Rendered inside the "Payments" tab - owned by the parent since saving
    *  payments needs page-level state (the calculation record, the API call). */
   paymentsSlot?: ReactNode;
@@ -78,34 +91,33 @@ export function ResultsPanel({
   const [tab, setTab] = useState<TabId>("breakdown");
 
   const today = startOfDay(new Date());
-  const withDates = result.schedule.map((inst, i) => {
-    const { month, day } = QUARTER_DATES[i];
-    return {
-      idx: i,
-      date: new Date(taxYear, month, day),
-      paid: inst.usd_balance <= 0.01 && inst.zig_balance <= 0.01,
-    };
-  });
-  const overdueIdx = new Set(withDates.filter((d) => !d.paid && d.date < today).map((d) => d.idx));
-  const upcoming = withDates
-    .filter((d) => !d.paid && d.date >= today)
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
-  const activeIndex = upcoming.length > 0 ? upcoming[0].idx : undefined;
+
+  // Only THIS calculation's own quarter has real, actual-payment-backed
+  // status - see the ScheduleRowStatus comment above.
+  const currentQuarterIdx = result.quarter - 1;
+  const currentMeta = QUARTER_DATES[currentQuarterIdx];
+  const currentDueDate = new Date(taxYear, currentMeta.month, currentMeta.day);
+  const paidUsd = actualUsdPaid ?? result.net_payable_usd;
+  const paidZig = actualZigPaid ?? result.net_payable_zig;
+  const currentBalanceUsd = Math.max(0, result.net_payable_usd - paidUsd);
+  const currentBalanceZig = Math.max(0, result.net_payable_zig - paidZig);
+  const currentPaid = currentBalanceUsd <= 0.01 && currentBalanceZig <= 0.01;
+  const currentOverdue = !currentPaid && currentDueDate < today;
+
+  let currentStatus: ScheduleRowStatus = "upcoming";
+  if (currentPaid) currentStatus = "paid";
+  else if (currentOverdue) currentStatus = "overdue";
+  else currentStatus = "active";
 
   const scheduleRows = result.schedule.map((inst, i) => {
-    const paid = inst.usd_balance <= 0.01 && inst.zig_balance <= 0.01;
-    let status: InstalmentStatus = "upcoming";
-    if (paid) status = "paid";
-    else if (overdueIdx.has(i)) status = "overdue";
-    else if (i === activeIndex) status = "active";
-
+    const isCurrentQuarter = i === currentQuarterIdx;
     return {
       label: `Q${i + 1}`,
       date: DATES[i] ?? inst.label,
       percentage: inst.percentage,
       amountUsd: inst.usd,
       amountZig: inst.zig,
-      status,
+      status: isCurrentQuarter ? currentStatus : ("projected" as ScheduleRowStatus),
     };
   });
 

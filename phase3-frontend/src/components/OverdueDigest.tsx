@@ -3,45 +3,31 @@
 import Link from "next/link";
 import { money } from "@/lib/format";
 import { Business, QpdCalculationOut } from "@/lib/types";
-
-const QUARTER_DATES = [
-  { month: 2, day: 25 },
-  { month: 5, day: 25 },
-  { month: 8, day: 25 },
-  { month: 11, day: 20 },
-];
-
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
+import { evaluatedQuarterObligations, splitObligations, startOfDay } from "@/lib/qpdStatus";
 
 export interface DigestItem {
   business: Business;
-  latestCalc: QpdCalculationOut | null;
+  calculations: QpdCalculationOut[];
 }
 
 export function OverdueDigest({ items }: { items: DigestItem[] }) {
   const today = startOfDay(new Date());
 
   const flagged = items
-    .map(({ business, latestCalc }) => {
-      if (!latestCalc) return null;
-      const schedule = latestCalc.result_json.schedule;
-      let usdOwed = 0;
-      let zigOwed = 0;
-      let count = 0;
-      schedule.forEach((inst, i) => {
-        const { month, day } = QUARTER_DATES[i];
-        const due = new Date(latestCalc.tax_year, month, day);
-        const paid = inst.usd_balance <= 0.01 && inst.zig_balance <= 0.01;
-        if (!paid && due < today) {
-          usdOwed += inst.usd_balance;
-          zigOwed += inst.zig_balance;
-          count += 1;
-        }
-      });
-      if (count === 0) return null;
-      return { business, usdOwed, zigOwed, count };
+    .map(({ business, calculations }) => {
+      if (calculations.length === 0) return null;
+      // Scoped to the most recent tax year this business has calculated -
+      // same scope the old logic used (it only ever looked at the latest
+      // calculation). Only quarters with their OWN record for that year
+      // ever count - a calculation for QPD3 can never flag QPD1/QPD2 as
+      // overdue unless QPD1/QPD2 were themselves calculated. See
+      // lib/qpdStatus.ts for the full root-cause explanation.
+      const taxYear = calculations[0].tax_year;
+      const { overdue } = splitObligations(evaluatedQuarterObligations(calculations, taxYear), today);
+      if (overdue.length === 0) return null;
+      const usdOwed = overdue.reduce((s, o) => s + o.usdBalance, 0);
+      const zigOwed = overdue.reduce((s, o) => s + o.zigBalance, 0);
+      return { business, usdOwed, zigOwed, count: overdue.length };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 

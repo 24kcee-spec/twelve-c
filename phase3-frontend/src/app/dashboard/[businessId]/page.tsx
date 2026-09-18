@@ -1,4 +1,4 @@
-﻿﻿"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -194,7 +194,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
 
             {tab === "overview" && (
               <div className="mt-6 space-y-6">
-                <NextPaymentDue calculation={selected} />
+                <NextPaymentDue calculations={calculations} taxYear={selected.tax_year} />
                 <QuarterStrip
                   businessId={businessId}
                   calculations={calculations}
@@ -241,6 +241,8 @@ function BusinessContent({ businessId }: { businessId: string }) {
                 <ResultsPanel
                   result={selected.result_json}
                   taxYear={selected.tax_year}
+                  actualUsdPaid={selected.actual_usd_paid}
+                  actualZigPaid={selected.actual_zig_paid}
                   paymentsSlot={
                     <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
                   }
