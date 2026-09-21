@@ -102,11 +102,16 @@ function BusinessContent({ businessId }: { businessId: string }) {
     }
   }
 
-  async function onSavePayments(usdPaid: number[], zigPaid: number[]) {
+  // Confirms what was ACTUALLY remitted to ZIMRA for the selected
+  // calculation's own quarter (see PaymentTracker.tsx) - this is the field
+  // every LATER quarter's calculation nets its cumulative amount against,
+  // so this must call confirm-payment, not the old flat-schedule payments
+  // endpoint.
+  async function onConfirmPayment(actualUsdPaid: number, actualZigPaid: number) {
     if (!selected) return;
-    const updated = await api.applyPayments(businessId, selected.id, {
-      usd_paid: usdPaid,
-      zig_paid: zigPaid,
+    const updated = await api.confirmActualPayment(businessId, selected.id, {
+      actual_usd_paid: actualUsdPaid,
+      actual_zig_paid: actualZigPaid,
     });
     setSelected(updated);
     setCalculations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
@@ -244,7 +249,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                   actualUsdPaid={selected.actual_usd_paid}
                   actualZigPaid={selected.actual_zig_paid}
                   paymentsSlot={
-                    <PaymentTracker key={selected.id} calculation={selected} onSubmit={onSavePayments} />
+                    <PaymentTracker key={selected.id} calculation={selected} onSubmit={onConfirmPayment} />
                   }
                 />
               </div>

@@ -159,3 +159,69 @@ async def test_different_tax_year_is_isolated(client, db_session):
 
     breakdown_2025 = await get_tax_year_breakdown(db_session, business_id, 2025)
     assert breakdown_2025.latest_calculated_quarter == 4
+
+
+async def test_confirmed_payment_propagates_into_next_quarters_calculation(client, db_session):
+    """
+    End-to-end regression test for the "Payments tab" bug: confirming what
+    was actually paid for Q1 must change the `previous_paid_usd/zig` (and
+    therefore `net_payable_usd/zig`) that the ENGINE computes when Q2 is
+    calculated next - not just what get_tax_year_breakdown() displays after
+    the fact. This exercises the real create_calculation ->
+    _build_engine_input -> _sum_actual_paid_before_quarter chain via the
+    actual HTTP API, the same path the frontend uses.
+    """
+    headers = await _auth_headers(client, "propagation@example.com")
+    r = await client.post(f"/businesses", headers=headers, json={"name": "Propagation Co"})
+    business_id = uuid.UUID(r.json()["id"])
+
+    # Q1: seeded actual_usd_paid defaults to net_payable_usd at creation.
+    q1 = await client.post(
+        f"/businesses/{business_id}/qpd-calculations", headers=headers, json=_calc_payload(1, "Q1", usd_sales=100_000)
+    )
+    assert q1.status_code == 201, q1.text
+    q1_net_payable_usd = q1.json()["result_json"]["net_payable_usd"]
+    q1_id = q1.json()["id"]
+    assert q1_net_payable_usd > 0
+
+    # Before any confirmation, Q2's calculation should net against the
+    # SEEDED default (the existing "assume paid until told otherwise"
+    # convention) - this leg already worked before this session's fix.
+    q2_before_confirm = await client.post(
+        f"/businesses/{business_id}/qpd-calculations", headers=headers, json=_calc_payload(2, "Q2", usd_sales=100_000)
+    )
+    assert q2_before_confirm.status_code == 201, q2_before_confirm.text
+    assert q2_before_confirm.json()["result_json"]["previous_paid_usd"] == pytest.approx(q1_net_payable_usd)
+
+    # Now confirm that ONLY HALF of Q1 was actually remitted (a real
+    # underpayment) - this is what the rebuilt Payments tab calls.
+    confirmed_q1_usd = round(q1_net_payable_usd * 0.5, 2)
+    conf_r = await client.post(
+        f"/businesses/{business_id}/qpd-calculations/{q1_id}/confirm-payment",
+        headers=headers,
+        json={"actual_usd_paid": confirmed_q1_usd, "actual_zig_paid": 0},
+    )
+    assert conf_r.status_code == 200, conf_r.text
+
+    # A fresh Q2 run (e.g. the person revises their Q2 estimate before the
+    # due date - the same "latest run wins" workflow test_recalculating_a_
+    # quarter_keeps_only_the_latest_run documents) must now net against the
+    # CONFIRMED, partial figure - not silently fall back to the seeded
+    # net_payable_usd from Q1, and not stay stuck at the earlier Q2 run's
+    # now-stale previous_paid_usd.
+    q2_after_confirm = await client.post(
+        f"/businesses/{business_id}/qpd-calculations", headers=headers, json=_calc_payload(2, "Q2", usd_sales=100_000)
+    )
+    assert q2_after_confirm.status_code == 201, q2_after_confirm.text
+    q2_result = q2_after_confirm.json()["result_json"]
+    assert q2_result["previous_paid_usd"] == pytest.approx(confirmed_q1_usd)
+    assert q2_result["previous_paid_usd"] != pytest.approx(q1_net_payable_usd)
+
+    # And net_payable_usd must be correspondingly HIGHER than it would have
+    # been against the full seeded amount, since less was actually paid.
+    expected_net_payable = q2_result["cumulative_due_usd"] - confirmed_q1_usd
+    assert q2_result["net_payable_usd"] == pytest.approx(max(0.0, expected_net_payable), abs=0.01)
+
+    # The year breakdown view must agree with what the engine actually used.
+    breakdown = await get_tax_year_breakdown(db_session, business_id, 2026)
+    assert breakdown.quarters[0].actual_usd_paid == pytest.approx(confirmed_q1_usd)
