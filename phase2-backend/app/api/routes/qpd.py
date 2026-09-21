@@ -11,7 +11,6 @@ from app.crud import qpd_calculation as qpd_crud
 from app.database import get_db
 from app.models.user import User
 from app.schemas.qpd_calculation import (
-    ApplyPaymentsRequest,
     ConfirmActualPaymentRequest,
     QpdCalculationCreate,
     QpdCalculationOut,
@@ -58,21 +57,6 @@ async def get_calculation(
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calculation not found")
     return record
-
-
-@router.post("/{calculation_id}/payments", response_model=QpdCalculationOut)
-async def apply_payments(
-    business_id: uuid.UUID,
-    calculation_id: uuid.UUID,
-    payload: ApplyPaymentsRequest,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    await _get_owned_business_or_404(db, user, business_id)
-    record = await qpd_crud.get_calculation(db, business_id, calculation_id)
-    if record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calculation not found")
-    return await qpd_crud.apply_payments_to_calculation(db, record, payload)
 
 
 @router.post("/{calculation_id}/confirm-payment", response_model=QpdCalculationOut)

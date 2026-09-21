@@ -37,7 +37,7 @@ async def test_business_crud_and_ownership_isolation(client):
     assert r.json()["name"] == "Acme Holdings"
 
 
-async def test_qpd_calculation_matches_engine_and_supports_payments(client):
+async def test_qpd_calculation_matches_engine_schedule_split(client):
     headers = await _auth_headers(client)
     r = await client.post("/businesses", headers=headers, json={"name": "Test Co", "default_exchange_rate": 26.8})
     business_id = r.json()["id"]
@@ -62,16 +62,10 @@ async def test_qpd_calculation_matches_engine_and_supports_payments(client):
         (Decimal(str(total_usd)) * Decimal("0.10")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     )
     assert calc["result_json"]["schedule"][0]["usd"] == expected_q1
-
-    calc_id = calc["id"]
-    pay_r = await client.post(
-        f"/businesses/{business_id}/qpd-calculations/{calc_id}/payments",
-        headers=headers,
-        json={"usd_paid": [calc["result_json"]["schedule"][0]["usd"], 0, 0, 0], "zig_paid": [0, 0, 0, 0]},
-    )
-    assert pay_r.status_code == 200
-    updated = pay_r.json()
-    assert updated["result_json"]["schedule"][0]["usd_balance"] == 0
+    # POST /payments (editing the flat-schedule projection) was removed
+    # this session - see test_qpd_reconciliation.py's
+    # test_confirmed_payment_propagates_into_next_quarters_calculation for
+    # the endpoint that replaced it (POST /confirm-payment).
 
 
 async def test_qpd_calculation_requires_ownership(client):

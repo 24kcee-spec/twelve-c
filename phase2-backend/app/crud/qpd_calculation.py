@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.business import Business
 from app.models.qpd_calculation import QpdCalculation
 from app.schemas.qpd_calculation import (
-    ApplyPaymentsRequest,
     ConfirmActualPaymentRequest,
     QpdCalculationCreate,
 )
@@ -20,7 +19,6 @@ from zimra_qpd.calculator import (
     QpdInput,
     QpdInstalment,
     QpdResult,
-    apply_payments,
     calculate_qpd,
 )
 
@@ -163,33 +161,22 @@ async def get_calculation(db: AsyncSession, business_id: uuid.UUID, calc_id: uui
     return result.scalar_one_or_none()
 
 
-async def apply_payments_to_calculation(
-    db: AsyncSession, record: QpdCalculation, data: ApplyPaymentsRequest
-) -> QpdCalculation:
-    """
-    Re-derives QpdInstalment objects from the stored schedule, applies
-    payments via the engine's apply_payments(), then persists the updated
-    schedule back into result_json.
-    """
-    schedule = [
-        QpdInstalment(
-            label=item["label"],
-            percentage=item["percentage"],
-            usd=item["usd"],
-            zig=item["zig"],
-            usd_paid=item.get("usd_paid", 0.0),
-            zig_paid=item.get("zig_paid", 0.0),
-        )
-        for item in record.result_json["schedule"]
-    ]
-    updated_schedule = apply_payments(schedule, data.usd_paid, data.zig_paid)
-
-    new_result_json = dict(record.result_json)
-    new_result_json["schedule"] = _schedule_to_dicts(updated_schedule)
-    record.result_json = new_result_json
-    await db.commit()
-    await db.refresh(record)
-    return record
+# --- apply_payments_to_calculation() removed (Twelve C, Sep 21 session) ---
+# This used to let the frontend edit result_json.schedule[]'s usd_paid/
+# zig_paid via POST /payments - schedule is a flat-share, full-year
+# PROJECTION rebuilt from scratch on every calculate_qpd() call (see
+# zimra_qpd/calculator.py module docstring, section 5), so those edits
+# were disconnected from actual_usd_paid/actual_zig_paid, the field every
+# later quarter's calculation actually reads (_sum_actual_paid_before_
+# quarter below). Nothing typed via that endpoint ever propagated forward
+# - that mismatch was the root cause of "paying QPD1 doesn't bring
+# anything down when QPD2 is calculated." confirm_actual_payment() below
+# is the correct, sole way to record what was actually remitted; the route
+# (POST /payments) and its ApplyPaymentsRequest schema were deleted at the
+# same time as this function so the broken path can't be silently re-wired
+# from the frontend again. The engine's own apply_payments() pure function
+# (zimra_qpd/calculator.py) was deliberately left alone - it's a tested,
+# independent utility, not the bug.
 
 
 async def delete_calculation(db: AsyncSession, record: QpdCalculation) -> None:

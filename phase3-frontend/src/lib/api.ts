@@ -1,6 +1,5 @@
 ﻿import {
   AccessTokenResponse,
-  ApplyPaymentsRequest,
   Business,
   BusinessCompliance,
   CapitalAllowanceTotals,
@@ -215,11 +214,6 @@ export const api = {
     request<QpdCalculationOut[]>(`/businesses/${businessId}/qpd-calculations`),
   createCalculation: (businessId: string, payload: QpdCalculationCreate) =>
     request<QpdCalculationOut>(`/businesses/${businessId}/qpd-calculations`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  applyPayments: (businessId: string, calculationId: string, payload: ApplyPaymentsRequest) =>
-    request<QpdCalculationOut>(`/businesses/${businessId}/qpd-calculations/${calculationId}/payments`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),

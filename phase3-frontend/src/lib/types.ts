@@ -166,11 +166,6 @@ export interface QpdCalculationOut {
   created_at: string;
 }
 
-export interface ApplyPaymentsRequest {
-  usd_paid: number[];
-  zig_paid: number[];
-}
-
 export interface ConfirmActualPaymentRequest {
   actual_usd_paid: number;
   actual_zig_paid: number;

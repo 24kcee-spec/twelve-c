@@ -109,11 +109,6 @@ class QpdCalculationOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ApplyPaymentsRequest(BaseModel):
-    usd_paid: list[float] = Field(min_length=4, max_length=4)
-    zig_paid: list[float] = Field(min_length=4, max_length=4)
-
-
 class ConfirmActualPaymentRequest(BaseModel):
     actual_usd_paid: float = Field(ge=0)
     actual_zig_paid: float = Field(ge=0)
