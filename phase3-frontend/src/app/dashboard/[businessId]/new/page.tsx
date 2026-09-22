@@ -1,13 +1,13 @@
-﻿"use client";
+"use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AssetRegister } from "@/components/AssetRegister";
 import { AuthGuard } from "@/components/AuthGuard";
 import { TopBar } from "@/components/TopBar";
 import { CurrencyPairInput } from "@/components/CurrencyPairInput";
-import { MonthlyIncomeCalculator } from "@/components/MonthlyIncomeCalculator";
+import { MonthlyIncomeCalculator, MonthlyIncomeHandle } from "@/components/MonthlyIncomeCalculator";
 import { Button, Card, ErrorNote, Eyebrow, Field } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useBusinessData } from "@/lib/useBusinessData";
@@ -70,6 +70,11 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
   const [usdExpenses, setUsdExpenses] = useState<CurrencyExpensesIn>(emptyExpenses());
   const [zigExpenses, setZigExpenses] = useState<CurrencyExpensesIn>(emptyExpenses());
   const [calculating, setCalculating] = useState(false);
+  // The monthly calculator holds the sales figures. While it is still loading the
+  // months saved at an earlier QPD (or failed to), submitting would calculate on
+  // blank sales, so the button is held until it reports ready.
+  const [incomeBlocked, setIncomeBlocked] = useState(true);
+  const incomeRef = useRef<MonthlyIncomeHandle>(null);
   const [error, setError] = useState("");
 
   const [showAdjustments, setShowAdjustments] = useState(false);
@@ -197,7 +202,7 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
     zigExpenses.cost_of_sales + zigExpenses.salaries + zigExpenses.other_expenses + zigExpenses.capital_allowances;
 
   const canSubmit =
-    Number.isFinite(taxYear) && taxYear >= 2000 && taxYear <= 2100 && !duplicateCalc;
+    Number.isFinite(taxYear) && taxYear >= 2000 && taxYear <= 2100 && !duplicateCalc && !incomeBlocked;
 
   async function runCalculation(e: React.FormEvent) {
     e.preventDefault();
@@ -206,12 +211,15 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
       return;
     }
     if (!canSubmit) {
-      setError("Enter a valid tax year.");
+      setError(incomeBlocked ? "Wait for your saved months to finish loading, or switch to manual entry." : "Enter a valid tax year.");
       return;
     }
     setError("");
     setCalculating(true);
     try {
+      // Push any monthly figure still inside the autosave debounce to the server
+      // before leaving this page, so the next QPD carries it forward.
+      await incomeRef.current?.flush();
       await api.createCalculation(businessId, {
         tax_year: taxYear,
         quarter_label: quarterLabel.trim() || QUARTER_OPTIONS[quarter - 1].label.split(" - ")[0],
@@ -314,6 +322,8 @@ function NewCalculationContent({ businessId }: { businessId: string }) {
 
           <SectionCard eyebrow="Income">
             <MonthlyIncomeCalculator
+              ref={incomeRef}
+              onBlockedChange={setIncomeBlocked}
               businessId={businessId}
               taxYear={taxYear}
               quarter={quarter}

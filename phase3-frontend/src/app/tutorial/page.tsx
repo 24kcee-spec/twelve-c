@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 
 const STEPS = [
@@ -35,7 +35,7 @@ const STEPS = [
   {
     n: "07",
     title: "See where you stand for the year",
-    body: "The reconciliation view compares what you've paid so far against what you should have paid by now, per currency, and flags whether you're fully compliant, within a safe buffer, or under-estimated. Where relevant it also shows the maximum possible penalty exposure as a ceiling — never presented as an actual bill, since ZIMRA has discretion over what's ultimately charged.",
+    body: "The reconciliation view lays out all four quarters side by side — due date, cumulative target, what you've confirmed paying, and what's still owed — so you can see at a glance whether a quarter is settled, outstanding, or not yet calculated.",
   },
   {
     n: "08",

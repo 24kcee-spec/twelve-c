@@ -25,6 +25,12 @@ from .tax_adjustments import (
     compute_deductible_other_expenses,
     to_currency_expenses,
 )
+from .rolling_estimate import (
+    MONTHS_ELAPSED_BY_QUARTER,
+    RollingEstimate,
+    rolling_annual_estimate,
+    window_for_quarter,
+)
 from .compliance import (
     ComplianceStatus,
     ComplianceCheck,
@@ -64,6 +70,10 @@ __all__ = [
     "BUFFER_TARGET",
     "assess_accuracy",
     "assess_accuracy_dual",
+    "MONTHS_ELAPSED_BY_QUARTER",
+    "RollingEstimate",
+    "rolling_annual_estimate",
+    "window_for_quarter",
 ]
 
 __version__ = "0.4.0"
