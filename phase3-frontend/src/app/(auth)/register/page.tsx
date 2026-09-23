@@ -68,7 +68,7 @@ export default function RegisterPage() {
           <p className="mt-1 text-sm text-ink-soft">One login, every business you run.</p>
 
           <div className="mt-6">
-            <GoogleSignInButton onSuccess={onGoogleSuccess} onError={setError} />
+            <GoogleSignInButton onSuccess={onGoogleSuccess} onError={(err) => setError(err.message)} />
           </div>
           <div className="my-6 flex items-center gap-3">
             <div className="h-px flex-1 bg-line" />
