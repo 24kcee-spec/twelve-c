@@ -1,5 +1,7 @@
 Metadata-Version: 2.4
 Name: zimra-qpd
-Version: 0.1.0
+Version: 0.5.0
 Summary: ZIMRA quarterly provisional tax (QPD) calculation engine
 Requires-Python: >=3.10
+Requires-Dist: openpyxl<4,>=3.1
+Requires-Dist: reportlab<5,>=4.4

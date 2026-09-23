@@ -1,4 +1,4 @@
-﻿import { QpdCalculationOut } from "./types";
+import { QpdCalculationOut } from "./types";
 
 /**
  * Calendar due dates for each QPD, by 1-indexed quarter number - matches

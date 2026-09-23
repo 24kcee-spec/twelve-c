@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { LegalLayout, LSection, LList } from "@/components/LegalLayout";
 
 export const metadata = { title: "Terms of Service | Twelve C" };

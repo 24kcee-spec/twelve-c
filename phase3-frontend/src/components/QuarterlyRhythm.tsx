@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { money } from "@/lib/format";
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 100-scenario invariant/property test suite for the ZIMRA QPD engine.
 
 Unlike test_calculator.py (which checks exact figures against the

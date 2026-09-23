@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 
 export const metadata = { title: "Know Your Taxes | Twelve C" };

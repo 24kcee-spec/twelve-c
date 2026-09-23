@@ -1,4 +1,4 @@
-﻿import {
+import {
   AccessTokenResponse,
   Business,
   BusinessCompliance,

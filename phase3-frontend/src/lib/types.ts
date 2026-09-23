@@ -1,4 +1,4 @@
-﻿export interface UserOut {
+export interface UserOut {
   id: string;
   email: string;
   is_active: boolean;

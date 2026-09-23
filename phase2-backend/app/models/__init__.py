@@ -1,4 +1,4 @@
-﻿from app.models.business import Business
+from app.models.business import Business
 from app.models.capital_asset import CapitalAsset
 from app.models.monthly_income import MonthlyIncomeEntry
 from app.models.qpd_calculation import QpdCalculation

@@ -1,4 +1,4 @@
-﻿import { LegalLayout, LSection, LList } from "@/components/LegalLayout";
+import { LegalLayout, LSection, LList } from "@/components/LegalLayout";
 
 export const metadata = { title: "Disclaimer | Twelve C" };
 

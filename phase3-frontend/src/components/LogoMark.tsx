@@ -1,4 +1,4 @@
-﻿export function LogoMark({ size = 22 }: { size?: number }) {
+export function LogoMark({ size = 22 }: { size?: number }) {
   // Four quarter-arcs (10/25/30/35, the actual QPD split) in forest-green
   // tones - a wax-seal ring rather than a generic logo shape.
   return (
