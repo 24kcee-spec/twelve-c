@@ -115,6 +115,62 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 }
 
+// Blob-downloading counterpart to `request` - same auth-header/401-refresh
+// handling, but for endpoints that return a binary file (xlsx/pdf) rather
+// than JSON. Reads the filename off Content-Disposition so the browser's
+// save dialog offers the same name the server chose (business + tax year),
+// instead of a generic path-derived one.
+async function rawDownload(path: string, skipAuth = false): Promise<{ blob: Blob; filename: string }> {
+  const headers: Record<string, string> = {};
+  if (!skipAuth && accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  const res = await fetch(`${BASE_URL}${path}`, { headers, credentials: "include" });
+
+  if (!res.ok) {
+    let detail: unknown = null;
+    try {
+      detail = await res.json();
+    } catch {
+      // Non-JSON error body (unlikely for these endpoints) - fall back to status text.
+    }
+    throw new ApiError(res.status, (detail as { detail?: unknown })?.detail ?? res.statusText);
+  }
+
+  const disposition = res.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match ? match[1] : "download";
+  const blob = await res.blob();
+  return { blob, filename };
+}
+
+async function downloadFile(path: string): Promise<{ blob: Blob; filename: string }> {
+  try {
+    return await rawDownload(path);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      const refreshed = await tryRefresh();
+      if (refreshed) {
+        return await rawDownload(path);
+      }
+    }
+    throw err;
+  }
+}
+
+// Triggers the browser's own "Save As" flow for a blob, without navigating
+// away from the app - the standard hidden-anchor-click trick.
+function triggerBrowserDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   // --- Auth ---
   register: (email: string, password: string) =>
@@ -252,4 +308,14 @@ export const api = {
   // --- Year-end reconciliation (Section 72(11) accuracy check) ---
   getCompliance: (businessId: string, taxYear: number) =>
     request<BusinessCompliance>(`/businesses/${businessId}/compliance?tax_year=${taxYear}`),
+
+  // --- Working Papers exports (live-formula Excel + professional PDF) ---
+  downloadWorkingPapersExcel: async (businessId: string, taxYear: number) => {
+    const { blob, filename } = await downloadFile(`/businesses/${businessId}/export/excel?tax_year=${taxYear}`);
+    triggerBrowserDownload(blob, filename);
+  },
+  downloadWorkingPapersPdf: async (businessId: string, taxYear: number) => {
+    const { blob, filename } = await downloadFile(`/businesses/${businessId}/export/pdf?tax_year=${taxYear}`);
+    triggerBrowserDownload(blob, filename);
+  },
 };

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { money, percent } from "@/lib/format";
-import { BusinessCompliance } from "@/lib/types";
+import { BusinessCompliance, ApiError } from "@/lib/types";
+import { Button } from "@/components/ui";
 
 function moneyOrDash(value: number | null, currency: "USD" | "ZIG"): string {
   return value === null ? "\u2014" : money(value, currency);
@@ -13,6 +14,8 @@ export function ReconciliationPanel({ businessId, taxYear }: { businessId: strin
   const [data, setData] = useState<BusinessCompliance | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<"excel" | "pdf" | null>(null);
+  const [downloadError, setDownloadError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +39,23 @@ export function ReconciliationPanel({ businessId, taxYear }: { businessId: strin
       cancelled = true;
     };
   }, [businessId, taxYear]);
+
+  async function handleDownload(kind: "excel" | "pdf") {
+    setDownloading(kind);
+    setDownloadError("");
+    try {
+      if (kind === "excel") {
+        await api.downloadWorkingPapersExcel(businessId, taxYear);
+      } else {
+        await api.downloadWorkingPapersPdf(businessId, taxYear);
+      }
+    } catch (err) {
+      const message = err instanceof ApiError ? String(err.detail ?? "Download failed.") : "Download failed.";
+      setDownloadError(message);
+    } finally {
+      setDownloading(null);
+    }
+  }
 
   if (loading) {
     return <div className="h-40 animate-pulse border border-line bg-surface" />;
@@ -67,9 +87,30 @@ export function ReconciliationPanel({ businessId, taxYear }: { businessId: strin
   return (
     <div className="border border-line bg-surface">
       <div className="p-4 sm:p-6">
-        <div className="font-mono text-[10px] tracking-wide text-ink-faint">
-          QUARTER-BY-QUARTER {"\u00B7"} {taxYear}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="font-mono text-[10px] tracking-wide text-ink-faint">
+            QUARTER-BY-QUARTER {"\u00B7"} {taxYear}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => handleDownload("excel")}
+              disabled={downloading !== null}
+            >
+              {downloading === "excel" ? "Preparing\u2026" : "Download Working Papers (Excel)"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => handleDownload("pdf")}
+              disabled={downloading !== null}
+            >
+              {downloading === "pdf" ? "Preparing\u2026" : "Download Working Papers (PDF)"}
+            </Button>
+          </div>
         </div>
+        {downloadError && <p className="mt-2 text-xs text-danger">{downloadError}</p>}
         <div className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-sm">
             <thead>

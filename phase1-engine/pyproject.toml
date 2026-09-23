@@ -1,8 +1,19 @@
 [project]
 name = "zimra-qpd"
-version = "0.1.0"
+version = "0.5.0"
 description = "ZIMRA quarterly provisional tax (QPD) calculation engine"
 requires-python = ">=3.10"
+# calculator.py / compliance.py / rolling_estimate.py / worked_examples.py /
+# tax_adjustments.py / capital_allowances.py stay pure stdlib on purpose -
+# these two are the only modules in the package with a real dependency,
+# because writing an actual .xlsx/.pdf binary needs a real library. Kept
+# as project-level deps (not "extras") since both the desktop/Tauri build
+# and phase2-backend need xlsx_export/pdf_export importable without an
+# extra install step.
+dependencies = [
+    "openpyxl>=3.1,<4",
+    "reportlab>=4.4,<5",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api.routes import assets, auth, businesses, compliance, monthly_income, qpd
+from app.api.routes import assets, auth, businesses, compliance, exports, monthly_income, qpd
 from app.config import get_settings
 from app.core.limiter import limiter
 
@@ -67,6 +67,7 @@ app.include_router(qpd.router, tags=["qpd-calculations"])
 app.include_router(assets.router, tags=["capital-assets"])
 app.include_router(monthly_income.router, tags=["monthly-income"])
 app.include_router(compliance.router, tags=["compliance"])
+app.include_router(exports.router, tags=["export"])
 
 
 @app.get("/")

@@ -321,19 +321,24 @@ def _row_from_calculation(record: QpdCalculation | None, quarter: int) -> Quarte
     )
 
 
-async def get_tax_year_breakdown(
+async def get_latest_calculations_by_quarter(
     db: AsyncSession, business_id: uuid.UUID, tax_year: int
-) -> TaxYearBreakdown:
+) -> dict[int, QpdCalculation]:
     """
-    Assembles the four-quarter audit trail for one business/tax_year, shaped
-    like the ZIMRA guide's worked example: quarter, due date, projected
-    annual profit, total projected tax, cumulative %, required cumulative
-    tax, less cumulative paid previously, net due.
+    The most recent QpdCalculation row for each quarter (1..4) of one
+    business/tax_year that has been calculated at least once. A quarter
+    with no calculation yet is simply absent from the returned dict - never
+    a fabricated placeholder.
 
     If a quarter was recalculated more than once, the MOST RECENT run wins
     (by created_at) - older runs for the same quarter are superseded, not
     averaged or listed separately; they remain individually retrievable via
     list_calculations()/get_calculation() for anyone who needs the history.
+
+    Shared by get_tax_year_breakdown() (the compliance/reconciliation view)
+    and the Working Papers Excel/PDF export (app/api/routes/exports.py) -
+    both need "the one calculation that currently represents each quarter",
+    just projected into different shapes afterward.
     """
     result = await db.execute(
         select(QpdCalculation)
@@ -350,7 +355,19 @@ async def get_tax_year_breakdown(
         # First record seen per quarter wins, since the query is already
         # ordered created_at DESC within each quarter.
         latest_by_quarter.setdefault(record.quarter, record)
+    return latest_by_quarter
 
+
+async def get_tax_year_breakdown(
+    db: AsyncSession, business_id: uuid.UUID, tax_year: int
+) -> TaxYearBreakdown:
+    """
+    Assembles the four-quarter audit trail for one business/tax_year, shaped
+    like the ZIMRA guide's worked example: quarter, due date, projected
+    annual profit, total projected tax, cumulative %, required cumulative
+    tax, less cumulative paid previously, net due.
+    """
+    latest_by_quarter = await get_latest_calculations_by_quarter(db, business_id, tax_year)
     rows = [_row_from_calculation(latest_by_quarter.get(q), q) for q in (1, 2, 3, 4)]
 
     total_remitted_usd = sum(
