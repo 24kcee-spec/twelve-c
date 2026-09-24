@@ -15,7 +15,7 @@ from app.crud.qpd_calculation import get_latest_calculations_by_quarter
 from app.database import get_db
 from app.models.qpd_calculation import QpdCalculation
 from app.models.user import User
-from zimra_qpd.calculator import QUARTER_DUE_DATES
+from zimra_qpd.tax_rules import get_tax_rules
 from zimra_qpd.pdf_export import build_qpd_pdf
 from zimra_qpd.xlsx_export import QuarterExportData, build_qpd_workbook
 
@@ -35,7 +35,9 @@ def _safe_filename_segment(value: str) -> str:
 
 def _build_quarter_export_data(
     latest_by_quarter: dict[int, QpdCalculation],
+    tax_year: int,
 ) -> list[QuarterExportData]:
+    rules = get_tax_rules(tax_year)
     quarters: list[QuarterExportData] = []
     for q in (1, 2, 3, 4):
         record = latest_by_quarter.get(q)
@@ -44,7 +46,7 @@ def _build_quarter_export_data(
                 QuarterExportData(
                     quarter=q,
                     quarter_label=f"Q{q}",
-                    due_date=QUARTER_DUE_DATES[q],
+                    due_date=rules.qpd_payment_dates[q],
                     has_calculation=False,
                 )
             )
@@ -53,7 +55,7 @@ def _build_quarter_export_data(
             QuarterExportData(
                 quarter=q,
                 quarter_label=record.quarter_label,
-                due_date=record.result_json.get("due_date", QUARTER_DUE_DATES[q]),
+                due_date=record.result_json.get("due_date", rules.qpd_payment_dates[q]),
                 has_calculation=True,
                 input=record.input_json,
                 result=record.result_json,
@@ -81,7 +83,7 @@ async def export_working_papers_excel(
     """
     business = await _get_owned_business_or_404(db, user, business_id)
     latest_by_quarter = await get_latest_calculations_by_quarter(db, business.id, tax_year)
-    quarters = _build_quarter_export_data(latest_by_quarter)
+    quarters = _build_quarter_export_data(latest_by_quarter, tax_year)
 
     workbook = build_qpd_workbook(business.name, tax_year, quarters)
     buffer = BytesIO()
@@ -111,7 +113,7 @@ async def export_working_papers_pdf(
     """
     business = await _get_owned_business_or_404(db, user, business_id)
     latest_by_quarter = await get_latest_calculations_by_quarter(db, business.id, tax_year)
-    quarters = _build_quarter_export_data(latest_by_quarter)
+    quarters = _build_quarter_export_data(latest_by_quarter, tax_year)
 
     generated_on = datetime.now().strftime("%d %B %Y")
     pdf_bytes = build_qpd_pdf(business.name, tax_year, quarters, generated_on=generated_on)
