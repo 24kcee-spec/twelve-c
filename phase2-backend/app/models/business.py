@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, Float, ForeignKey, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from zimra_qpd.tax_rules import DEFAULT_TAX_RULES
 
 
 class Business(Base):
@@ -28,8 +29,8 @@ class Business(Base):
     # Defaults only - each QpdCalculation stores the actual values used, so
     # changing a default here never rewrites historical calculations.
     default_exchange_rate: Mapped[float] = mapped_column(Float, default=26.8, nullable=False)
-    default_tax_rate: Mapped[float] = mapped_column(Float, default=0.25, nullable=False)
-    default_aids_levy_rate: Mapped[float] = mapped_column(Float, default=0.03, nullable=False)
+    default_tax_rate: Mapped[float] = mapped_column(Float, default=float(DEFAULT_TAX_RULES.corporate_tax_rate), nullable=False)
+    default_aids_levy_rate: Mapped[float] = mapped_column(Float, default=float(DEFAULT_TAX_RULES.aids_levy_rate), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

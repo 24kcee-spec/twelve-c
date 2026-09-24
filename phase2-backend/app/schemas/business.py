@@ -5,12 +5,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from zimra_qpd.tax_rules import DEFAULT_TAX_RULES
+
 
 class BusinessCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     default_exchange_rate: float = Field(default=26.8, gt=0)
-    default_tax_rate: float = Field(default=0.25, ge=0, le=1)
-    default_aids_levy_rate: float = Field(default=0.03, ge=0, le=1)
+    default_tax_rate: float = Field(default=float(DEFAULT_TAX_RULES.corporate_tax_rate), ge=0, le=1)
+    default_aids_levy_rate: float = Field(default=float(DEFAULT_TAX_RULES.aids_levy_rate), ge=0, le=1)
 
 
 class BusinessUpdate(BaseModel):
