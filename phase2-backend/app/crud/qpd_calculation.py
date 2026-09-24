@@ -14,13 +14,13 @@ from app.schemas.qpd_calculation import (
     QpdCalculationCreate,
 )
 from zimra_qpd.calculator import (
-    QUARTER_DUE_DATES,
     CurrencyExpenses,
     QpdInput,
     QpdInstalment,
     QpdResult,
     calculate_qpd,
 )
+from zimra_qpd.tax_rules import QUARTER_DUE_DATES
 
 
 async def _sum_actual_paid_before_quarter(
@@ -72,6 +72,7 @@ async def _build_engine_input(
         zig_sales=data.zig_sales,
         usd_expenses=CurrencyExpenses(**data.usd_expenses.model_dump()),
         zig_expenses=CurrencyExpenses(**data.zig_expenses.model_dump()),
+        tax_year=data.tax_year,
         exchange_rate=data.exchange_rate or business.default_exchange_rate,
         tax_rate=data.tax_rate if data.tax_rate is not None else business.default_tax_rate,
         aids_levy_rate=(
