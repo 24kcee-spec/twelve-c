@@ -31,6 +31,10 @@ const config: Config = {
           DEFAULT: "rgb(var(--color-danger) / <alpha-value>)",
           soft: "rgb(var(--color-danger-soft) / <alpha-value>)",
         },
+        brass: {
+          DEFAULT: "rgb(var(--color-brass) / <alpha-value>)",
+          soft: "rgb(var(--color-brass-soft) / <alpha-value>)",
+        },
       },
       fontFamily: {
         display: ["var(--font-fraunces)", "Georgia", "serif"],

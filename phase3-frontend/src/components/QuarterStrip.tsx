@@ -20,13 +20,9 @@ export function QuarterStrip({
 
   // One obligation per quarter that genuinely has its own calculation
   // record this tax year - NEVER borrowed from another quarter's row in
-  // `selected`'s own flat-share projection schedule. Previously every tile
-  // read `selected.result_json.schedule[i]`, so viewing a QPD3 calculation
-  // showed QPD1/QPD2's tiles with QPD3's own (always-zero-paid) projected
-  // figures instead of QPD1/QPD2's real net_payable/actual_paid - which is
-  // exactly how a QPD3 calculation could make QPD1/QPD2 look unpaid even
-  // when they were never calculated or when they'd genuinely been settled.
-  // See lib/qpdStatus.ts for the full explanation.
+  // `selected`'s own flat-share projection schedule. See lib/qpdStatus.ts
+  // for the full explanation of why that used to make QPD1/QPD2 look
+  // unpaid whenever QPD3 was the one being viewed.
   const obligationsByQuarter = new Map(
     evaluatedQuarterObligations(calculations, selected.tax_year).map((o) => [o.quarter, o])
   );
@@ -34,7 +30,7 @@ export function QuarterStrip({
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="divide-y divide-line border border-ink/15 bg-surface">
         {[1, 2, 3, 4].map((quarter) => {
           const meta = QUARTER_DATES[quarter - 1];
           const obligation = obligationsByQuarter.get(quarter);
@@ -44,13 +40,12 @@ export function QuarterStrip({
               <Link
                 key={quarter}
                 href={`/dashboard/${businessId}/new?taxYear=${selected.tax_year}&quarter=${quarter}`}
-                className="flex min-h-[104px] flex-col justify-between rounded-md border border-dashed border-line bg-surface/60 p-4 transition duration-150 hover:border-seal/50"
+                className="flex items-center gap-4 px-4 py-3 transition duration-150 hover:bg-surface-2"
               >
-                <div>
-                  <span className="font-display text-base text-ink-faint">QPD{quarter}</span>
-                  <p className="mt-1 font-mono text-[11px] text-ink-faint">{meta.short}</p>
-                </div>
-                <span className="font-mono text-[11px] font-semibold text-seal">+ Calculate</span>
+                <span className="w-14 shrink-0 font-display text-base text-ink-faint">QPD{quarter}</span>
+                <span className="w-44 shrink-0 text-sm text-ink-faint">{meta.short} · not yet calculated</span>
+                <span className="flex-1" />
+                <span className="text-sm font-semibold text-brass">Calculate &rarr;</span>
               </Link>
             );
           }
@@ -63,17 +58,17 @@ export function QuarterStrip({
           const due = !paid && !overdue && obligation.dueDate >= today;
           const isSelected = calc.id === selected.id;
 
-          let badgeLabel = "Calculated";
-          let badgeClass = "bg-zig-soft text-zig";
+          let statusLabel = "Calculated";
+          let statusClass = "text-zig";
           if (paid) {
-            badgeLabel = "Paid";
-            badgeClass = "bg-usd-soft text-usd";
+            statusLabel = "Paid in full";
+            statusClass = "text-seal font-semibold";
           } else if (overdue) {
-            badgeLabel = "Overdue";
-            badgeClass = "bg-danger-soft text-danger";
+            statusLabel = "Overdue";
+            statusClass = "text-danger font-semibold";
           } else if (due) {
-            badgeLabel = "Due";
-            badgeClass = "bg-seal-soft text-seal";
+            statusLabel = "Due now";
+            statusClass = "text-danger";
           }
 
           return (
@@ -81,22 +76,31 @@ export function QuarterStrip({
               key={quarter}
               type="button"
               onClick={() => onSelectQuarter(calc)}
-              className={`relative overflow-hidden rounded-md border bg-surface p-4 text-left transition duration-150 ${
-                isSelected ? "border-seal ring-1 ring-seal" : "border-line hover:border-seal/40"
-              } ${due || overdue ? "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-seal" : ""}`}
+              className={`flex w-full items-center gap-4 px-4 py-3 text-left transition duration-150 ${
+                isSelected ? "bg-seal-soft" : "hover:bg-surface-2"
+              }`}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-display text-base text-ink">QPD{quarter}</span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badgeClass}`}>
-                  {badgeLabel}
-                </span>
-              </div>
-              <p className="mt-1 font-mono text-[11px] text-ink-faint">
-                {meta.short} · {percent(calc.result_json.cumulative_percentage)} cumulative
-              </p>
-              <p className="mt-2 font-mono text-sm text-ink">
+              <span className="w-14 shrink-0 font-display text-base text-ink">QPD{quarter}</span>
+              <span className="w-44 shrink-0 text-sm text-ink-faint">
+                {meta.short} &middot; {percent(calc.result_json.cumulative_percentage)} cumulative
+              </span>
+              <span className={`flex flex-1 items-center gap-1.5 text-sm ${statusClass}`}>
+                {paid && (
+                  <svg
+                    className="h-3.5 w-3.5 shrink-0 rounded-full bg-seal p-[3px] text-surface"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  >
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                )}
+                {statusLabel}
+              </span>
+              <span className="font-mono text-sm font-semibold tabular-nums text-ink">
                 {paid ? money(obligation.usdOwed, "USD") : money(obligation.usdBalance, "USD")}
-              </p>
+              </span>
             </button>
           );
         })}
@@ -104,7 +108,7 @@ export function QuarterStrip({
       {allQuartersCalculated && (
         <Link
           href={`/dashboard/${businessId}/new?taxYear=${selected.tax_year + 1}&quarter=1`}
-          className="mt-3 inline-block font-mono text-xs font-semibold text-seal hover:underline"
+          className="mt-3 inline-block text-sm font-semibold text-brass hover:underline"
         >
           + Start {selected.tax_year + 1}
         </Link>

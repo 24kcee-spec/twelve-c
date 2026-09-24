@@ -1,4 +1,4 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -26,6 +26,8 @@
   --color-seal-soft: 224 234 220;
   --color-danger: 168 65 47;
   --color-danger-soft: 243 227 222;
+  --color-brass: 138 90 43;
+  --color-brass-soft: 239 226 208;
 }
 
 html.dark {
@@ -44,6 +46,8 @@ html.dark {
   --color-seal-soft: 35 48 31;
   --color-danger: 226 133 122;
   --color-danger-soft: 51 27 22;
+  --color-brass: 196 148 96;
+  --color-brass-soft: 51 40 26;
 }
 
 html {

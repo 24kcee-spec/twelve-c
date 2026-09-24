@@ -3,7 +3,6 @@
 import { ReactNode, useState } from "react";
 import { InstalmentStatus } from "@/components/QuarterWheel";
 import { CurrencySplitBars } from "@/components/CurrencySplitBars";
-import { TabBar } from "@/components/ui";
 import { money, percent } from "@/lib/format";
 import { useCountUp } from "@/lib/useCountUp";
 import { QpdResultJson } from "@/lib/types";
@@ -13,18 +12,14 @@ const DATES = ["25 Mar", "25 Jun", "25 Sep", "20 Dec"];
 
 /** The schedule's other three rows are a flat-share, full-year PROJECTION,
  *  not a record of what those quarters actually were (see the "Schedule"
- *  tab header below, and the module docstring in zimra_qpd/calculator.py).
+ *  pane below, and the module docstring in zimra_qpd/calculator.py).
  *  Only the row matching this calculation's own `quarter` has real
  *  actual-payment data behind it, so only that row ever gets a genuine
- *  paid/overdue/due verdict - the rest get a neutral "PROJECTED" label.
- *  This is what used to make calculating QPD3 show QPD1/QPD2 as OVERDUE
- *  right here in the Schedule tab, even when QPD1/QPD2 were never
- *  calculated or confirmed at all. */
+ *  paid/overdue/due verdict - the rest get a neutral "Projected" label. */
 type ScheduleRowStatus = InstalmentStatus | "projected";
 
-/** A dense two-currency line item row - the ledger-terminal replacement for
- *  the old rounded "card row". Border-bottom hairlines do the separating;
- *  no radius, no shadow. `strong` marks subtotal/total rows. */
+/** A dense two-currency ledger row. Border-bottom hairlines separate rows;
+ *  `strong` marks subtotal/total rows with a real double-rule treatment. */
 function Row({
   label,
   usd,
@@ -42,30 +37,51 @@ function Row({
   const zigAnim = useCountUp(zig);
   return (
     <div
-      className={`flex items-center justify-between border-b border-line py-2 text-sm last:border-b-0 ${
-        strong ? "-mx-3 bg-surface-2 px-3" : ""
+      className={`flex items-center justify-between py-2.5 text-sm ${
+        strong ? "border-y-2 border-ink" : "border-b border-line"
       }`}
     >
       <span className={muted ? "text-ink-faint" : strong ? "font-semibold text-ink" : "text-ink-soft"}>
         {label}
       </span>
       <div className="flex gap-6 font-mono tabular-nums">
-        <span className={`w-24 text-right ${strong ? "font-semibold" : ""} text-usd`}>{money(usdAnim, "USD")}</span>
-        <span className={`w-28 text-right ${strong ? "font-semibold" : ""} text-zig`}>{money(zigAnim, "ZIG")}</span>
+        <span className={`w-24 text-right text-brass ${strong ? "font-semibold" : ""}`}>{money(usdAnim, "USD")}</span>
+        <span className={`w-28 text-right text-zig ${strong ? "font-semibold" : ""}`}>{money(zigAnim, "ZIG")}</span>
       </div>
     </div>
   );
 }
 
-const STATUS_META: Record<ScheduleRowStatus, { label: string; className: string }> = {
-  paid: { label: "PAID", className: "text-seal" },
-  overdue: { label: "OVERDUE", className: "text-danger font-semibold" },
-  active: { label: "DUE", className: "text-danger" },
-  upcoming: { label: "—", className: "text-ink-faint" },
-  projected: { label: "PROJECTED", className: "text-ink-faint" },
+function SectionLabel({ children }: { children: ReactNode }) {
+  return <div className="pb-1.5 pt-4 text-xs font-semibold text-brass first:pt-0">{children}</div>;
+}
+
+const STATUS_META: Record<ScheduleRowStatus, { label: string; className: string; icon: "check" | "ring" }> = {
+  paid: { label: "Paid", className: "text-seal font-semibold", icon: "check" },
+  overdue: { label: "Overdue", className: "text-danger font-semibold", icon: "ring" },
+  active: { label: "Due now", className: "text-danger", icon: "ring" },
+  upcoming: { label: "Upcoming", className: "text-ink-faint", icon: "ring" },
+  projected: { label: "Projected", className: "text-ink-faint", icon: "ring" },
 };
 
-type TabId = "breakdown" | "split" | "schedule" | "payments";
+function StatusIcon({ kind }: { kind: "check" | "ring" }) {
+  if (kind === "check") {
+    return (
+      <svg
+        className="inline-block h-3.5 w-3.5 rounded-full bg-seal p-[3px] text-surface"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="4"
+      >
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
+    );
+  }
+  return <span className="inline-block h-3 w-3 rounded-full border border-ink/30" />;
+}
+
+type PaneId = "breakdown" | "split" | "schedule" | "payments";
 
 export function ResultsPanel({
   result,
@@ -84,11 +100,12 @@ export function ResultsPanel({
    *  row is a projection and is never given a paid/overdue verdict. */
   actualUsdPaid?: number | null;
   actualZigPaid?: number | null;
-  /** Rendered inside the "Payments" tab - owned by the parent since saving
-   *  payments needs page-level state (the calculation record, the API call). */
+  /** Rendered inside the "Payments" pane - owned by the parent since
+   *  saving payments needs page-level state (the calculation record, the
+   *  API call). */
   paymentsSlot?: ReactNode;
 }) {
-  const [tab, setTab] = useState<TabId>("breakdown");
+  const [pane, setPane] = useState<PaneId>("breakdown");
 
   const today = startOfDay(new Date());
 
@@ -123,132 +140,152 @@ export function ResultsPanel({
 
   const isCapped = result.payment_ratio_usd === 0.5 && result.usd_ratio !== 0.5;
 
-  const tabs: { id: TabId; label: string }[] = [
-    { id: "breakdown", label: "Breakdown" },
-    { id: "split", label: "Currency split" },
-    { id: "schedule", label: "Schedule" },
-    ...(paymentsSlot ? [{ id: "payments" as TabId, label: "Payments" }] : []),
+  const panes: { id: PaneId; code: string; label: string }[] = [
+    { id: "breakdown", code: "W1", label: "Breakdown" },
+    { id: "split", code: "W2", label: "Currency split" },
+    { id: "schedule", code: "W3", label: "Schedule" },
+    ...(paymentsSlot ? [{ id: "payments" as PaneId, code: "W4", label: "Payments" }] : []),
   ];
 
   return (
-    <div className="border border-line bg-surface">
-      {/* Stat header - the "net payable" figure moved off a floating hero
-          card and into a dense terminal-style stat row, on record with the
-          rest of the sheet instead of announcing itself above it. */}
-      <div className="grid grid-cols-2 divide-x divide-line border-b border-line sm:grid-cols-3">
+    <div className="border border-ink/15 bg-surface">
+      {/* Stat header - the "net payable" figures, plus a real progress bar
+          under Cumulative instead of a bare number. */}
+      <div className="grid grid-cols-2 divide-x divide-line border-b border-ink/15 sm:grid-cols-3">
         <div className="px-4 py-3 sm:px-5 sm:py-4">
-          <div className="font-mono text-[10px] tracking-wide text-ink-faint">NET PAYABLE USD</div>
-          <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-usd sm:text-2xl">
+          <div className="text-xs text-ink-faint">Net payable, USD</div>
+          <div className="mt-1 font-display text-2xl font-medium tabular-nums text-brass">
             {money(result.net_payable_usd, "USD")}
           </div>
         </div>
         <div className="px-4 py-3 sm:px-5 sm:py-4">
-          <div className="font-mono text-[10px] tracking-wide text-ink-faint">NET PAYABLE ZIG</div>
-          <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-zig sm:text-2xl">
+          <div className="text-xs text-ink-faint">Net payable, ZiG</div>
+          <div className="mt-1 font-display text-2xl font-medium tabular-nums text-zig">
             {money(result.net_payable_zig, "ZIG")}
           </div>
         </div>
-        <div className="col-span-2 border-t border-line px-4 py-3 sm:col-span-1 sm:border-l sm:border-t-0 sm:px-5 sm:py-4">
-          <div className="font-mono text-[10px] tracking-wide text-ink-faint">CUMULATIVE</div>
-          <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-ink sm:text-2xl">
+        <div className="col-span-2 border-t border-ink/15 px-4 py-3 sm:col-span-1 sm:border-l sm:border-t-0 sm:px-5 sm:py-4">
+          <div className="text-xs text-ink-faint">Cumulative target reached</div>
+          <div className="mt-1 font-display text-2xl font-medium tabular-nums text-ink">
             {percent(result.cumulative_percentage)}
+          </div>
+          <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-line">
+            <div
+              className="h-full bg-ink"
+              style={{ width: `${Math.min(100, result.cumulative_percentage * 100)}%` }}
+            />
           </div>
         </div>
       </div>
 
-      <div className="p-4 sm:p-6">
-        <TabBar tabs={tabs} active={tab} onChange={setTab} />
+      {/* Working-paper folio: W1-W4 index instead of pill tabs. */}
+      <div className="flex flex-col sm:flex-row">
+        <div className="flex shrink-0 divide-x divide-ink/15 border-b border-ink/15 sm:w-44 sm:flex-col sm:divide-x-0 sm:divide-y sm:border-b-0 sm:border-r">
+          {panes.map((pn) => (
+            <button
+              key={pn.id}
+              type="button"
+              onClick={() => setPane(pn.id)}
+              className={`flex flex-1 items-baseline gap-2 px-4 py-3 text-left text-sm font-medium transition duration-150 sm:border-l-2 ${
+                pane === pn.id
+                  ? "bg-surface-2 text-ink sm:border-l-brass"
+                  : "text-ink-faint hover:text-ink-soft sm:border-l-transparent"
+              }`}
+            >
+              <span className="font-mono text-[11px] text-ink-faint">{pn.code}</span>
+              {pn.label}
+            </button>
+          ))}
+        </div>
 
-        {tab === "breakdown" && (
-          <div className="mt-4 fade-in-up">
-            <div className="mb-2 flex items-center justify-between font-mono text-[10px] tracking-wide text-ink-faint">
-              <span>LINE ITEM</span>
-              <div className="flex gap-6">
-                <span className="w-24 text-right">USD</span>
-                <span className="w-28 text-right">ZIG</span>
+        <div className="flex-1 p-4 sm:p-5">
+          {pane === "breakdown" && (
+            <div className="fade-in-up">
+              <div className="mb-1 flex items-center justify-between text-xs text-ink-faint">
+                <span>Line item</span>
+                <div className="flex gap-6">
+                  <span className="w-24 text-right">USD</span>
+                  <span className="w-28 text-right">ZiG</span>
+                </div>
+              </div>
+              <div>
+                <SectionLabel>Income</SectionLabel>
+                <Row label="Adjusted income" usd={result.adjusted_income_usd} zig={result.adjusted_income_zig} />
+                <SectionLabel>Deductions</SectionLabel>
+                <Row
+                  label="Adjusted deductions"
+                  usd={result.adjusted_deductions_usd}
+                  zig={result.adjusted_deductions_zig}
+                  muted
+                />
+                <SectionLabel>Computation</SectionLabel>
+                <Row label="Taxable profit" usd={result.taxable_profit_usd} zig={result.taxable_profit_zig} strong />
+                <Row label="Tax payable" usd={result.tax_payable_usd} zig={result.tax_payable_zig} muted />
+                <Row label="AIDS levy" usd={result.aids_levy_usd} zig={result.aids_levy_zig} muted />
+                <Row label="Total tax due" usd={result.total_tax_usd} zig={result.total_tax_zig} strong />
               </div>
             </div>
-            <div>
-              <Row label="Adjusted income" usd={result.adjusted_income_usd} zig={result.adjusted_income_zig} />
-              <Row
-                label="Adjusted deductions"
-                usd={result.adjusted_deductions_usd}
-                zig={result.adjusted_deductions_zig}
-                muted
+          )}
+
+          {pane === "split" && (
+            <div className="fade-in-up">
+              <CurrencySplitBars
+                rawUsd={result.usd_ratio}
+                rawZig={result.zig_ratio}
+                paymentUsd={result.payment_ratio_usd}
+                paymentZig={result.payment_ratio_zig}
+                capped={isCapped}
               />
-              <Row
-                label="Taxable profit"
-                usd={result.taxable_profit_usd}
-                zig={result.taxable_profit_zig}
-                strong
-              />
-              <Row label="Tax payable" usd={result.tax_payable_usd} zig={result.tax_payable_zig} muted />
-              <Row label="AIDS levy" usd={result.aids_levy_usd} zig={result.aids_levy_zig} muted />
-              <Row label="Total tax due" usd={result.total_tax_usd} zig={result.total_tax_zig} strong />
             </div>
-          </div>
-        )}
+          )}
 
-        {tab === "split" && (
-          <div className="mt-4 fade-in-up">
-            <div className="font-mono text-[10px] tracking-wide text-ink-faint">TRADING CURRENCY SPLIT</div>
-            <CurrencySplitBars
-              rawUsd={result.usd_ratio}
-              rawZig={result.zig_ratio}
-              paymentUsd={result.payment_ratio_usd}
-              paymentZig={result.payment_ratio_zig}
-              capped={isCapped}
-            />
-          </div>
-        )}
-
-        {tab === "schedule" && (
-          <div className="mt-4 fade-in-up">
-            <div className="font-mono text-[10px] tracking-wide text-ink-faint">
-              FULL-YEAR PROJECTION (AT TODAY&apos;S ESTIMATE)
+          {pane === "schedule" && (
+            <div className="fade-in-up">
+              <div className="mb-2 text-xs text-ink-faint">Full-year projection, at today&apos;s estimate</div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-ink/15 text-left text-xs text-ink-faint">
+                      <th className="py-2 pr-3 font-medium">Qtr</th>
+                      <th className="py-2 pr-3 font-medium">Due</th>
+                      <th className="py-2 pr-3 font-medium">Cumulative</th>
+                      <th className="py-2 pr-3 text-right font-medium">USD</th>
+                      <th className="py-2 pr-3 text-right font-medium">ZiG</th>
+                      <th className="py-2 pl-3 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scheduleRows.map((row) => {
+                      const meta = STATUS_META[row.status];
+                      return (
+                        <tr key={row.label} className="border-b border-line last:border-b-0">
+                          <td className="py-2.5 pr-3 text-ink">{row.label}</td>
+                          <td className="py-2.5 pr-3 text-ink-faint">{row.date}</td>
+                          <td className="py-2.5 pr-3">
+                            <span className="mr-2 inline-block h-[5px] w-12 overflow-hidden rounded-full bg-line align-middle">
+                              <span
+                                className="block h-full bg-seal"
+                                style={{ width: `${Math.min(100, row.percentage * 100)}%` }}
+                              />
+                            </span>
+                            <span className="tabular-nums text-ink-faint">{percent(row.percentage)}</span>
+                          </td>
+                          <td className="py-2.5 pr-3 text-right tabular-nums text-brass">{money(row.amountUsd, "USD")}</td>
+                          <td className="py-2.5 pr-3 text-right tabular-nums text-zig">{money(row.amountZig, "ZIG")}</td>
+                          <td className={`py-2.5 pl-3 ${meta.className}`}>
+                            <StatusIcon kind={meta.icon} /> <span className="align-middle">{meta.label}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full min-w-[520px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-line text-left font-mono text-[10px] tracking-wide text-ink-faint">
-                    <th className="py-2 pr-3 font-medium">QTR</th>
-                    <th className="py-2 pr-3 font-medium">DUE</th>
-                    <th className="py-2 pr-3 text-right font-medium">SHARE%</th>
-                    <th className="py-2 pr-3 text-right font-medium">USD</th>
-                    <th className="py-2 pr-3 text-right font-medium">ZIG</th>
-                    <th className="py-2 pl-3 font-medium">STATUS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scheduleRows.map((row) => {
-                    const meta = STATUS_META[row.status];
-                    return (
-                      <tr
-                        key={row.label}
-                        className={`border-b border-line/60 font-mono text-xs last:border-b-0 ${
-                          row.status === "overdue"
-                            ? "bg-danger-soft/40"
-                            : row.status === "active"
-                            ? "bg-seal-soft/40"
-                            : ""
-                        }`}
-                      >
-                        <td className="py-2 pr-3 text-ink">{row.label}</td>
-                        <td className="py-2 pr-3 text-ink-faint">{row.date}</td>
-                        <td className="py-2 pr-3 text-right text-ink-faint">{percent(row.percentage)}</td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-ink">{money(row.amountUsd, "USD")}</td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-ink">{money(row.amountZig, "ZIG")}</td>
-                        <td className={`py-2 pl-3 ${meta.className}`}>{meta.label}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+          )}
 
-        {tab === "payments" && paymentsSlot && <div className="mt-4 fade-in-up">{paymentsSlot}</div>}
+          {pane === "payments" && paymentsSlot && <div className="fade-in-up">{paymentsSlot}</div>}
+        </div>
       </div>
     </div>
   );
