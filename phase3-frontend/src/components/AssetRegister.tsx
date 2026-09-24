@@ -2,6 +2,7 @@
 
 import { api } from "@/lib/api";
 import { ASSET_CATEGORY_LABELS, AssetCategory, CapitalAssetOut } from "@/lib/types";
+import { money } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Button, Field, TrashIcon } from "./ui";
 
@@ -119,40 +120,50 @@ export function AssetRegister({
           </p>
 
           {loading && <p className="text-xs text-ink-faint">Loading register...</p>}
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-danger">{error}</p>}
 
           {!loading && assets.length > 0 && (
-            <ul className="space-y-1">
-              {assets.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-center justify-between gap-2 rounded border border-line px-2 py-1.5 text-sm"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-ink">{a.description}</p>
-                    <p className="truncate text-xs text-ink-faint">
-                      {ASSET_CATEGORY_LABELS[a.category]} - {a.year_acquired}
-                      {a.elect_sia ? " - SIA elected" : ""}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="font-mono text-xs tabular-nums text-ink-soft">
-                      {a.cost_usd > 0 ? `$${a.cost_usd.toLocaleString()}` : ""}
-                      {a.cost_usd > 0 && a.cost_zig > 0 ? " / " : ""}
-                      {a.cost_zig > 0 ? `Z${a.cost_zig.toLocaleString()}` : ""}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(a.id)}
-                      className="text-ink-faint hover:text-red-600"
-                      aria-label={`Remove ${a.description}`}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto rounded border border-line">
+              <table className="w-full min-w-[420px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-line text-left text-xs text-ink-faint">
+                    <th className="py-1.5 pl-2 pr-3 font-medium">Asset</th>
+                    <th className="py-1.5 pr-3 text-right font-medium">Cost (USD)</th>
+                    <th className="py-1.5 pr-3 text-right font-medium">Cost (ZiG)</th>
+                    <th className="py-1.5 pr-2 font-medium" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {assets.map((a) => (
+                    <tr key={a.id} className="border-b border-line last:border-b-0">
+                      <td className="min-w-0 py-1.5 pl-2 pr-3">
+                        <p className="truncate text-ink">{a.description}</p>
+                        <p className="truncate text-xs text-ink-faint">
+                          {ASSET_CATEGORY_LABELS[a.category]} - {a.year_acquired}
+                          {a.elect_sia ? " - SIA elected" : ""}
+                        </p>
+                      </td>
+                      <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums text-usd">
+                        {a.cost_usd > 0 ? money(a.cost_usd, "USD") : "\u2014"}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums text-zig">
+                        {a.cost_zig > 0 ? money(a.cost_zig, "ZIG") : "\u2014"}
+                      </td>
+                      <td className="py-1.5 pr-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(a.id)}
+                          className="text-ink-faint hover:text-danger"
+                          aria-label={`Remove ${a.description}`}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {!loading && assets.length === 0 && (
@@ -163,12 +174,8 @@ export function AssetRegister({
             <div className="flex items-center justify-between rounded bg-surface-soft px-2 py-1.5 text-sm">
               <span className="text-ink-soft">Claimable for {taxYear}</span>
               <div className="flex items-center gap-3">
-                <span className="font-mono text-xs tabular-nums text-usd">
-                  ${totals.usd.toLocaleString()}
-                </span>
-                <span className="font-mono text-xs tabular-nums text-zig">
-                  Z{totals.zig.toLocaleString()}
-                </span>
+                <span className="font-mono text-xs tabular-nums text-usd">{money(totals.usd, "USD")}</span>
+                <span className="font-mono text-xs tabular-nums text-zig">{money(totals.zig, "ZIG")}</span>
                 <Button
                   type="button"
                   variant="secondary"

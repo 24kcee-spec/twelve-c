@@ -12,6 +12,19 @@ export function useCountUp(target: number, durationMs = 700): number {
   const frame = useRef<number>();
 
   useEffect(() => {
+    // requestAnimationFrame ignores the CSS prefers-reduced-motion media
+    // query (that only pauses CSS transitions/animations), so a JS-driven
+    // "roll up" like this one needs its own check - jump straight to the
+    // target instead of animating when the user has asked for less motion.
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) {
+      prevTarget.current = target;
+      setValue(target);
+      return;
+    }
+
     const start = prevTarget.current;
     const startTime = performance.now();
     if (frame.current) cancelAnimationFrame(frame.current);

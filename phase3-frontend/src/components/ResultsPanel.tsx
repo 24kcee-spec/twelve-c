@@ -3,6 +3,7 @@
 import { ReactNode, useState } from "react";
 import { InstalmentStatus } from "@/components/QuarterWheel";
 import { CurrencySplitBars } from "@/components/CurrencySplitBars";
+import { Disclosure } from "@/components/ui";
 import { money, percent } from "@/lib/format";
 import { useCountUp } from "@/lib/useCountUp";
 import { QpdResultJson } from "@/lib/types";
@@ -140,6 +141,23 @@ export function ResultsPanel({
 
   const isCapped = result.payment_ratio_usd === 0.5 && result.usd_ratio !== 0.5;
 
+  // Effective rates, derived from the actual figures rather than
+  // hardcoded - a business's tax_rate/aids_levy_rate are configurable, so
+  // this stays correct even if the ZIMRA defaults are overridden. Falls
+  // back to whichever currency has a non-zero base to divide by.
+  const taxRatePct =
+    result.taxable_profit_usd > 0
+      ? (result.tax_payable_usd / result.taxable_profit_usd) * 100
+      : result.taxable_profit_zig > 0
+        ? (result.tax_payable_zig / result.taxable_profit_zig) * 100
+        : null;
+  const aidsRatePct =
+    result.tax_payable_usd > 0
+      ? (result.aids_levy_usd / result.tax_payable_usd) * 100
+      : result.tax_payable_zig > 0
+        ? (result.aids_levy_zig / result.tax_payable_zig) * 100
+        : null;
+
   const panes: { id: PaneId; code: string; label: string }[] = [
     { id: "breakdown", code: "W1", label: "Breakdown" },
     { id: "split", code: "W2", label: "Currency split" },
@@ -223,6 +241,60 @@ export function ResultsPanel({
                 <Row label="Tax payable" usd={result.tax_payable_usd} zig={result.tax_payable_zig} muted />
                 <Row label="AIDS levy" usd={result.aids_levy_usd} zig={result.aids_levy_zig} muted />
                 <Row label="Total tax due" usd={result.total_tax_usd} zig={result.total_tax_zig} strong />
+              </div>
+
+              <div className="mt-4 border-t border-line pt-1">
+                <Disclosure summary="How was this calculated?">
+                  <ol className="list-decimal space-y-2 pl-4 text-xs leading-relaxed text-ink-soft">
+                    <li>
+                      Sales split {percent(result.usd_ratio)} USD / {percent(result.zig_ratio)} ZiG.{" "}
+                      {isCapped
+                        ? "ZIMRA's 50% cap applied, so income and deductions were split evenly instead."
+                        : "That same ratio carries through to income and deductions."}
+                    </li>
+                    <li>
+                      Adjusted income = total income × applied ratio ={" "}
+                      {money(result.adjusted_income_usd, "USD")} / {money(result.adjusted_income_zig, "ZIG")}.
+                    </li>
+                    <li>
+                      Adjusted deductions = allowable expenses (cost of sales, salaries, other expenses,
+                      capital allowances), converted to a common baseline and re-split the same way ={" "}
+                      {money(result.adjusted_deductions_usd, "USD")} / {money(result.adjusted_deductions_zig, "ZIG")}.
+                    </li>
+                    <li>
+                      Taxable profit = adjusted income − adjusted deductions (floored at zero) ={" "}
+                      {money(result.taxable_profit_usd, "USD")} / {money(result.taxable_profit_zig, "ZIG")}.
+                    </li>
+                    <li>
+                      Tax payable = taxable profit ×{" "}
+                      {taxRatePct !== null ? `${taxRatePct.toFixed(2)}%` : "your business's tax rate"} ={" "}
+                      {money(result.tax_payable_usd, "USD")} / {money(result.tax_payable_zig, "ZIG")}.
+                    </li>
+                    <li>
+                      AIDS levy = tax payable ×{" "}
+                      {aidsRatePct !== null ? `${aidsRatePct.toFixed(2)}%` : "the AIDS levy rate"} (levied on the
+                      tax, not the income) = {money(result.aids_levy_usd, "USD")} / {money(result.aids_levy_zig, "ZIG")}.
+                    </li>
+                    <li>
+                      Total tax due = tax payable + AIDS levy = {money(result.total_tax_usd, "USD")} /{" "}
+                      {money(result.total_tax_zig, "ZIG")}.
+                    </li>
+                    <li>
+                      By {result.quarter === 1 ? "Q1" : `Q${result.quarter}`}, ZIMRA's cumulative schedule
+                      requires {percent(result.cumulative_percentage)} of that total to have been paid ={" "}
+                      {money(result.cumulative_due_usd, "USD")} / {money(result.cumulative_due_zig, "ZIG")} due
+                      cumulatively.
+                    </li>
+                    <li>
+                      Net payable now = cumulative due − {money(result.previous_paid_usd, "USD")} /{" "}
+                      {money(result.previous_paid_zig, "ZIG")} already paid in prior quarters ={" "}
+                      <span className="font-medium text-ink">
+                        {money(result.net_payable_usd, "USD")} / {money(result.net_payable_zig, "ZIG")}
+                      </span>
+                      .
+                    </li>
+                  </ol>
+                </Disclosure>
               </div>
             </div>
           )}

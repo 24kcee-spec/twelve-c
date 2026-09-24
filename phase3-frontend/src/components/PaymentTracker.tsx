@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, ErrorNote } from "@/components/ui";
+import { Button, ErrorNote, Field } from "@/components/ui";
 import { money } from "@/lib/format";
 import { QpdCalculationOut } from "@/lib/types";
 
@@ -88,30 +88,30 @@ export function PaymentTracker({
         )}
 
         <div className="mt-4 grid grid-cols-2 gap-4">
-          <label className="text-xs text-ink-faint">
-            USD actually paid
-            <input
+          <div>
+            <Field
+              label="USD actually paid"
               type="number"
               step="0.01"
               min={0}
               value={usdPaid}
               onChange={(e) => setUsdPaid(parseFloat(e.target.value) || 0)}
-              className="mt-1.5 w-full border border-ink/15 bg-surface px-2.5 py-1.5 font-mono text-sm tabular-nums text-ink outline-none focus:border-brass"
+              className="tabular-nums"
             />
             <span className={`mt-1.5 block text-xs ${usdInfo.className}`}>{usdInfo.text}</span>
-          </label>
-          <label className="text-xs text-ink-faint">
-            ZiG actually paid
-            <input
+          </div>
+          <div>
+            <Field
+              label="ZiG actually paid"
               type="number"
               step="0.01"
               min={0}
               value={zigPaid}
               onChange={(e) => setZigPaid(parseFloat(e.target.value) || 0)}
-              className="mt-1.5 w-full border border-ink/15 bg-surface px-2.5 py-1.5 font-mono text-sm tabular-nums text-ink outline-none focus:border-zig"
+              className="tabular-nums"
             />
             <span className={`mt-1.5 block text-xs ${zigInfo.className}`}>{zigInfo.text}</span>
-          </label>
+          </div>
         </div>
       </div>
 
