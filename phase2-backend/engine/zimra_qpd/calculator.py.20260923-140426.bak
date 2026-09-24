@@ -107,8 +107,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 
-from .tax_rules import get_tax_rules
-
 # 50 significant digits is far beyond anything a tax figure needs - it only
 # has to be "large enough that binary/rounding error never surfaces even
 # after several chained operations", and 50 clears that with huge margin.
@@ -116,6 +114,23 @@ from .tax_rules import get_tax_rules
 getcontext().prec = 50
 
 _CENTS = Decimal("0.01")
+
+# Cumulative percentage of the annual estimate due BY (not AT) each QPD,
+# per ZIMRA's published schedule (10/25/30/35% quarterly shares, read
+# cumulatively: 10%, 10+25=35%, 35+30=65%, 65+35=100%).
+QUARTER_CUMULATIVE_PERCENTAGE: dict[int, Decimal] = {
+    1: Decimal("0.10"),
+    2: Decimal("0.35"),
+    3: Decimal("0.65"),
+    4: Decimal("1.00"),
+}
+
+QUARTER_DUE_DATES: dict[int, str] = {
+    1: "25 March",
+    2: "25 June",
+    3: "25 September",
+    4: "20 December",
+}
 
 
 def _d(value: float | int | str | Decimal) -> Decimal:
@@ -178,12 +193,6 @@ class QpdInput:
 
     usd_sales: float
     zig_sales: float
-
-    # Tax-year selector for the versioned TaxRuleSet. Defaults to 2026 for
-    # backward compatibility with existing callers; backend callers pass the
-    # persisted request tax_year explicitly.
-    tax_year: int = 2026
-
     usd_expenses: CurrencyExpenses = field(default_factory=CurrencyExpenses)
     zig_expenses: CurrencyExpenses = field(default_factory=CurrencyExpenses)
     exchange_rate: float = 26.8  # ZIG per 1 USD - update to the current interbank rate
@@ -273,16 +282,10 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
     if usd_sales < 0 or zig_sales < 0:
         raise ValueError("sales figures cannot be negative")
 
-    rules = get_tax_rules(data.tax_year)
-
-    # User-supplied rates remain supported for backward compatibility and
-    # deliberate overrides. When the caller uses the registry defaults, the
-    # values are identical to the selected tax year's verified rule set.
     tax_rate = _d(data.tax_rate)
     aids_levy_rate = _d(data.aids_levy_rate)
 
-    cumulative_percentages = rules.qpd_cumulative_percentages
-    if data.quarter not in cumulative_percentages:
+    if data.quarter not in QUARTER_CUMULATIVE_PERCENTAGE:
         raise ValueError("quarter must be 1, 2, 3, or 4")
 
     previous_paid_usd = _d(data.previous_qpds_paid_usd)
@@ -394,20 +397,17 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
     # rounding). Everything above stays at full Decimal precision right up
     # until this point.
     schedule = [
-        QpdInstalment(
-            f"Q{q} - {rules.qpd_rules[q].payment_date}",
-            float(rules.qpd_rules[q].installment_percentage),
-            _money(total_tax_usd * rules.qpd_rules[q].installment_percentage),
-            _money(total_tax_zig * rules.qpd_rules[q].installment_percentage),
-        )
-        for q in (1, 2, 3, 4)
+        QpdInstalment("Q1 - 25 March", 0.10, _money(total_tax_usd * Decimal("0.10")), _money(total_tax_zig * Decimal("0.10"))),
+        QpdInstalment("Q2 - 25 June", 0.25, _money(total_tax_usd * Decimal("0.25")), _money(total_tax_zig * Decimal("0.25"))),
+        QpdInstalment("Q3 - 25 September", 0.30, _money(total_tax_usd * Decimal("0.30")), _money(total_tax_zig * Decimal("0.30"))),
+        QpdInstalment("Q4 - 20 December", 0.35, _money(total_tax_usd * Decimal("0.35")), _money(total_tax_zig * Decimal("0.35"))),
     ]
 
     # --- Cumulative amount actually due THIS quarter (fixes the workbook's
     # flat-share bug: see module docstring section 5). Uses the CURRENT
     # estimate's total_tax, cumulative-to-date, minus what was genuinely
     # paid in prior quarters - not a fixed slice of a number frozen at Q1. ---
-    cumulative_pct = cumulative_percentages[data.quarter]
+    cumulative_pct = QUARTER_CUMULATIVE_PERCENTAGE[data.quarter]
     cumulative_due_usd = total_tax_usd * cumulative_pct
     cumulative_due_zig = total_tax_zig * cumulative_pct
     # Withholding tax credits (new): WHT already suffered this tax year
@@ -437,7 +437,7 @@ def calculate_qpd(data: QpdInput) -> QpdResult:
         total_tax_zig=float(total_tax_zig),
         schedule=schedule,
         quarter=data.quarter,
-        due_date=rules.qpd_payment_dates[data.quarter],
+        due_date=QUARTER_DUE_DATES[data.quarter],
         cumulative_percentage=float(cumulative_pct),
         cumulative_due_usd=_money(cumulative_due_usd),
         cumulative_due_zig=_money(cumulative_due_zig),
