@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, Button, Card, Disclosure, Eyebrow, Logo } from "@/components/ui";
+import { Badge, Button, Card, Disclosure, Eyebrow, Logo, SectionHeading } from "@/components/ui";
 
 export const metadata = { title: "Documentation | Twelve C" };
 
@@ -131,15 +131,6 @@ const FAQ = [
     a: "Yes, under a single login, each with its own exchange rate, tax rate, and AIDS levy rate defaults.",
   },
 ];
-
-function SectionHeading({ n, title }: { n: string; title: string }) {
-  return (
-    <div className="flex items-baseline gap-3">
-      <span className="font-mono text-xs text-ink-faint">{n}</span>
-      <h2 className="font-display text-xl text-ink">{title}</h2>
-    </div>
-  );
-}
 
 export default function TutorialPage() {
   return (

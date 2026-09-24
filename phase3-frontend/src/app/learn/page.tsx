@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button, Card, Eyebrow, Logo } from "@/components/ui";
+import { Button, Card, Eyebrow, Logo, SectionHeading } from "@/components/ui";
 
 export const metadata = { title: "Know Your Taxes | Twelve C" };
 
@@ -126,9 +126,7 @@ export default function LearnPage() {
 
         {/* Entity types */}
         <section id="entities" className="mt-12 scroll-mt-6">
-          <h2 className="font-display text-xl text-ink">
-            1. What kind of business are you?
-          </h2>
+          <SectionHeading n="01" title="What kind of business are you?" />
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
             Zimbabwe's Companies and Other Business Entities Act (COBE Act)
             recognises several structures. Which one you're trading as
@@ -201,9 +199,7 @@ export default function LearnPage() {
 
         {/* Tax types */}
         <section id="taxes" className="mt-12 scroll-mt-6">
-          <h2 className="font-display text-xl text-ink">
-            2. Which taxes might apply to you
-          </h2>
+          <SectionHeading n="02" title="Which taxes might apply to you" />
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
             Most trading businesses deal with two or three of these, not all
             five. Presumptive Tax and full QPD self-assessment are generally

@@ -95,6 +95,15 @@ export function Eyebrow({ children }: { children: React.ReactNode }) {
   return <span className="text-sm font-medium text-ink-faint">{children}</span>;
 }
 
+export function SectionHeading({ n, title }: { n: string; title: string }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <span className="font-mono text-xs text-ink-faint">{n}</span>
+      <h2 className="font-display text-xl text-ink">{title}</h2>
+    </div>
+  );
+}
+
 export function ErrorNote({ children }: { children: React.ReactNode }) {
   if (!children) return null;
   return (
