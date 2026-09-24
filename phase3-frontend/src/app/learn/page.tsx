@@ -82,6 +82,12 @@ const TAX_TYPES: TaxType[] = [
   },
 ];
 
+const SECTIONS: { id: string; label: string }[] = [
+  { id: "entities", label: "Business types" },
+  { id: "vat", label: "VAT threshold" },
+  { id: "taxes", label: "Which taxes apply" },
+];
+
 export default function LearnPage() {
   return (
     <main className="min-h-screen bg-paper">
@@ -106,8 +112,20 @@ export default function LearnPage() {
           when.
         </p>
 
+        <nav aria-label="On this page" className="mt-8 flex flex-wrap gap-2">
+          {SECTIONS.map((s) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              className="rounded-full border border-line px-3 py-1 font-mono text-xs text-ink-soft transition duration-150 hover:border-seal hover:text-ink"
+            >
+              {s.label}
+            </a>
+          ))}
+        </nav>
+
         {/* Entity types */}
-        <section className="mt-12">
+        <section id="entities" className="mt-12 scroll-mt-6">
           <h2 className="font-display text-xl text-ink">
             1. What kind of business are you?
           </h2>
@@ -153,7 +171,7 @@ export default function LearnPage() {
         </section>
 
         {/* VAT callout - the specific question that prompted this page */}
-        <section className="mt-12 rounded-md border border-zig/30 bg-zig-soft p-5">
+        <section id="vat" className="mt-12 scroll-mt-6 rounded-md border border-zig/30 bg-zig-soft p-5">
           <Eyebrow>The question people actually ask</Eyebrow>
           <h2 className="mt-2 font-display text-lg text-ink">
             Do I need to register for VAT?
@@ -182,7 +200,7 @@ export default function LearnPage() {
         </section>
 
         {/* Tax types */}
-        <section className="mt-12">
+        <section id="taxes" className="mt-12 scroll-mt-6">
           <h2 className="font-display text-xl text-ink">
             2. Which taxes might apply to you
           </h2>
