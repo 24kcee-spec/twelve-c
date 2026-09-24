@@ -408,6 +408,42 @@ export function Modal({
   );
 }
 
+/**
+ * Accessible FAQ-style disclosure. Built on native <details>/<summary> so
+ * keyboard, screen-reader, and find-in-page behaviour all come for free -
+ * no open/close state to wire up. Used on the Tutorial page's FAQ section.
+ */
+export function Disclosure({
+  summary,
+  children,
+  defaultOpen = false,
+}: {
+  summary: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details
+      className="group border-b border-line py-3.5 last:border-b-0 open:pb-4"
+      open={defaultOpen || undefined}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium text-ink [&::-webkit-details-marker]:hidden">
+        <span>{summary}</span>
+        <svg
+          width="11"
+          height="11"
+          viewBox="0 0 12 12"
+          fill="none"
+          className="shrink-0 text-ink-faint transition-transform duration-150 group-open:rotate-180"
+        >
+          <path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </summary>
+      <div className="mt-2 pr-6 text-sm leading-relaxed text-ink-soft">{children}</div>
+    </details>
+  );
+}
+
 /** A small pill badge used on history rows ("Latest", "Viewing"). */
 export function Badge({
   children,
