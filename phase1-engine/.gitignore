@@ -1,9 +1,15 @@
+# Local Python environment
+env/
 venv/
 .venv/
-env/
 __pycache__/
+**/__pycache__/
 *.pyc
+*.pyo
 .pytest_cache/
 *.egg-info/
 *.bak
 *.bak-*
+
+# Generated files and diagnostics
+*.log

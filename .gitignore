@@ -10,6 +10,7 @@
 
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
@@ -18,6 +19,7 @@ __pycache__/
 .ruff_cache/
 venv/
 .venv/
+env/
 .envrc
 
 # Node / frontend
@@ -30,12 +32,22 @@ coverage/
 
 # Packaging / generated artifacts
 *.egg-info/
+**/*.egg-info/
 *.egg
 *.dist-info/
 *.bak
 *.bak-*
 *.orig
 *.rej
+*.log
+
+# Diagnostic and generated outputs
+diagnostics/*.txt
+diagnostics/*.sql
+**/test_output.txt
+**/*.pyc
+**/*.pyo
+**/__pycache__/
 
 # System files
 .DS_Store
