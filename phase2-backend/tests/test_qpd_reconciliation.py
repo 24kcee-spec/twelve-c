@@ -67,13 +67,32 @@ async def test_missing_quarters_reported_and_excluded_from_total(client, db_sess
     assert breakdown.quarters_missing == [3, 4]
     assert breakdown.latest_calculated_quarter == 2
 
-    # Missing quarters contribute nothing to the remitted total - they are
-    # not silently treated as zero-liability. (zig_sales=0 does not imply a
-    # zero ZiG leg: the engine still splits USD-equivalent expenses across
-    # both currencies via the payment ratio, so a non-zero ZiG figure here
-    # is expected engine behaviour, not a test bug.)
+    # Neither Q1 nor Q2 has been CONFIRMED yet (only calculated) - since
+    # payment_confirmed_at exists now, total_remitted counts only confirmed
+    # quarters, not the seeded net_payable assumption. Both should show up
+    # as unconfirmed, and the total should be zero until they're confirmed.
+    assert breakdown.quarters_unconfirmed == [1, 2]
+    assert breakdown.total_remitted_usd == 0.0
+    assert breakdown.total_remitted_zig == 0.0
+
+    # Confirming both (at their seeded figures, for simplicity) is what
+    # should move them into the total - missing Q3/Q4 still contribute
+    # nothing, they're not silently treated as zero-liability. (zig_sales=0
+    # does not imply a zero ZiG leg: the engine still splits USD-equivalent
+    # expenses across both currencies via the payment ratio, so a non-zero
+    # ZiG figure here is expected engine behaviour, not a test bug.)
     expected_total_usd = q1.actual_usd_paid + q2.actual_usd_paid
     expected_total_zig = q1.actual_zig_paid + q2.actual_zig_paid
+    for q, calc_id in ((q1, r1.json()["id"]), (q2, r2.json()["id"])):
+        conf = await client.post(
+            f"/businesses/{business_id}/qpd-calculations/{calc_id}/confirm-payment",
+            headers=headers,
+            json={"actual_usd_paid": q.actual_usd_paid, "actual_zig_paid": q.actual_zig_paid},
+        )
+        assert conf.status_code == 200, conf.text
+
+    breakdown = await get_tax_year_breakdown(db_session, business_id, 2026)
+    assert breakdown.quarters_unconfirmed == []
     assert breakdown.total_remitted_usd == pytest.approx(expected_total_usd)
     assert breakdown.total_remitted_zig == pytest.approx(expected_total_zig)
 

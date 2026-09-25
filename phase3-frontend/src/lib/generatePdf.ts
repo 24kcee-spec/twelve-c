@@ -7,6 +7,21 @@ const DUE_DATES = ["25 March", "25 June", "25 September", "20 December"];
 const IS_USD = "USD" as const;
 const IS_ZIG = "ZIG" as const;
 
+// --- Ledger palette (matches zimra_qpd.pdf_export / xlsx_export - the
+// backend's full-year Working Papers export - so the per-quarter PDF a
+// person downloads mid-year and the full-year one they download later
+// read as the same product, not two different tools). Keep these in sync
+// by hand if the backend palette ever changes; there's no shared source
+// between a Python reportlab doc and this jsPDF one.
+const INK: [number, number, number] = [31, 26, 23]; // #1F1A17
+const INK_SOFT: [number, number, number] = [107, 98, 90]; // #6B625A
+const SEAL: [number, number, number] = [156, 107, 46]; // #9C6B2E - ochre gold
+const LINE: [number, number, number] = [216, 207, 192]; // #D8CFC0
+const PAPER: [number, number, number] = [251, 247, 240]; // #FBF7F0
+const HEADER_BAND: [number, number, number] = [43, 35, 29]; // #2B231D
+const GOLD_FILL: [number, number, number] = [243, 230, 204]; // #F3E6CC - headline figures
+const BAND_SUBTEXT: [number, number, number] = [216, 207, 192]; // #D8CFC0
+
 /** Turns "Kuda's Bakery / Q3!" into "Kudas-Bakery-Q3" - safe for a filename
  *  on both Windows and macOS/Linux. */
 function safeFileSegment(value: string): string {
@@ -33,47 +48,61 @@ export function downloadTaxSummaryPdf(business: Business, calculation: QpdCalcul
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const marginX = 40;
   const pageWidth = doc.internal.pageSize.getWidth();
-  let y = 50;
+  const bandHeight = 78;
+  let y: number;
 
-  // --- Header ---
+  // --- Header band (dark ink band, matches the backend export's header) ---
+  doc.setFillColor(...HEADER_BAND);
+  doc.rect(0, 0, pageWidth, bandHeight, "F");
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
-  doc.text("Twelve C", marginX, y);
+  doc.setTextColor(255, 255, 255);
+  doc.text("Twelve C", marginX, 34);
+
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(90);
-  doc.text("QPD Provisional Tax Summary", marginX, y + 16);
+  doc.setTextColor(...BAND_SUBTEXT);
+  doc.text("QPD Provisional Tax Summary", marginX, 50);
 
   const generatedOn = new Date().toLocaleDateString("en-ZW", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  doc.setFontSize(9);
-  doc.text(`Generated ${generatedOn}`, pageWidth - marginX, y - 4, { align: "right" });
-  doc.text("Not a ZIMRA filing document - for internal/accountant use", pageWidth - marginX, y + 10, {
+  doc.setFontSize(8.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(business.name, pageWidth - marginX, 34, { align: "right" });
+  doc.setTextColor(...BAND_SUBTEXT);
+  doc.text(`Generated ${generatedOn}`, pageWidth - marginX, 46, { align: "right" });
+  doc.text("Not a ZIMRA filing document \u2014 internal/accountant use", pageWidth - marginX, 58, {
     align: "right",
   });
 
-  doc.setDrawColor(0);
-  doc.setLineWidth(1.2);
-  y += 26;
-  doc.line(marginX, y, pageWidth - marginX, y);
-  y += 26;
+  y = bandHeight + 34;
 
   // --- Business / period ---
-  doc.setTextColor(0);
   doc.setFontSize(9);
-  doc.setTextColor(120);
+  doc.setTextColor(...INK_SOFT);
+  doc.setFont("helvetica", "normal");
   doc.text("BUSINESS", marginX, y);
   doc.text("TAX YEAR / PERIOD", pageWidth / 2, y);
-  doc.setTextColor(0);
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
+  doc.setTextColor(...INK);
   doc.text(business.name, marginX, y + 16);
   doc.text(`${calculation.tax_year} - ${calculation.quarter_label}`, pageWidth / 2, y + 16);
   doc.setFont("helvetica", "normal");
   y += 40;
+
+  const sectionHeadStyles = {
+    fontStyle: "bold" as const,
+    fillColor: HEADER_BAND,
+    textColor: [255, 255, 255] as [number, number, number],
+    lineWidth: 0,
+  };
+  const bodyStyles = { fontSize: 10, cellPadding: 5, textColor: INK, lineColor: LINE, lineWidth: 0.4 };
+  const alternateRowStyles = { fillColor: PAPER };
 
   // --- Rates applied ---
   autoTable(doc, {
@@ -86,8 +115,9 @@ export function downloadTaxSummaryPdf(business: Business, calculation: QpdCalcul
       ["AIDS levy (on tax payable)", percent(aidsLevyRate)],
     ],
     theme: "plain",
-    styles: { fontSize: 10, cellPadding: 5 },
-    headStyles: { fontStyle: "bold", lineWidth: { bottom: 1 }, lineColor: 0 },
+    styles: bodyStyles,
+    headStyles: sectionHeadStyles,
+    alternateRowStyles,
     columnStyles: { 1: { halign: "right" } },
     didDrawPage: (data) => {
       y = data.cursor?.y ?? y;
@@ -110,9 +140,10 @@ export function downloadTaxSummaryPdf(business: Business, calculation: QpdCalcul
     ],
     foot: [["Total tax due", money(r.total_tax_usd, IS_USD), money(r.total_tax_zig, IS_ZIG)]],
     theme: "plain",
-    styles: { fontSize: 10, cellPadding: 5 },
-    headStyles: { fontStyle: "bold", lineWidth: { bottom: 1 }, lineColor: 0 },
-    footStyles: { fontStyle: "bold", textColor: 0, lineWidth: { top: 1 }, lineColor: 0, fillColor: false },
+    styles: bodyStyles,
+    headStyles: sectionHeadStyles,
+    alternateRowStyles,
+    footStyles: { fontStyle: "bold", textColor: INK, lineWidth: { top: 0.6 }, lineColor: SEAL, fillColor: GOLD_FILL },
     columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
   });
   // @ts-expect-error - jspdf-autotable attaches this at runtime
@@ -139,8 +170,9 @@ export function downloadTaxSummaryPdf(business: Business, calculation: QpdCalcul
     head: [["QPD schedule", "Due date", "%", "USD", "ZiG", "Balance"]],
     body: scheduleRows,
     theme: "plain",
-    styles: { fontSize: 10, cellPadding: 5 },
-    headStyles: { fontStyle: "bold", lineWidth: { bottom: 1 }, lineColor: 0 },
+    styles: bodyStyles,
+    headStyles: sectionHeadStyles,
+    alternateRowStyles,
     columnStyles: {
       2: { halign: "right" },
       3: { halign: "right" },
@@ -152,8 +184,11 @@ export function downloadTaxSummaryPdf(business: Business, calculation: QpdCalcul
   y = doc.lastAutoTable.finalY + 30;
 
   // --- Disclaimer ---
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.6);
+  doc.line(marginX, y - 14, pageWidth - marginX, y - 14);
   doc.setFontSize(8);
-  doc.setTextColor(120);
+  doc.setTextColor(...INK_SOFT);
   const disclaimer =
     "Twelve C is an independent calculator and is not affiliated with the Zimbabwe Revenue Authority. " +
     "This summary is generated from figures entered by the business owner and is provided for planning " +

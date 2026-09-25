@@ -29,6 +29,7 @@ class QuarterBreakdownOut(BaseModel):
     net_due_zig: float | None
     actual_usd_paid: float | None
     actual_zig_paid: float | None
+    payment_confirmed_at: datetime | None
 
     model_config = {"from_attributes": True}
 
@@ -61,4 +62,5 @@ class BusinessComplianceOut(BaseModel):
 
     latest_calculated_quarter: int | None
     quarters_missing: list[int]
+    quarters_unconfirmed: list[int]
     quarters: list[QuarterBreakdownOut]

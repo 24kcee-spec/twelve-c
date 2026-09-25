@@ -53,6 +53,17 @@ class QpdCalculation(Base):
     actual_usd_paid: Mapped[float | None] = mapped_column(Float, nullable=True)
     actual_zig_paid: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # NULL until confirm_actual_payment() is called - this is the ONLY
+    # reliable signal that actual_usd_paid/actual_zig_paid reflect what the
+    # person genuinely told us they remitted, rather than the seeded
+    # net_payable default create_calculation() writes at creation time.
+    # Do not infer "confirmed" from actual_usd_paid/actual_zig_paid being
+    # non-null - they are ALWAYS non-null after creation (seeded), so that
+    # alone can't distinguish the two states. This field is what can.
+    payment_confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     business: Mapped["Business"] = relationship(back_populates="calculations")  # noqa: F821

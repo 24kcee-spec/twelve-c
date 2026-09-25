@@ -61,6 +61,7 @@ def _build_quarter_export_data(
                 result=record.result_json,
                 actual_usd_paid=record.actual_usd_paid,
                 actual_zig_paid=record.actual_zig_paid,
+                payment_confirmed_at=record.payment_confirmed_at,
             )
         )
     return quarters

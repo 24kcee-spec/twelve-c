@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -197,6 +197,7 @@ async def confirm_actual_payment(
     """
     record.actual_usd_paid = data.actual_usd_paid
     record.actual_zig_paid = data.actual_zig_paid
+    record.payment_confirmed_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(record)
     return record
@@ -240,15 +241,19 @@ class QuarterBreakdownRow:
     net_due_usd: float | None
     net_due_zig: float | None
 
-    # What's recorded against this quarter as actually remitted. NOTE: this
-    # is whatever confirm_actual_payment() last set, OR the seeded
-    # net-payable default if the person never confirmed it (see
-    # QpdCalculation.actual_usd_paid docstring) - there is no field yet that
-    # distinguishes "genuinely confirmed" from "still just the seeded
-    # assumption." Treat these as provisional until a confirmation-date
-    # field exists (flagged in HANDOVER.md Step 2/6).
+    # What's recorded against this quarter as actually remitted. This is
+    # whatever confirm_actual_payment() last set, OR the seeded net-payable
+    # default if the person never confirmed it - check payment_confirmed_at
+    # below (None means still just the seeded assumption, not a genuine
+    # confirmation) before treating these figures as real.
     actual_usd_paid: float | None
     actual_zig_paid: float | None
+
+    # None = never confirmed (actual_*_paid above is still just the seeded
+    # net_payable assumption from calculation time). Non-None = the person
+    # explicitly confirmed this figure via confirm_actual_payment() at this
+    # timestamp - only then should a reconciliation view treat it as real.
+    payment_confirmed_at: datetime | None
 
 
 @dataclasses.dataclass
@@ -257,16 +262,25 @@ class TaxYearBreakdown:
     tax_year: int
     quarters: list[QuarterBreakdownRow]  # always exactly 4 rows, Q1..Q4 in order
 
-    # Sum of actual_usd_paid/actual_zig_paid across every quarter that HAS a
-    # calculation this tax year (missing quarters contribute nothing - they
-    # are not assumed to be zero-liability, just not yet calculated). This
-    # is the figure step 3 should feed into assess_accuracy_dual() as
-    # total_remitted, alongside the same "provisional until confirmed"
-    # caveat as the per-row fields above.
+    # Sum of actual_usd_paid/actual_zig_paid across every quarter that has
+    # been GENUINELY CONFIRMED via confirm_actual_payment() this tax year
+    # (payment_confirmed_at is not None). A calculated-but-unconfirmed
+    # quarter contributes nothing here - same reasoning as
+    # _sum_actual_paid_before_quarter's cross-year carry-forward: silently
+    # counting the seeded net_payable assumption as "remitted" would let a
+    # skipped confirmation understate what's actually still owed. This is
+    # the figure fed into assess_accuracy_dual() as total_remitted.
     total_remitted_usd: float
     total_remitted_zig: float
 
     quarters_missing: list[int]  # e.g. [3, 4] if only Q1/Q2 have been run
+
+    # Calculated but never confirmed via confirm_actual_payment() - distinct
+    # from quarters_missing (never calculated at all). A reconciliation view
+    # should flag these separately: "N unconfirmed prior quarter(s) -
+    # total_remitted may understate what's actually been paid."
+    quarters_unconfirmed: list[int]
+
     latest_calculated_quarter: int | None  # highest quarter number with a calculation
 
 
@@ -292,6 +306,7 @@ def _row_from_calculation(record: QpdCalculation | None, quarter: int) -> Quarte
             net_due_zig=None,
             actual_usd_paid=None,
             actual_zig_paid=None,
+            payment_confirmed_at=None,
         )
 
     result = record.result_json
@@ -319,6 +334,7 @@ def _row_from_calculation(record: QpdCalculation | None, quarter: int) -> Quarte
         net_due_zig=result.get("net_payable_zig"),
         actual_usd_paid=record.actual_usd_paid,
         actual_zig_paid=record.actual_zig_paid,
+        payment_confirmed_at=record.payment_confirmed_at,
     )
 
 
@@ -372,13 +388,20 @@ async def get_tax_year_breakdown(
     rows = [_row_from_calculation(latest_by_quarter.get(q), q) for q in (1, 2, 3, 4)]
 
     total_remitted_usd = sum(
-        r.actual_usd_paid for r in rows if r.has_calculation and r.actual_usd_paid is not None
+        r.actual_usd_paid
+        for r in rows
+        if r.payment_confirmed_at is not None and r.actual_usd_paid is not None
     )
     total_remitted_zig = sum(
-        r.actual_zig_paid for r in rows if r.has_calculation and r.actual_zig_paid is not None
+        r.actual_zig_paid
+        for r in rows
+        if r.payment_confirmed_at is not None and r.actual_zig_paid is not None
     )
 
     quarters_missing = [r.quarter for r in rows if not r.has_calculation]
+    quarters_unconfirmed = [
+        r.quarter for r in rows if r.has_calculation and r.payment_confirmed_at is None
+    ]
     calculated_quarters = [r.quarter for r in rows if r.has_calculation]
     latest_calculated_quarter = max(calculated_quarters) if calculated_quarters else None
 
@@ -389,5 +412,6 @@ async def get_tax_year_breakdown(
         total_remitted_usd=float(total_remitted_usd),
         total_remitted_zig=float(total_remitted_zig),
         quarters_missing=quarters_missing,
+        quarters_unconfirmed=quarters_unconfirmed,
         latest_calculated_quarter=latest_calculated_quarter,
     )

@@ -104,6 +104,7 @@ class QpdCalculationOut(BaseModel):
     result_json: dict
     actual_usd_paid: float | None
     actual_zig_paid: float | None
+    payment_confirmed_at: datetime | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

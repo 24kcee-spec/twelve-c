@@ -60,6 +60,7 @@ async def get_business_compliance(
             "net_due_zig": q.net_due_zig,
             "actual_usd_paid": q.actual_usd_paid,
             "actual_zig_paid": q.actual_zig_paid,
+            "payment_confirmed_at": q.payment_confirmed_at,
         }
         for q in breakdown.quarters
     ]
@@ -74,6 +75,7 @@ async def get_business_compliance(
             zig=None,
             latest_calculated_quarter=None,
             quarters_missing=breakdown.quarters_missing,
+            quarters_unconfirmed=breakdown.quarters_unconfirmed,
             quarters=quarters_out,
         )
 
@@ -100,5 +102,6 @@ async def get_business_compliance(
         zig=dual_check.zig,
         latest_calculated_quarter=breakdown.latest_calculated_quarter,
         quarters_missing=breakdown.quarters_missing,
+        quarters_unconfirmed=breakdown.quarters_unconfirmed,
         quarters=quarters_out,
     )

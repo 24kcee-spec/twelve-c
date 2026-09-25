@@ -91,6 +91,11 @@ class QuarterExportData:
     result: dict = field(default_factory=dict)
     actual_usd_paid: float | None = None
     actual_zig_paid: float | None = None
+    # None = actual_*_paid above is still just the seeded net_payable
+    # assumption, never confirmed via confirm_actual_payment(). Not yet
+    # rendered differently in the workbook/PDF - available for a future
+    # "provisional" label on these figures.
+    payment_confirmed_at: datetime | None = None
 
 
 def _set(ws: Worksheet, cell: str, value, font=_FONT_VALUE, fmt: str | None = None, fill=None, align=None):
