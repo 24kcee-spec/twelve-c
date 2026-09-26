@@ -154,3 +154,53 @@ This is a different regulatory system from Twelve C's QPD engine:
 Both systems independently enforce no-cross-currency-netting — that's a
 genuine ZIMRA-wide pattern, not a coincidence, and worth keeping consistent
 in how both phases present it to the user.
+
+
+## 13. Signature generation (device + FDMS, receipt + fiscal day)
+
+Full detail and worked examples: spec PDF pages 71-77. Implementation:
+`fiscal_core/canonicalise.py`. Algorithm (13.1): concatenate fields as
+strings (no separator) → SHA-256 → sign the hash (RSA or ECC per device
+key type). canonicalise.py stops at the concatenated string; hashing and
+signing is crypto.py's job (Phase 2).
+
+**Shared formatting rules** used everywhere a percent or an amount appears
+in a signing string:
+- Amounts (`receiptTotal`, `taxAmount`, `salesAmountWithTax`,
+  `fiscalCounterValue`) are in **cents**, sign preserved, no decimal point.
+- A tax/counter percent: absent/exempt → empty string; otherwise always
+  exactly 2 decimal places (`15` → `"15.00"`, `14.5` → `"14.50"`).
+- `receiptType`/`receiptCurrency`/counter names are upper-cased.
+- Dates: `YYYY-MM-DDTHH:mm:ss` (receipt-level, local time) or `YYYY-MM-DD`
+  (fiscal-day-level).
+
+**Receipt device signature (13.2.1)**: `deviceID || receiptType ||
+receiptCurrency || receiptGlobalNo || receiptDate || receiptTotal(cents) ||
+receiptTaxes || previousReceiptHash`. `receiptTaxes` = each tax line's
+`taxCode || taxPercent || taxAmount || salesAmountWithTax`, concatenated
+after sorting by taxID ascending then taxCode alphabetically (empty code
+sorts first). `previousReceiptHash` is **omitted entirely** for the first
+receipt of a fiscal day.
+
+**Receipt FDMS signature (13.2.2)**: `receiptDeviceSignature || receiptID
+|| serverDate`. Only generated for "Online" mode receipts.
+
+**Fiscal day device signature (13.3.1)**: `deviceID || fiscalDayNo ||
+fiscalDayDate || fiscalDayCounters`. `fiscalDayCounters` = each non-zero
+counter's `counterType || currency || (taxPercent or moneyType) ||
+value(cents)`, concatenated. **Open item**: the ordering ACROSS different
+counter types (e.g. SaleByTax vs BalanceByMoneyType) is not confirmed —
+see `decisions.md` 2026-09-26 (session 4). Ordering WITHIN one type
+(currency, then percent/moneytype) is confirmed.
+
+**Fiscal day FDMS signature (13.3.2)**: `deviceID || fiscalDayNo ||
+fiscalDayDate || fiscalDayUpdated || reconciliationMode || fiscalDayCounters
+|| fiscalDayDeviceSignature`. The trailing device signature is **omitted**
+when `reconciliationMode` is `MANUAL` (included for `AUTO`).
+
+**QR code (Section 11)**: `qrUrl + deviceID(10, zero-padded) +
+receiptDate(ddMMyyyy) + receiptGlobalNo(10, zero-padded) +
+receiptQrData(first 16 hex chars of MD5 of the device signature)`.
+Note this uses **different** field widths/padding than the signing
+strings above (e.g. deviceID zero-padded to 10 digits here, but bare in
+the signing string) — don't reuse one formatter for both.

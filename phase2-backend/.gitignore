@@ -1,8 +1,11 @@
+# Local Python environment
 .env
 .env.local
 *.env
 __pycache__/
+**/__pycache__/
 *.pyc
+*.pyo
 .pytest_cache/
 venv/
 .venv/
@@ -11,3 +14,6 @@ venv/
 .idea/
 *.bak
 *.bak-*
+
+# Generated outputs
+*.log
