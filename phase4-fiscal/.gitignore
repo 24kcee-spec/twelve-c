@@ -1,0 +1,8 @@
+# phase4-fiscal scratch state — never commit these
+_backups/
+_logs/
+.pytest_cache/
+venv/
+__pycache__/
+*.egg-info/
+*.pyc

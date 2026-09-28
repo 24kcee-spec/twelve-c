@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fiscal-core"
+version = "0.1.0"
+description = "Twelve C Phase 4 — ZIMRA FDMS fiscalisation core engine"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# V3 fix (26 Sep 2026): scope collection to tests/ only. Without this,
+# pytest's default rootdir-recursive discovery also picks up every
+# test_*.py copy sitting inside _backups/<timestamp>/ (created by the
+# delivery script's own Backup-IfExists step) and fails collection with
+# "import file mismatch" once more than one backup exists — this is what
+# actually caused the "12 errors" / "0 passed" gate failure, not a real
+# bug in money.py or canonicalise.py. testpaths + norecursedirs is
+# belt-and-braces with the --ignore flags Invoke-PhaseGate now also
+# passes explicitly.
+testpaths = ["tests"]
+norecursedirs = ["_backups", "_logs", ".pytest_cache", "venv", "*.egg-info"]
