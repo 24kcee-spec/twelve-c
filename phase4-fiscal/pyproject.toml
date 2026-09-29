@@ -7,7 +7,7 @@ name = "fiscal-core"
 version = "0.1.0"
 description = "Twelve C Phase 4 — ZIMRA FDMS fiscalisation core engine"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["cryptography>=42"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
