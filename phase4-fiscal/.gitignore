@@ -1,8 +1,31 @@
-# phase4-fiscal scratch state — never commit these
+# phase4-fiscal scratch state - never commit these
 _backups/
 _logs/
 .pytest_cache/
 venv/
+.venv/
 __pycache__/
 *.egg-info/
 *.pyc
+
+# Secrets: certificates, private keys, keystores, env files (security.md launch-blocker)
+*.pem
+*.key
+*.csr
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
+keystore/
+.env
+.env.*
+*.sqlite
+*.sqlite3
+*.db
+
+# Only ZIMRA's published spec sample keys (illustration only, never real) may be committed
+!tests/fixtures/spec_examples/
+!tests/fixtures/spec_examples/**
