@@ -19,10 +19,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "fiscal_core"
 ALLOWED_FIXTURES = pathlib.Path("tests") / "fixtures" / "spec_examples"
 SKIP_DIRS = {"venv", ".venv", "_backups", "_logs", ".pytest_cache", "__pycache__", ".git"}
-SECRET_SUFFIXES = {".pem", ".key", ".csr", ".crt", ".cer", ".p12", ".pfx", ".jks", ".keystore"}
+SECRET_SUFFIXES = {".pem", ".key", ".csr", ".crt", ".cer", ".p12", ".pfx", ".jks", ".keystore", ".fkey"}
 REQUIRED_IGNORES = [
     "*.pem", "*.key", "*.csr", "*.crt", "*.cer", "*.p12", "*.pfx", "*.jks",
-    "*.keystore", "secrets/", "keystore/", ".env", ".env.*", "*.sqlite", "*.db",
+    "*.keystore", "*.fkey", "secrets/", "keystore/", ".env", ".env.*", "*.sqlite", "*.db",
     "venv/", "_backups/", "_logs/",
 ]
 

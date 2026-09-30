@@ -29,3 +29,7 @@ keystore/
 # Only ZIMRA's published spec sample keys (illustration only, never real) may be committed
 !tests/fixtures/spec_examples/
 !tests/fixtures/spec_examples/**
+
+# P3: encrypted device-key files and their temp files
+*.fkey
+*.tmp
