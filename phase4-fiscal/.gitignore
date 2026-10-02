@@ -33,3 +33,9 @@ keystore/
 # P3: encrypted device-key files and their temp files
 *.fkey
 *.tmp
+
+# P5: SQLite WAL/SHM sidecar files of the fiscal ledger
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
