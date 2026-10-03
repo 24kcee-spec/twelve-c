@@ -239,7 +239,7 @@ COUNTER_TYPE_ORDER = {
     "BALANCEBYMONEYTYPE": 6,
 }
 # Spec Section 5.4.5 "Enum order" column.
-MONEY_TYPE_ORDER = {"CASH": 0, "CARD": 1, "MOBILEWALLET": 2}
+MONEY_TYPE_ORDER = {"CASH": 0, "CARD": 1, "MOBILEWALLET": 2, "COUPON": 3, "CREDIT": 4, "BANKTRANSFER": 5, "OTHER": 6}
 
 
 def _counter_type_rank(counter_type: str) -> int:
