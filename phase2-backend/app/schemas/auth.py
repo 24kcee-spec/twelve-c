@@ -37,6 +37,7 @@ class UserOut(BaseModel):
     is_verified: bool
     mfa_enabled: bool
     has_password: bool
+    is_study_guest: bool = False
 
     model_config = {"from_attributes": True}
 
