@@ -58,9 +58,9 @@ export function clearStudyState(): void {
 
 export function createLocalId(prefix: string): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return \`\${prefix}-\${crypto.randomUUID()}\`;
+    return `${prefix}-${crypto.randomUUID()}`;
   }
-  return \`\${prefix}-\${Date.now()}-\${Math.random().toString(36).slice(2, 10)}\`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function sumConfirmedPriorPayments(
