@@ -16,6 +16,8 @@ function isMfaRequired(
 interface AuthContextType {
   user: UserOut | null;
   loading: boolean;
+  studyError: string | null;
+  startStudySession: () => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<{ mfaRequired: boolean }>;
   loginWithGoogle: (idToken: string) => Promise<{ mfaRequired: boolean }>;
@@ -29,6 +31,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserOut | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [studyError, setStudyError] = useState<string | null>(null);
   const pathname = usePathname();
 
   const refreshUser = useCallback(async () => {
@@ -40,28 +43,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  useEffect(() => {
-    // Study mode is deliberately anonymous and browser-only. Do not send
-    // the refresh cookie, request /auth/me, or retain an in-memory account
-    // token while this route is active.
-    if (pathname === "/study" || pathname.startsWith("/study/")) {
+  const startStudySession = useCallback(async () => {
+    setLoading(true);
+    setStudyError(null);
+    try {
+      const tokens = await api.createStudySession();
+      setAccessToken(tokens.access_token);
+      const me = await api.me();
+      if (!me.is_study_guest) {
+        throw new Error("The API did not return an anonymous research session.");
+      }
+      setUser(me);
+    } catch {
       setAccessToken(null);
       setUser(null);
+      setStudyError("Twelve C could not start the research session. Check the API connection and try again.");
+    } finally {
       setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const isStudyEntry = pathname === "/study" || pathname?.startsWith("/study/");
+
+    if (isStudyEntry) {
+      // A separate httpOnly cookie keeps the temporary study session
+      // independent from any normal account already signed in in this browser.
+      setAccessToken(null);
+      setUser(null);
+      void startStudySession();
       return;
     }
 
     let cancelled = false;
     (async () => {
       setLoading(true);
-      // The access token lives only in memory, so on a fresh page load we
-      // don't have one yet - try to mint one off the httpOnly refresh
-      // cookie before deciding whether the user is logged in.
+      setStudyError(null);
       try {
-        const tokens = await api.refresh();
+        // Resume an anonymous research session first when one exists. This
+        // endpoint returns 401 for ordinary visitors and never creates a guest.
+        let tokens: AccessTokenResponse;
+        try {
+          tokens = await api.refreshStudySession();
+        } catch {
+          tokens = await api.refresh();
+        }
+
         if (cancelled) return;
         setAccessToken(tokens.access_token);
-        await refreshUser();
+        const me = await api.me();
+        if (!cancelled) setUser(me);
       } catch {
         if (cancelled) return;
         setAccessToken(null);
@@ -73,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       cancelled = true;
     };
-  }, [refreshUser, pathname]);
+  }, [pathname, startStudySession]);
 
   const register = async (email: string, password: string) => {
     await api.register(email, password);
@@ -110,13 +141,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await api.logout();
+    if (user?.is_study_guest) {
+      await api.logoutStudySession();
+    } else {
+      await api.logout();
+    }
+    setAccessToken(null);
     setUser(null);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, register, login, loginWithGoogle, completeMfaLogin, logout, refreshUser }}
+      value={{
+        user,
+        loading,
+        studyError,
+        startStudySession,
+        register,
+        login,
+        loginWithGoogle,
+        completeMfaLogin,
+        logout,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>
