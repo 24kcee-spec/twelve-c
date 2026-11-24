@@ -74,4 +74,4 @@ class User(Base):
     @property
     def is_study_guest(self) -> bool:
         """True only for temporary anonymous research-session identities."""
-        return self.email.endswith("@guest.twelvec.invalid")
+        return bool(self.google_id and self.google_id.startswith("twelvec-study-guest:"))
