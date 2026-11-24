@@ -69,48 +69,39 @@ per the original blueprint — nothing in this frontend needs to change for
 that, since both just point a webview at the built Next.js app.
 
 
-## Browser-only research study mode
 
-The `/study` route is for approved usability-study sessions. It keeps the
-normal registration/login product intact but does not require a participant
-account. It is deliberately not wrapped in `AuthGuard`, and `AuthProvider`
-skips its refresh-cookie and `/auth/me` requests while this route is active.
+## Anonymous research study access
 
-- The calculator runs the same Python `calculator.py` and `tax_rules.py`
-  from `phase2-backend/engine/zimra_qpd` inside the participant's browser
-  using a version-pinned Pyodide runtime.
-- The `predev` and `prebuild` scripts copy those source files into
-  `public/study-engine` and create a SHA-256 manifest. The manifest shows
-  both engine hashes and the Vercel/Git commit used for that build.
-- The fictional business, calculation history and explicitly confirmed
-  payment records are stored in this browser's `localStorage` only. The
-  study route does not call the account, business, calculation or export API.
-  The Clear demo data control removes the study data from this browser.
-- PDF working papers use the existing client-side PDF generator. Excel
-  working papers are assembled and downloaded in the browser. Neither export
-  is uploaded.
-- The study build does not add analytics or tracking SDKs. The first
-  calculation downloads the version-pinned Pyodide runtime and static engine
-  source; participant-entered values are not sent to that CDN.
+The temporary `/study` entry point starts an anonymous server-side session and
+opens the **same Twelve C application** used by registered users. Participants
+do not register, enter an email address, or set a password.
 
-### Locking the study build
+- The API issues a revocable, HTTP-only research-session cookie and an access
+  token for an internal guest identity. This is not a participant account and
+  cannot be used to sign in through the normal login form.
+- The normal dashboard, business profile, QPD calculation engine, calculation
+  history, payment confirmation, capital asset register, monthly income,
+  compliance view, PDF export and Excel export are used without a separate
+  study implementation.
+- All participant actions use the existing authenticated API routes. Business
+  profiles, calculations, payments, assets and monthly-income records are saved
+  in the existing database and scoped to that anonymous research identity.
+- Research sessions use a separate cookie from normal accounts. Starting or
+  ending a study session does not overwrite a normal account's refresh cookie.
+  A normal sign-in clears the research-session cookie.
+- The interface labels the session and tells participants that entries are
+  saved through the Twelve C API. Participants should use only fictional
+  information supplied by the researcher.
+- Starting a session is rate-limited. Ending it revokes the research refresh
+  token; saved records remain in the database for the researcher's analysis
+  and retention process.
 
-Set `NEXT_PUBLIC_STUDY_EXCHANGE_RATE` to the exact independently approved
-rate used in the sealed usability task sheet before building. This variable
-is mandatory: study mode remains unavailable until the value is configured.
-Set the same environment variable in the Vercel project before deployment. Do not change it after the first sealed
-session. Any change to the engine, tax rules, exchange rate or study UI
-requires a new frozen commit and the relevant sealed tests to be rerun.
+To start a participant session, open `/study`. The frontend creates or resumes
+the anonymous session and redirects to the ordinary `/dashboard`. No study-
+specific environment variable, client-side tax engine, local-only storage, or
+alternate export implementation is required.
 
-Example local setup (run from `phase3-frontend`):
-
-```powershell
-$env:NEXT_PUBLIC_STUDY_EXCHANGE_RATE = "YOUR_APPROVED_TASK_5_RATE"
-npm install
-npm run build
-npm run dev
-```
-
-Study mode is a research interface, not an alternative account or data-sync
-mechanism. A participant's local records do not follow them to another device
-or browser profile.
+This is temporary research access. Remove the `/study` entry point and the
+three `/auth/study-*` API routes after the study, and then clean up guest
+identities and associated records in accordance with the approved data
+retention plan.
