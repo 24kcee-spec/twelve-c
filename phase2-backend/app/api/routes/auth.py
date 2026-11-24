@@ -199,8 +199,9 @@ async def create_study_session(
         _clear_study_refresh_cookie(response)
 
     guest = User(
-        email=f"study-{uuid.uuid4().hex}@guest.twelvec.invalid",
+        email=f"study-{uuid.uuid4().hex}@example.com",
         hashed_password=None,
+        google_id=f"twelvec-study-guest:{uuid.uuid4().hex}",
         is_active=True,
         is_verified=True,
     )
