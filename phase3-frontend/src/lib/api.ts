@@ -27,9 +27,14 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://twelve-c.onrender.c
 // hard page refresh by itself - AuthProvider calls /auth/refresh on mount
 // (which succeeds off the cookie) to get a fresh one silently.
 let accessToken: string | null = null;
+let studySessionMode = false;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+}
+
+export function setStudySessionMode(active: boolean) {
+  studySessionMode = active;
 }
 
 export function hasAccessToken(): boolean {
@@ -43,10 +48,8 @@ let refreshInFlight: Promise<AccessTokenResponse | null> | null = null;
 
 async function tryRefresh(): Promise<AccessTokenResponse | null> {
   if (!refreshInFlight) {
-    refreshInFlight = rawRequest<AccessTokenResponse>("/auth/study-refresh", { method: "POST" }, true)
-      .catch(() =>
-        rawRequest<AccessTokenResponse>("/auth/refresh", { method: "POST" }, true)
-      )
+    const refreshPath = studySessionMode ? "/auth/study-refresh" : "/auth/refresh";
+    refreshInFlight = rawRequest<AccessTokenResponse>(refreshPath, { method: "POST" }, true)
       .then((tokens) => {
         setAccessToken(tokens.access_token);
         return tokens;
