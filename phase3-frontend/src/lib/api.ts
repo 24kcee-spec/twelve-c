@@ -43,7 +43,10 @@ let refreshInFlight: Promise<AccessTokenResponse | null> | null = null;
 
 async function tryRefresh(): Promise<AccessTokenResponse | null> {
   if (!refreshInFlight) {
-    refreshInFlight = rawRequest<AccessTokenResponse>("/auth/refresh", { method: "POST" }, true)
+    refreshInFlight = rawRequest<AccessTokenResponse>("/auth/study-refresh", { method: "POST" }, true)
+      .catch(() =>
+        rawRequest<AccessTokenResponse>("/auth/refresh", { method: "POST" }, true)
+      )
       .then((tokens) => {
         setAccessToken(tokens.access_token);
         return tokens;
@@ -207,8 +210,14 @@ export const api = {
   refreshStudySession: () =>
     rawRequest<AccessTokenResponse>("/auth/study-refresh", { method: "POST" }, true),
 
-  logoutStudySession: () =>
-    rawRequest<void>("/auth/study-logout", { method: "POST" }, true),
+  logoutStudySession: async () => {
+    try {
+      await rawRequest<void>("/auth/study-logout", { method: "POST" }, true);
+    } catch {
+      // Best-effort - clear the in-memory guest token even if the API is offline.
+    }
+    setAccessToken(null);
+  },
 
   logout: async () => {
     try {
