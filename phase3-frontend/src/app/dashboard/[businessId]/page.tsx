@@ -102,19 +102,25 @@ function BusinessContent({ businessId }: { businessId: string }) {
     }
   }
 
-  // Confirms what was ACTUALLY remitted to ZIMRA for the selected
-  // calculation's own quarter (see PaymentTracker.tsx) - this is the field
-  // every LATER quarter's calculation nets its cumulative amount against,
-  // so this must call confirm-payment, not the old flat-schedule payments
-  // endpoint.
-  async function onConfirmPayment(actualUsdPaid: number, actualZigPaid: number) {
-    if (!selected) return;
-    const updated = await api.confirmActualPayment(businessId, selected.id, {
+  // Confirms what was ACTUALLY remitted to ZIMRA for a given calculation -
+  // shared by both the Overview inline PaymentTracker and ReconciliationPanel
+  // so both views stay in sync immediately and later quarters net against it.
+  async function onConfirmPaymentForCalc(
+    calcId: string,
+    actualUsdPaid: number,
+    actualZigPaid: number
+  ) {
+    const updated = await api.confirmActualPayment(businessId, calcId, {
       actual_usd_paid: actualUsdPaid,
       actual_zig_paid: actualZigPaid,
     });
-    setSelected(updated);
+    setSelected((curr) => (curr?.id === updated.id ? updated : curr));
     setCalculations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+  }
+
+  async function onConfirmPayment(actualUsdPaid: number, actualZigPaid: number) {
+    if (!selected) return;
+    await onConfirmPaymentForCalc(selected.id, actualUsdPaid, actualZigPaid);
   }
 
   if (!business) {
@@ -248,6 +254,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
                   taxYear={selected.tax_year}
                   actualUsdPaid={selected.actual_usd_paid}
                   actualZigPaid={selected.actual_zig_paid}
+                  paymentConfirmedAt={selected.payment_confirmed_at}
                   paymentsSlot={
                     <PaymentTracker key={selected.id} calculation={selected} onSubmit={onConfirmPayment} />
                   }
@@ -257,7 +264,12 @@ function BusinessContent({ businessId }: { businessId: string }) {
 
             {tab === "reconciliation" && (
               <div className="mt-6">
-                <ReconciliationPanel businessId={businessId} taxYear={selected.tax_year} />
+                <ReconciliationPanel
+                  businessId={businessId}
+                  taxYear={selected.tax_year}
+                  calculations={calculations}
+                  onConfirmPayment={onConfirmPaymentForCalc}
+                />
               </div>
             )}
 

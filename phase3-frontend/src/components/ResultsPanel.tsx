@@ -7,7 +7,7 @@ import { Disclosure } from "@/components/ui";
 import { money, percent } from "@/lib/format";
 import { useCountUp } from "@/lib/useCountUp";
 import { QpdResultJson } from "@/lib/types";
-import { QUARTER_DATES, startOfDay } from "@/lib/qpdStatus";
+import { getConfirmedPaidAmounts, QUARTER_DATES, startOfDay } from "@/lib/qpdStatus";
 
 const DATES = ["25 Mar", "25 Jun", "25 Sep", "20 Dec"];
 
@@ -42,12 +42,16 @@ function Row({
         strong ? "border-y-2 border-ink" : "border-b border-line"
       }`}
     >
-      <span className={muted ? "text-ink-faint" : strong ? "font-semibold text-ink" : "text-ink-soft"}>
+      <span className={`pr-2 ${muted ? "text-ink-faint" : strong ? "font-semibold text-ink" : "text-ink-soft"}`}>
         {label}
       </span>
-      <div className="flex gap-6 font-mono tabular-nums">
-        <span className={`w-24 text-right text-brass ${strong ? "font-semibold" : ""}`}>{money(usdAnim, "USD")}</span>
-        <span className={`w-28 text-right text-zig ${strong ? "font-semibold" : ""}`}>{money(zigAnim, "ZIG")}</span>
+      <div className="flex shrink-0 gap-3 font-mono tabular-nums sm:gap-6">
+        <span className={`w-20 whitespace-nowrap text-right text-brass sm:w-24 ${strong ? "font-semibold" : ""}`}>
+          {money(usdAnim, "USD")}
+        </span>
+        <span className={`w-32 whitespace-nowrap text-right text-zig sm:w-36 ${strong ? "font-semibold" : ""}`}>
+          {money(zigAnim, "ZIG")}
+        </span>
       </div>
     </div>
   );
@@ -82,28 +86,23 @@ function StatusIcon({ kind }: { kind: "check" | "ring" }) {
   return <span className="inline-block h-3 w-3 rounded-full border border-ink/30" />;
 }
 
-type PaneId = "breakdown" | "split" | "schedule" | "payments";
+type PaneId = "breakdown" | "split" | "schedule";
 
 export function ResultsPanel({
   result,
   taxYear,
   actualUsdPaid,
   actualZigPaid,
+  paymentConfirmedAt,
   paymentsSlot,
 }: {
   result: QpdResultJson;
   taxYear: number;
-  /** What's actually been confirmed as remitted for THIS calculation's own
-   *  quarter (QpdCalculationOut.actual_usd_paid/actual_zig_paid) - falls
-   *  back to net_payable (i.e. "assume paid until told otherwise", the
-   *  same convention the backend uses) when not supplied. Used ONLY to
-   *  status the one schedule row that matches result.quarter; every other
-   *  row is a projection and is never given a paid/overdue verdict. */
   actualUsdPaid?: number | null;
   actualZigPaid?: number | null;
-  /** Rendered inside the "Payments" pane - owned by the parent since
-   *  saving payments needs page-level state (the calculation record, the
-   *  API call). */
+  paymentConfirmedAt?: string | null;
+  /** Rendered inline right beneath the net-payable header so users can
+   *  immediately write down what they actually paid for this quarter. */
   paymentsSlot?: ReactNode;
 }) {
   const [pane, setPane] = useState<PaneId>("breakdown");
@@ -115,11 +114,15 @@ export function ResultsPanel({
   const currentQuarterIdx = result.quarter - 1;
   const currentMeta = QUARTER_DATES[currentQuarterIdx];
   const currentDueDate = new Date(taxYear, currentMeta.month, currentMeta.day);
-  const paidUsd = actualUsdPaid ?? result.net_payable_usd;
-  const paidZig = actualZigPaid ?? result.net_payable_zig;
+  const { usd: paidUsd, zig: paidZig, confirmed } = getConfirmedPaidAmounts({
+    actual_usd_paid: actualUsdPaid ?? null,
+    actual_zig_paid: actualZigPaid ?? null,
+    payment_confirmed_at: paymentConfirmedAt ?? null,
+  });
   const currentBalanceUsd = Math.max(0, result.net_payable_usd - paidUsd);
   const currentBalanceZig = Math.max(0, result.net_payable_zig - paidZig);
-  const currentPaid = currentBalanceUsd <= 0.01 && currentBalanceZig <= 0.01;
+  const noTaxDue = result.net_payable_usd <= 0.01 && result.net_payable_zig <= 0.01;
+  const currentPaid = noTaxDue || (confirmed && currentBalanceUsd <= 0.01 && currentBalanceZig <= 0.01);
   const currentOverdue = !currentPaid && currentDueDate < today;
 
   let currentStatus: ScheduleRowStatus = "upcoming";
@@ -162,24 +165,42 @@ export function ResultsPanel({
     { id: "breakdown", code: "W1", label: "Breakdown" },
     { id: "split", code: "W2", label: "Currency split" },
     { id: "schedule", code: "W3", label: "Schedule" },
-    ...(paymentsSlot ? [{ id: "payments" as PaneId, code: "W4", label: "Payments" }] : []),
   ];
 
   return (
     <div className="border border-ink/15 bg-surface">
-      {/* Stat header - the "net payable" figures, plus a real progress bar
-          under Cumulative instead of a bare number. */}
+      {/* Stat header - the "net payable" figures, plus confirmed paid status */}
       <div className="grid grid-cols-2 divide-x divide-line border-b border-ink/15 sm:grid-cols-3">
         <div className="px-4 py-3 sm:px-5 sm:py-4">
           <div className="text-xs text-ink-faint">Net payable, USD</div>
           <div className="mt-1 font-display text-2xl font-medium tabular-nums text-brass">
             {money(result.net_payable_usd, "USD")}
           </div>
+          <div className="mt-1 font-mono text-[11px] tabular-nums text-ink-faint">
+            Paid: {money(paidUsd, "USD")}
+            {!confirmed ? (
+              <span className="text-danger"> &middot; unpaid</span>
+            ) : currentBalanceUsd > 0.005 ? (
+              <span className="text-danger"> &middot; {money(currentBalanceUsd, "USD")} owing</span>
+            ) : (
+              <span className="text-seal"> &middot; settled</span>
+            )}
+          </div>
         </div>
         <div className="px-4 py-3 sm:px-5 sm:py-4">
           <div className="text-xs text-ink-faint">Net payable, ZiG</div>
           <div className="mt-1 font-display text-2xl font-medium tabular-nums text-zig">
             {money(result.net_payable_zig, "ZIG")}
+          </div>
+          <div className="mt-1 font-mono text-[11px] tabular-nums text-ink-faint">
+            Paid: {money(paidZig, "ZIG")}
+            {!confirmed ? (
+              <span className="text-danger"> &middot; unpaid</span>
+            ) : currentBalanceZig > 0.005 ? (
+              <span className="text-danger"> &middot; {money(currentBalanceZig, "ZIG")} owing</span>
+            ) : (
+              <span className="text-seal"> &middot; settled</span>
+            )}
           </div>
         </div>
         <div className="col-span-2 border-t border-ink/15 px-4 py-3 sm:col-span-1 sm:border-l sm:border-t-0 sm:px-5 sm:py-4">
@@ -196,7 +217,10 @@ export function ResultsPanel({
         </div>
       </div>
 
-      {/* Working-paper folio: W1-W4 index instead of pill tabs. */}
+      {/* Inline payment input directly visible without opening a sub-tab */}
+      {paymentsSlot}
+
+      {/* Working-paper folio: W1-W3 index instead of pill tabs. */}
       <div className="flex flex-col sm:flex-row">
         <div className="flex shrink-0 divide-x divide-ink/15 border-b border-ink/15 sm:w-44 sm:flex-col sm:divide-x-0 sm:divide-y sm:border-b-0 sm:border-r">
           {panes.map((pn) => (
@@ -221,9 +245,9 @@ export function ResultsPanel({
             <div className="fade-in-up">
               <div className="mb-1 flex items-center justify-between text-xs text-ink-faint">
                 <span>Line item</span>
-                <div className="flex gap-6">
-                  <span className="w-24 text-right">USD</span>
-                  <span className="w-28 text-right">ZiG</span>
+                <div className="flex shrink-0 gap-3 sm:gap-6">
+                  <span className="w-20 text-right sm:w-24">USD</span>
+                  <span className="w-32 text-right sm:w-36">ZiG</span>
                 </div>
               </div>
               <div>
@@ -355,8 +379,6 @@ export function ResultsPanel({
               </div>
             </div>
           )}
-
-          {pane === "payments" && paymentsSlot && <div className="fade-in-up">{paymentsSlot}</div>}
         </div>
       </div>
     </div>

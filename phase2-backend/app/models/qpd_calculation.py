@@ -45,21 +45,17 @@ class QpdCalculation(Base):
 
     # What was ACTUALLY remitted to ZIMRA for this specific quarter, once
     # the person has paid and comes back to confirm it. Nullable/None means
-    # "not yet confirmed" - CRUD seeds it to the calculated net_payable at
-    # creation time as a starting assumption, but this is the field the
-    # NEXT quarter's calculation sums up as "previous_qpds_paid", not
-    # result_json.net_payable_usd, precisely because the two can and do
-    # diverge (partial payment, late payment, ZIMRA adjustment).
+    # "not yet paid / not yet recorded" - create_calculation() leaves these
+    # as None so newly calculated QPDs never masquerade as already paid.
+    # This is the field the NEXT quarter's calculation sums up as
+    # "previous_qpds_paid", not result_json.net_payable_usd.
     actual_usd_paid: Mapped[float | None] = mapped_column(Float, nullable=True)
     actual_zig_paid: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    # NULL until confirm_actual_payment() is called - this is the ONLY
-    # reliable signal that actual_usd_paid/actual_zig_paid reflect what the
-    # person genuinely told us they remitted, rather than the seeded
-    # net_payable default create_calculation() writes at creation time.
-    # Do not infer "confirmed" from actual_usd_paid/actual_zig_paid being
-    # non-null - they are ALWAYS non-null after creation (seeded), so that
-    # alone can't distinguish the two states. This field is what can.
+    # NULL until confirm_actual_payment() is called - the authoritative
+    # timestamp proving the person explicitly recorded/confirmed what they
+    # remitted. Used alongside actual_*_paid so legacy rows seeded before
+    # this fix are still treated as unconfirmed/unpaid.
     payment_confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

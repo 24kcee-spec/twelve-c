@@ -28,43 +28,38 @@ export interface QuarterObligation {
   dueDate: Date;
   usdOwed: number;
   zigOwed: number;
+  usdPaid: number;
+  zigPaid: number;
   usdBalance: number;
   zigBalance: number;
+  confirmed: boolean;
+  partial: boolean;
   paid: boolean;
   calculationId: string;
 }
 
 /**
- * ROOT-CAUSE FIX for "calculating QPD3 marks QPD1/QPD2 as outstanding".
- *
- * The bug: zimra_qpd.calculate_qpd() always returns a full 4-row
- * `schedule` - a flat-share, full-YEAR PROJECTION ("if this estimate holds,
- * here's roughly how every quarter would land"), rebuilt from scratch on
- * every single call regardless of which one `quarter` it was asked to
- * compute. Every row in that fresh schedule defaults usd_paid/zig_paid to
- * 0 (see QpdInstalment in zimra_qpd/calculator.py) - nothing about
- * calculating QPD3 ever marks QPD1/QPD2 as paid, because QPD3's own
- * schedule row 0/1 is just a hypothetical "what QPD1/QPD2 would have been
- * under today's numbers", not a record of what QPD1/QPD2 actually were.
- * Several UI surfaces were reading `schedule[i]` positionally and treating
- * row i as "the true, confirmed status of calendar quarter i" - so any
- * quarter whose ZIMRA due date had already passed showed as overdue, even
- * when that quarter was never separately calculated, confirmed, or looked
- * at.
- *
- * The fix: never derive a quarter's status from another quarter's row in
- * someone else's projection. Build one obligation per quarter that
- * genuinely HAS its own calculation record for this business/tax year,
- * using that record's own net_payable_{usd,zig} (the real cumulative
- * amount due at that quarter, already netted against prior confirmed
- * payments) and actual_{usd,zig}_paid (the canonical "what was actually
- * remitted" figure - the same field ReconciliationPanel and the backend's
- * own cumulative "previous paid" sum already treat as authoritative). A
- * quarter with no calculation record for this business/tax year simply
- * produces no obligation - it is "not yet calculated", never "unpaid" or
- * "overdue". This mirrors the backend's own already-correct
- * get_tax_year_breakdown()/TaxYearBreakdown pattern (see
- * app/crud/qpd_calculation.py).
+ * Returns what the user actually confirmed/recorded as paid for a calculation.
+ * Unconfirmed calculations (`payment_confirmed_at === null`) ALWAYS resolve
+ * to 0 paid - even if a legacy backend record seeded `actual_*_paid`.
+ */
+export function getConfirmedPaidAmounts(
+  calc: Pick<QpdCalculationOut, "actual_usd_paid" | "actual_zig_paid" | "payment_confirmed_at">
+): { usd: number; zig: number; confirmed: boolean } {
+  if (!calc.payment_confirmed_at) {
+    return { usd: 0, zig: 0, confirmed: false };
+  }
+  return {
+    usd: calc.actual_usd_paid ?? 0,
+    zig: calc.actual_zig_paid ?? 0,
+    confirmed: true,
+  };
+}
+
+/**
+ * Builds one obligation per quarter that genuinely has its own calculation
+ * record for this business/tax year, using that record's net_payable_{usd,zig}
+ * and confirmed actual_{usd,zig}_paid (defaulting to 0 when unconfirmed).
  *
  * If a quarter was recalculated more than once, the most recent run wins -
  * same "latest run wins" rule the backend uses.
@@ -86,14 +81,12 @@ export function evaluatedQuarterObligations(
     .map((calc): QuarterObligation => {
       const usdOwed = calc.result_json.net_payable_usd ?? 0;
       const zigOwed = calc.result_json.net_payable_zig ?? 0;
-      // Unconfirmed defaults to the seeded net_payable figure - the same
-      // "assume paid until told otherwise" convention the backend uses
-      // (see QpdCalculation.actual_usd_paid docstring) - never to 0, which
-      // is what the old schedule[i]-based logic effectively assumed.
-      const paidUsd = calc.actual_usd_paid ?? usdOwed;
-      const paidZig = calc.actual_zig_paid ?? zigOwed;
-      const usdBalance = Math.max(0, usdOwed - paidUsd);
-      const zigBalance = Math.max(0, zigOwed - paidZig);
+      const { usd: usdPaid, zig: zigPaid, confirmed } = getConfirmedPaidAmounts(calc);
+      const usdBalance = Math.max(0, usdOwed - usdPaid);
+      const zigBalance = Math.max(0, zigOwed - zigPaid);
+      const noTaxDue = usdOwed <= 0.01 && zigOwed <= 0.01;
+      const paid = noTaxDue || (confirmed && usdBalance <= 0.01 && zigBalance <= 0.01);
+      const partial = !paid && confirmed && (usdPaid > 0.005 || zigPaid > 0.005);
       return {
         quarter: calc.quarter,
         label: calc.quarter_label || `Q${calc.quarter}`,
@@ -101,9 +94,13 @@ export function evaluatedQuarterObligations(
         dueDate: quarterDueDate(calc.tax_year, calc.quarter),
         usdOwed,
         zigOwed,
+        usdPaid,
+        zigPaid,
         usdBalance,
         zigBalance,
-        paid: usdBalance <= 0.01 && zigBalance <= 0.01,
+        confirmed,
+        partial,
+        paid,
         calculationId: calc.id,
       };
     })

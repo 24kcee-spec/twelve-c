@@ -164,6 +164,7 @@ export interface QpdCalculationOut {
   result_json: QpdResultJson;
   actual_usd_paid: number | null;
   actual_zig_paid: number | null;
+  payment_confirmed_at: string | null;
   created_at: string;
 }
 
@@ -258,6 +259,7 @@ export interface QuarterBreakdown {
   net_due_zig: number | null;
   actual_usd_paid: number | null;
   actual_zig_paid: number | null;
+  payment_confirmed_at: string | null;
 }
 
 export interface BusinessCompliance {
@@ -269,6 +271,7 @@ export interface BusinessCompliance {
   zig: ComplianceCheck | null;
   latest_calculated_quarter: number | null;
   quarters_missing: number[];
+  quarters_unconfirmed?: number[];
   quarters: QuarterBreakdown[];
 }
 

@@ -44,6 +44,7 @@ async def _sum_actual_paid_before_quarter(
             QpdCalculation.business_id == business_id,
             QpdCalculation.tax_year == tax_year,
             QpdCalculation.quarter < quarter,
+            QpdCalculation.payment_confirmed_at.is_not(None),
         )
     )
     records = result.scalars().all()
@@ -130,13 +131,11 @@ async def create_calculation(
         quarter=data.quarter,
         input_json=dataclasses.asdict(engine_input),
         result_json=_result_to_dict(result),
-        # Seeded to the calculated figure as a starting assumption - NOT a
-        # confirmation of payment. The frontend should let the person
-        # correct this once they've actually paid (partial payment, late
-        # payment, TaRMS rounding, etc. all happen), via confirm_payment()
-        # below. Until corrected, this is just "what we expect you'll pay".
-        actual_usd_paid=result.net_payable_usd,
-        actual_zig_paid=result.net_payable_zig,
+        # Newly calculated QPDs have not been paid yet. Leave both fields
+        # None (and payment_confirmed_at None) until the user explicitly
+        # records what they paid via confirm_actual_payment().
+        actual_usd_paid=None,
+        actual_zig_paid=None,
     )
     db.add(record)
     await db.commit()
@@ -332,8 +331,12 @@ def _row_from_calculation(record: QpdCalculation | None, quarter: int) -> Quarte
         previous_paid_zig=result.get("previous_paid_zig"),
         net_due_usd=result.get("net_payable_usd"),
         net_due_zig=result.get("net_payable_zig"),
-        actual_usd_paid=record.actual_usd_paid,
-        actual_zig_paid=record.actual_zig_paid,
+        actual_usd_paid=(
+            record.actual_usd_paid if record.payment_confirmed_at is not None else None
+        ),
+        actual_zig_paid=(
+            record.actual_zig_paid if record.payment_confirmed_at is not None else None
+        ),
         payment_confirmed_at=record.payment_confirmed_at,
     )
 

@@ -75,19 +75,19 @@ async def test_missing_quarters_reported_and_excluded_from_total(client, db_sess
     assert breakdown.total_remitted_usd == 0.0
     assert breakdown.total_remitted_zig == 0.0
 
-    # Confirming both (at their seeded figures, for simplicity) is what
-    # should move them into the total - missing Q3/Q4 still contribute
-    # nothing, they're not silently treated as zero-liability. (zig_sales=0
-    # does not imply a zero ZiG leg: the engine still splits USD-equivalent
-    # expenses across both currencies via the payment ratio, so a non-zero
-    # ZiG figure here is expected engine behaviour, not a test bug.)
-    expected_total_usd = q1.actual_usd_paid + q2.actual_usd_paid
-    expected_total_zig = q1.actual_zig_paid + q2.actual_zig_paid
+    # Unconfirmed calculations must NOT assume they were paid.
+    assert q1.actual_usd_paid is None and q1.actual_zig_paid is None
+    assert q2.actual_usd_paid is None and q2.actual_zig_paid is None
+
+    # Confirming both at their net-due figures is what moves them into
+    # total_remitted - missing Q3/Q4 still contribute nothing.
+    expected_total_usd = q1.net_due_usd + q2.net_due_usd
+    expected_total_zig = q1.net_due_zig + q2.net_due_zig
     for q, calc_id in ((q1, r1.json()["id"]), (q2, r2.json()["id"])):
         conf = await client.post(
             f"/businesses/{business_id}/qpd-calculations/{calc_id}/confirm-payment",
             headers=headers,
-            json={"actual_usd_paid": q.actual_usd_paid, "actual_zig_paid": q.actual_zig_paid},
+            json={"actual_usd_paid": q.net_due_usd, "actual_zig_paid": q.net_due_zig},
         )
         assert conf.status_code == 200, conf.text
 
@@ -97,18 +97,21 @@ async def test_missing_quarters_reported_and_excluded_from_total(client, db_sess
     assert breakdown.total_remitted_zig == pytest.approx(expected_total_zig)
 
 
-async def test_confirmed_payment_overrides_seeded_default_in_breakdown(client, db_session):
+async def test_confirmed_payment_records_actual_paid_in_breakdown(client, db_session):
     headers = await _auth_headers(client, "confirm@example.com")
     r = await client.post("/businesses", headers=headers, json={"name": "Confirmed Co"})
     business_id = uuid.UUID(r.json()["id"])
 
     r1 = await client.post(f"/businesses/{business_id}/qpd-calculations", headers=headers, json=_calc_payload(1, "Q1"))
     calc = r1.json()
-    seeded_net_payable = calc["result_json"]["net_payable_usd"]
+    assert calc["actual_usd_paid"] is None
+    assert calc["actual_zig_paid"] is None
+    assert calc["payment_confirmed_at"] is None
+    net_payable = calc["result_json"]["net_payable_usd"]
     calc_id = calc["id"]
 
-    # Confirm a DIFFERENT amount than what was seeded (partial payment).
-    confirmed_amount = round(seeded_net_payable * 0.5, 2)
+    # Confirm a partial payment.
+    confirmed_amount = round(net_payable * 0.5, 2)
     conf_r = await client.post(
         f"/businesses/{business_id}/qpd-calculations/{calc_id}/confirm-payment",
         headers=headers,
@@ -120,11 +123,11 @@ async def test_confirmed_payment_overrides_seeded_default_in_breakdown(client, d
     q1 = breakdown.quarters[0]
 
     assert q1.actual_usd_paid == pytest.approx(confirmed_amount)
-    assert q1.actual_usd_paid != pytest.approx(seeded_net_payable)
+    assert q1.actual_usd_paid != pytest.approx(net_payable)
     assert breakdown.total_remitted_usd == pytest.approx(confirmed_amount)
     # The projected/required figures come from result_json and are
-    # untouched by confirming a different actual payment.
-    assert q1.net_due_usd == pytest.approx(seeded_net_payable)
+    # untouched by confirming an actual payment.
+    assert q1.net_due_usd == pytest.approx(net_payable)
 
 
 async def test_recalculating_a_quarter_keeps_only_the_latest_run(client, db_session):
@@ -194,23 +197,24 @@ async def test_confirmed_payment_propagates_into_next_quarters_calculation(clien
     r = await client.post(f"/businesses", headers=headers, json={"name": "Propagation Co"})
     business_id = uuid.UUID(r.json()["id"])
 
-    # Q1: seeded actual_usd_paid defaults to net_payable_usd at creation.
+    # Q1: actual_usd_paid is None until the user records a payment.
     q1 = await client.post(
         f"/businesses/{business_id}/qpd-calculations", headers=headers, json=_calc_payload(1, "Q1", usd_sales=100_000)
     )
     assert q1.status_code == 201, q1.text
+    assert q1.json()["actual_usd_paid"] is None
+    assert q1.json()["payment_confirmed_at"] is None
     q1_net_payable_usd = q1.json()["result_json"]["net_payable_usd"]
     q1_id = q1.json()["id"]
     assert q1_net_payable_usd > 0
 
-    # Before any confirmation, Q2's calculation should net against the
-    # SEEDED default (the existing "assume paid until told otherwise"
-    # convention) - this leg already worked before this session's fix.
+    # Before Q1 is confirmed as paid, Q2's calculation must NOT assume Q1
+    # was paid - previous_paid_usd stays 0.
     q2_before_confirm = await client.post(
         f"/businesses/{business_id}/qpd-calculations", headers=headers, json=_calc_payload(2, "Q2", usd_sales=100_000)
     )
     assert q2_before_confirm.status_code == 201, q2_before_confirm.text
-    assert q2_before_confirm.json()["result_json"]["previous_paid_usd"] == pytest.approx(q1_net_payable_usd)
+    assert q2_before_confirm.json()["result_json"]["previous_paid_usd"] == 0.0
 
     # Now confirm that ONLY HALF of Q1 was actually remitted (a real
     # underpayment) - this is what the rebuilt Payments tab calls.

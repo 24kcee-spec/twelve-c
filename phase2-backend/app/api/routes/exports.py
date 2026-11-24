@@ -59,8 +59,12 @@ def _build_quarter_export_data(
                 has_calculation=True,
                 input=record.input_json,
                 result=record.result_json,
-                actual_usd_paid=record.actual_usd_paid,
-                actual_zig_paid=record.actual_zig_paid,
+                actual_usd_paid=(
+                    record.actual_usd_paid if record.payment_confirmed_at is not None else None
+                ),
+                actual_zig_paid=(
+                    record.actual_zig_paid if record.payment_confirmed_at is not None else None
+                ),
                 payment_confirmed_at=record.payment_confirmed_at,
             )
         )

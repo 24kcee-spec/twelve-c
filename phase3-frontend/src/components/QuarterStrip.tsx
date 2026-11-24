@@ -40,20 +40,21 @@ export function QuarterStrip({
               <Link
                 key={quarter}
                 href={`/dashboard/${businessId}/new?taxYear=${selected.tax_year}&quarter=${quarter}`}
-                className="flex items-center gap-4 px-4 py-3 transition duration-150 hover:bg-surface-2"
+                className="flex items-center gap-3 px-4 py-3 transition duration-150 hover:bg-surface-2 sm:gap-4"
               >
-                <span className="w-14 shrink-0 font-display text-base text-ink-faint">QPD{quarter}</span>
-                <span className="w-44 shrink-0 text-sm text-ink-faint">{meta.short} · not yet calculated</span>
-                <span className="flex-1" />
-                <span className="text-sm font-semibold text-brass">Calculate &rarr;</span>
+                <span className="w-12 shrink-0 font-display text-base text-ink-faint sm:w-14">QPD{quarter}</span>
+                <span className="min-w-0 flex-1 text-sm text-ink-faint sm:w-44 sm:flex-none">
+                  {meta.short} · not yet calculated
+                </span>
+                <span className="hidden sm:block sm:flex-1" />
+                <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-brass">Calculate &rarr;</span>
               </Link>
             );
           }
 
-          // Safe: obligationsByQuarter is built straight from `calculations`,
-          // so a matching record always exists for every obligation.
           const calc = calculations.find((c) => c.id === obligation.calculationId)!;
           const paid = obligation.paid;
+          const partial = obligation.partial;
           const overdue = !paid && obligation.dueDate < today;
           const due = !paid && !overdue && obligation.dueDate >= today;
           const isSelected = calc.id === selected.id;
@@ -64,11 +65,11 @@ export function QuarterStrip({
             statusLabel = "Paid in full";
             statusClass = "text-seal font-semibold";
           } else if (overdue) {
-            statusLabel = "Overdue";
+            statusLabel = partial ? "Overdue · partial" : "Overdue · unpaid";
             statusClass = "text-danger font-semibold";
           } else if (due) {
-            statusLabel = "Due now";
-            statusClass = "text-danger";
+            statusLabel = partial ? "Partial · balance due" : "Due now · unpaid";
+            statusClass = partial ? "text-zig font-semibold" : "text-danger";
           }
 
           return (
@@ -76,30 +77,39 @@ export function QuarterStrip({
               key={quarter}
               type="button"
               onClick={() => onSelectQuarter(calc)}
-              className={`flex w-full items-center gap-4 px-4 py-3 text-left transition duration-150 ${
+              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition duration-150 sm:gap-4 ${
                 isSelected ? "bg-seal-soft" : "hover:bg-surface-2"
               }`}
             >
-              <span className="w-14 shrink-0 font-display text-base text-ink">QPD{quarter}</span>
-              <span className="w-44 shrink-0 text-sm text-ink-faint">
-                {meta.short} &middot; {percent(calc.result_json.cumulative_percentage)} cumulative
+              <span className="w-12 shrink-0 font-display text-base text-ink sm:w-14">QPD{quarter}</span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-4">
+                <span className="text-xs text-ink-faint sm:w-44 sm:shrink-0 sm:text-sm">
+                  {meta.short} &middot; {percent(calc.result_json.cumulative_percentage)} cumulative
+                </span>
+                <span className={`flex items-center gap-1.5 text-sm sm:flex-1 ${statusClass}`}>
+                  {paid && (
+                    <svg
+                      className="h-3.5 w-3.5 shrink-0 rounded-full bg-seal p-[3px] text-surface"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    >
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  )}
+                  {statusLabel}
+                </span>
               </span>
-              <span className={`flex flex-1 items-center gap-1.5 text-sm ${statusClass}`}>
-                {paid && (
-                  <svg
-                    className="h-3.5 w-3.5 shrink-0 rounded-full bg-seal p-[3px] text-surface"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  >
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
+              <span className="shrink-0 text-right font-mono tabular-nums">
+                <span className="block text-sm font-semibold text-ink">
+                  {paid ? money(obligation.usdOwed, "USD") : money(obligation.usdBalance, "USD")}
+                </span>
+                {partial && (
+                  <span className="block text-[11px] text-ink-faint">
+                    paid {money(obligation.usdPaid, "USD")}
+                  </span>
                 )}
-                {statusLabel}
-              </span>
-              <span className="font-mono text-sm font-semibold tabular-nums text-ink">
-                {paid ? money(obligation.usdOwed, "USD") : money(obligation.usdBalance, "USD")}
               </span>
             </button>
           );
