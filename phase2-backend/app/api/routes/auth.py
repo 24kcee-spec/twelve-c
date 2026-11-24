@@ -146,6 +146,13 @@ async def _issue_study_tokens(db: AsyncSession, user: User, response: Response) 
     _set_study_refresh_cookie(response, refresh_token)
     return AccessTokenResponse(access_token=access_token)
 
+def _require_registered_account(user: User) -> None:
+    if user.is_study_guest:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account security settings are not available in a research session",
+        )
+
 
 def _decode_or_401(token: str, expected_type: TokenType, detail: str) -> uuid.UUID:
     try:
@@ -534,6 +541,7 @@ async def google_login(request: Request, response: Response, payload: GoogleAuth
 
 @router.post("/mfa/setup", response_model=MfaSetupResponse)
 async def mfa_setup(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    _require_registered_account(user)
     secret = generate_totp_secret()
     user.mfa_secret_pending = encrypt_mfa_secret(secret)
     await db.commit()
@@ -553,6 +561,7 @@ async def mfa_verify(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _require_registered_account(user)
     if not user.mfa_secret_pending:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Start MFA setup first")
 
@@ -572,6 +581,7 @@ async def mfa_disable(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _require_registered_account(user)
     if not user.mfa_enabled or not user.mfa_secret:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA is not enabled")
 
@@ -597,6 +607,7 @@ async def delete_account(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _require_registered_account(user)
     # Password accounts must re-confirm their password before deletion -
     # a valid access token alone isn't enough for something irreversible.
     if user.hashed_password is not None:
