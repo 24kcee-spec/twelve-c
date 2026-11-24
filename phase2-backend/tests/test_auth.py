@@ -366,6 +366,70 @@ async def test_study_session_creates_anonymous_api_identity_and_business(client)
     assert listed.status_code == 200, listed.text
     assert [business["id"] for business in listed.json()] == [created.json()["id"]]
 
+    business_id = created.json()["id"]
+    calculation = await client.post(
+        f"/businesses/{business_id}/qpd-calculations",
+        headers=headers,
+        json={
+            "tax_year": 2026,
+            "quarter_label": "Q1",
+            "quarter": 1,
+            "usd_sales": 100000,
+            "zig_sales": 500000,
+            "usd_expenses": {
+                "cost_of_sales": 30000,
+                "salaries": 10000,
+                "other_expenses": 5000,
+                "capital_allowances": 2000,
+            },
+            "zig_expenses": {
+                "cost_of_sales": 100000,
+                "salaries": 50000,
+                "other_expenses": 20000,
+                "capital_allowances": 0,
+            },
+        },
+    )
+    assert calculation.status_code == 201, calculation.text
+    assert calculation.json()["result_json"]["total_tax_usd"] > 0
+
+    calculation_id = calculation.json()["id"]
+    payment = await client.post(
+        f"/businesses/{business_id}/qpd-calculations/{calculation_id}/confirm-payment",
+        headers=headers,
+        json={"actual_usd_paid": 1000, "actual_zig_paid": 2500},
+    )
+    assert payment.status_code == 200, payment.text
+    assert payment.json()["actual_usd_paid"] == 1000
+
+    assets = await client.post(
+        f"/businesses/{business_id}/assets",
+        headers=headers,
+        json={
+            "description": "Study delivery vehicle",
+            "category": "motor_vehicle",
+            "cost_usd": 15000,
+            "cost_zig": 0,
+            "year_acquired": 2026,
+            "elect_sia": False,
+        },
+    )
+    assert assets.status_code == 201, assets.text
+
+    excel = await client.get(
+        f"/businesses/{business_id}/export/excel?tax_year=2026",
+        headers=headers,
+    )
+    assert excel.status_code == 200, excel.text
+    assert "spreadsheetml" in excel.headers.get("content-type", "")
+
+    pdf = await client.get(
+        f"/businesses/{business_id}/export/pdf?tax_year=2026",
+        headers=headers,
+    )
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.headers.get("content-type", "").startswith("application/pdf")
+
 
 async def test_study_session_resumes_same_guest_and_rotates_refresh_cookie(client):
     first = await client.post("/auth/study-session")
