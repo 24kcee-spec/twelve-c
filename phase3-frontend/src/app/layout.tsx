@@ -71,9 +71,11 @@ export default function RootLayout({
         </Script>
       </head>
       <body className="bg-paper font-body text-ink antialiased">
-        <AuthScript />
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <AuthScript />
+            {children}
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
