@@ -3,7 +3,7 @@
 import type { QpdResultJson } from "@/lib/types";
 
 const PYODIDE_VERSION = "v314.0.8";
-const PYODIDE_INDEX = \`https://cdn.jsdelivr.net/pyodide/\${PYODIDE_VERSION}/full/\`;
+const PYODIDE_INDEX = `https://cdn.jsdelivr.net/pyodide/${PYODIDE_VERSION}/full/`;
 
 export interface StudyEngineInput {
   tax_year: number;
@@ -79,7 +79,7 @@ function loadPyodideScript(): Promise<void> {
       'script[data-twelve-c-pyodide="true"]'
     );
     const script = existing ?? document.createElement("script");
-    script.src = \`\${PYODIDE_INDEX}pyodide.js\`;
+    script.src = `${PYODIDE_INDEX}pyodide.js`;
     script.async = true;
     script.dataset.twelveCPyodide = "true";
     script.onload = () => {
@@ -99,7 +99,7 @@ function loadPyodideScript(): Promise<void> {
 async function fetchEngineSource(path: string): Promise<string> {
   const response = await fetch(path, { cache: "no-store", credentials: "omit" });
   if (!response.ok) {
-    throw new Error(\`The frozen calculation engine could not be loaded (\${response.status}). Rebuild and redeploy the study site.\`);
+    throw new Error(`The frozen calculation engine could not be loaded (${response.status}). Rebuild and redeploy the study site.`);
   }
   return response.text();
 }
@@ -148,7 +148,7 @@ export async function calculateStudyQpd(input: StudyEngineInput): Promise<QpdRes
 
   let returned: unknown;
   try {
-    returned = await pyodide.runPythonAsync(String.raw\`
+    returned = await pyodide.runPythonAsync(String.raw`
 import dataclasses
 import json
 from zimra_qpd.calculator import CurrencyExpenses, QpdInput, calculate_qpd
@@ -182,7 +182,7 @@ output["schedule"] = [
     for item in result.schedule
 ]
 json.dumps(output, separators=(",", ":"))
-\`);
+`);
   } finally {
     pyodide.globals.delete("study_input_json");
   }
