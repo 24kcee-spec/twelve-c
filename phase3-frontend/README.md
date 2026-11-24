@@ -96,17 +96,16 @@ skips its refresh-cookie and `/auth/me` requests while this route is active.
 ### Locking the study build
 
 Set `NEXT_PUBLIC_STUDY_EXCHANGE_RATE` to the exact independently approved
-rate used in the sealed usability task sheet before building. The repository
-default of `26.8` is only the current product default, not a claim that it is
-the approved Task 5 benchmark rate. Set the same environment variable in the
-Vercel project before deployment. Do not change it after the first sealed
+rate used in the sealed usability task sheet before building. This variable
+is mandatory: study mode remains unavailable until the value is configured.
+Set the same environment variable in the Vercel project before deployment. Do not change it after the first sealed
 session. Any change to the engine, tax rules, exchange rate or study UI
 requires a new frozen commit and the relevant sealed tests to be rerun.
 
 Example local setup (run from `phase3-frontend`):
 
 ```powershell
-$env:NEXT_PUBLIC_STUDY_EXCHANGE_RATE = "26.8" # replace with approved Task 5 rate
+$env:NEXT_PUBLIC_STUDY_EXCHANGE_RATE = "YOUR_APPROVED_TASK_5_RATE"
 npm install
 npm run build
 npm run dev
