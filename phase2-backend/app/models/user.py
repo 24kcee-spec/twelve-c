@@ -70,3 +70,8 @@ class User(Base):
         """False for Google-only accounts - lets the frontend know whether
         to ask for a password before letting someone delete their account."""
         return self.hashed_password is not None
+
+    @property
+    def is_study_guest(self) -> bool:
+        """True only for temporary anonymous research-session identities."""
+        return self.email.endswith("@guest.twelvec.invalid")
