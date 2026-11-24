@@ -104,16 +104,37 @@ async function fetchEngineSource(path: string): Promise<string> {
   return response.text();
 }
 
+async function sha256(source: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 async function getRuntime(): Promise<PyodideRuntime> {
   if (!runtimePromise) {
     runtimePromise = (async () => {
       await loadPyodideScript();
       if (!window.loadPyodide) throw new Error("The browser calculation runtime is unavailable.");
 
+      const manifest = await readStudyEngineManifest();
       const [calculatorSource, rulesSource] = await Promise.all([
         fetchEngineSource("/study-engine/zimra_qpd/calculator.py"),
         fetchEngineSource("/study-engine/zimra_qpd/tax_rules.py"),
       ]);
+
+      const [calculatorHash, taxRulesHash] = await Promise.all([
+        sha256(calculatorSource),
+        sha256(rulesSource),
+      ]);
+      if (
+        calculatorHash !== manifest.calculatorSha256 ||
+        taxRulesHash !== manifest.taxRulesSha256
+      ) {
+        throw new Error(
+          "The study engine files do not match this build's SHA-256 manifest. Do not continue the study on this deployment."
+        );
+      }
 
       const pyodide = await window.loadPyodide({ indexURL: PYODIDE_INDEX });
       pyodide.FS.mkdirTree("/home/pyodide/study_engine/zimra_qpd");
