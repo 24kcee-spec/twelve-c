@@ -131,7 +131,7 @@ async function getRuntime(): Promise<PyodideRuntime> {
       );
 
       await pyodide.runPythonAsync(
-        "import sys\\nsys.path.insert(0, '/home/pyodide/study_engine')\\nfrom zimra_qpd.calculator import CurrencyExpenses, QpdInput, calculate_qpd"
+        "import sys\nsys.path.insert(0, '/home/pyodide/study_engine')\nfrom zimra_qpd.calculator import CurrencyExpenses, QpdInput, calculate_qpd"
       );
       return pyodide;
     })().catch((error: unknown) => {
