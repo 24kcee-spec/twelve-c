@@ -67,3 +67,51 @@ not in this frontend.
 Desktop (Tauri) and Android (Capacitor) shells wrapping this same web build,
 per the original blueprint — nothing in this frontend needs to change for
 that, since both just point a webview at the built Next.js app.
+
+
+## Browser-only research study mode
+
+The `/study` route is for approved usability-study sessions. It keeps the
+normal registration/login product intact but does not require a participant
+account. It is deliberately not wrapped in `AuthGuard`, and `AuthProvider`
+skips its refresh-cookie and `/auth/me` requests while this route is active.
+
+- The calculator runs the same Python `calculator.py` and `tax_rules.py`
+  from `phase2-backend/engine/zimra_qpd` inside the participant's browser
+  using a version-pinned Pyodide runtime.
+- The `predev` and `prebuild` scripts copy those source files into
+  `public/study-engine` and create a SHA-256 manifest. The manifest shows
+  both engine hashes and the Vercel/Git commit used for that build.
+- The fictional business, calculation history and explicitly confirmed
+  payment records are stored in this browser's `localStorage` only. The
+  study route does not call the account, business, calculation or export API.
+  The Clear demo data control removes the study data from this browser.
+- PDF working papers use the existing client-side PDF generator. Excel
+  working papers are assembled and downloaded in the browser. Neither export
+  is uploaded.
+- The study build does not add analytics or tracking SDKs. The first
+  calculation downloads the version-pinned Pyodide runtime and static engine
+  source; participant-entered values are not sent to that CDN.
+
+### Locking the study build
+
+Set `NEXT_PUBLIC_STUDY_EXCHANGE_RATE` to the exact independently approved
+rate used in the sealed usability task sheet before building. The repository
+default of `26.8` is only the current product default, not a claim that it is
+the approved Task 5 benchmark rate. Set the same environment variable in the
+Vercel project before deployment. Do not change it after the first sealed
+session. Any change to the engine, tax rules, exchange rate or study UI
+requires a new frozen commit and the relevant sealed tests to be rerun.
+
+Example local setup (run from `phase3-frontend`):
+
+```powershell
+$env:NEXT_PUBLIC_STUDY_EXCHANGE_RATE = "26.8" # replace with approved Task 5 rate
+npm install
+npm run build
+npm run dev
+```
+
+Study mode is a research interface, not an alternative account or data-sync
+mechanism. A participant's local records do not follow them to another device
+or browser profile.
