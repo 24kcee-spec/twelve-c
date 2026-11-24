@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $culture = [System.Globalization.CultureInfo]::InvariantCulture
 
 function Find-RepoRoot {
-    $candidate = (Get-Location).Path
+    $candidate = $PSScriptRoot
     while ($candidate) {
         if ((Test-Path (Join-Path $candidate ".git")) -and
             (Test-Path (Join-Path $candidate "phase3-frontend")) -and
