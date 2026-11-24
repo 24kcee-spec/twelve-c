@@ -199,6 +199,17 @@ export const api = {
 
   refresh: () => rawRequest<AccessTokenResponse>("/auth/refresh", { method: "POST" }, true),
 
+  // Anonymous research sessions use a separate httpOnly refresh cookie.
+  // Their business and tax data still use the ordinary authenticated API.
+  createStudySession: () =>
+    rawRequest<AccessTokenResponse>("/auth/study-session", { method: "POST" }, true),
+
+  refreshStudySession: () =>
+    rawRequest<AccessTokenResponse>("/auth/study-refresh", { method: "POST" }, true),
+
+  logoutStudySession: () =>
+    rawRequest<void>("/auth/study-logout", { method: "POST" }, true),
+
   logout: async () => {
     try {
       await rawRequest("/auth/logout", { method: "POST" }, true);
