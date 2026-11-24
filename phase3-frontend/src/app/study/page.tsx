@@ -21,8 +21,8 @@ export default function StudyPage() {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
           <Logo />
-          <Link href="/login" className="text-sm text-ink-soft transition hover:text-ink">
-            Existing account? Log in
+          <Link href="/" className="text-sm text-ink-soft transition hover:text-ink">
+            Back to Twelve C
           </Link>
         </div>
       </header>
