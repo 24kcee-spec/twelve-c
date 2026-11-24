@@ -38,10 +38,10 @@ $frontendRoot = Join-Path $repoRoot "phase3-frontend"
 $envFile = Join-Path $frontendRoot ".env.local"
 
 if (-not $ExchangeRate) {
-    $ExchangeRate = Read-Host "Enter the independently approved Task 5 exchange rate (ZiG per USD) [26.8]"
+    $ExchangeRate = Read-Host "Enter the independently approved Task 5 exchange rate (ZiG per USD)"
 }
 if ([string]::IsNullOrWhiteSpace($ExchangeRate)) {
-    $ExchangeRate = "26.8"
+    throw "The approved Task 5 exchange rate is required. Do not run participant sessions with a guessed or default rate."
 }
 
 [decimal]$parsedRate = 0
