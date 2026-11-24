@@ -40,9 +40,9 @@ const manifest = {
 
 const manifestPath = resolve(frontendRoot, "public", "study-engine", "manifest.json");
 await mkdir(dirname(manifestPath), { recursive: true });
-await writeFile(manifestPath, \`\${JSON.stringify(manifest, null, 2)}\n\`, "utf8");
+await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
 console.log("Twelve C study engine synced from the backend's authoritative Python source.");
-console.log(\`calculator.py SHA-256: \${manifest.calculatorSha256}\`);
-console.log(\`tax_rules.py SHA-256: \${manifest.taxRulesSha256}\`);
-console.log(\`Build commit: \${manifest.buildCommit}\`);
+console.log(`calculator.py SHA-256: ${manifest.calculatorSha256}`);
+console.log(`tax_rules.py SHA-256: ${manifest.taxRulesSha256}`);
+console.log(`Build commit: ${manifest.buildCommit}`);
