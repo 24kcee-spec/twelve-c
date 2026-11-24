@@ -26,9 +26,9 @@ import {
 } from "@/lib/types";
 
 const TAX_YEAR = 2026;
-const STUDY_EXCHANGE_RATE = Number(
-  process.env.NEXT_PUBLIC_STUDY_EXCHANGE_RATE || "26.8"
-);
+const STUDY_EXCHANGE_RATE = process.env.NEXT_PUBLIC_STUDY_EXCHANGE_RATE
+  ? Number(process.env.NEXT_PUBLIC_STUDY_EXCHANGE_RATE)
+  : Number.NaN;
 const CORPORATE_TAX_RATE = 0.25;
 const AIDS_LEVY_RATE = 0.03;
 
@@ -463,6 +463,11 @@ export default function StudyPage() {
             This study mode does not send those values to the Twelve C API. Do not enter real client or taxpayer data.
           </p>
         </div>
+        {!fixedRateAvailable && (
+          <div role="alert" className="mt-4 rounded-md border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
+            The study exchange rate has not been configured. The researcher must set the independently approved Task 5 rate and rebuild the site before participants begin.
+          </div>
+        )}
 
         <div className="mt-7 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
