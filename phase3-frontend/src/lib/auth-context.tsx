@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { api, setAccessToken } from "./api";
 import { UserOut, TokenPair, AccessTokenResponse, MfaRequiredResponse } from "./types";
 
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserOut | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const pathname = usePathname();
 
   const refreshUser = useCallback(async () => {
     try {
@@ -39,6 +41,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    // Study mode is deliberately anonymous and browser-only. Do not send
+    // the refresh cookie, request /auth/me, or retain an in-memory account
+    // token while this route is active.
+    if (pathname === "/study" || pathname.startsWith("/study/")) {
+      setAccessToken(null);
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
     (async () => {
       setLoading(true);
       // The access token lives only in memory, so on a fresh page load we
@@ -46,15 +59,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // cookie before deciding whether the user is logged in.
       try {
         const tokens = await api.refresh();
+        if (cancelled) return;
         setAccessToken(tokens.access_token);
         await refreshUser();
       } catch {
+        if (cancelled) return;
         setAccessToken(null);
         setUser(null);
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     })();
-  }, [refreshUser]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshUser, pathname]);
 
   const register = async (email: string, password: string) => {
     await api.register(email, password);

@@ -4,6 +4,7 @@ import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
+import { AuthScript } from "@/components/AuthScript";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -70,7 +71,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body className="bg-paper font-body text-ink antialiased">
-        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
+        <AuthScript />
         <ThemeProvider>
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>

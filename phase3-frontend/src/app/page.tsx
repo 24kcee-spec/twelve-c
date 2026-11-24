@@ -47,6 +47,9 @@ function LandingHeader() {
           </Link>
         </nav>
         <div className="flex items-center gap-3">
+          <Link href="/study" className="hidden text-sm font-medium text-usd transition duration-150 hover:text-ink sm:inline">
+            Try without an account
+          </Link>
           <Link href="/login" className="text-sm font-medium text-ink-soft transition duration-150 hover:text-ink">
             Log in
           </Link>
@@ -135,6 +138,12 @@ export default function LandingPage() {
                 <Button variant="ghost" className="px-6 py-3 text-base">
                   Know your taxes first &rarr;
                 </Button>
+              </Link>
+              <Link
+                href="/study"
+                className="text-sm font-medium text-usd underline-offset-4 hover:underline"
+              >
+                Try the research study mode — no account needed
               </Link>
             </div>
             <p className="mt-6 font-mono text-xs uppercase tracking-[0.15em] text-ink-faint">
