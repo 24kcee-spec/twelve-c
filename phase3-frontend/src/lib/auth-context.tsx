@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { api, setAccessToken } from "./api";
+import { api, setAccessToken, setStudySessionMode } from "./api";
 import { UserOut, TokenPair, AccessTokenResponse, MfaRequiredResponse } from "./types";
 
 const MFA_PENDING_KEY = "twelvec_mfa_pending";
@@ -46,6 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const startStudySession = useCallback(async () => {
     setLoading(true);
     setStudyError(null);
+    setStudySessionMode(true);
     try {
       const tokens = await api.createStudySession();
       setAccessToken(tokens.access_token);
@@ -57,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       setAccessToken(null);
       setUser(null);
+      setStudySessionMode(false);
       setStudyError("Twelve C could not start the research session. Check the API connection and try again.");
     } finally {
       setLoading(false);
@@ -83,19 +85,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Resume an anonymous research session first when one exists. This
         // endpoint returns 401 for ordinary visitors and never creates a guest.
         let tokens: AccessTokenResponse;
+        let isStudyGuest = false;
         try {
           tokens = await api.refreshStudySession();
+          isStudyGuest = true;
         } catch {
           tokens = await api.refresh();
         }
 
         if (cancelled) return;
+        setStudySessionMode(isStudyGuest);
         setAccessToken(tokens.access_token);
         const me = await api.me();
         if (!cancelled) setUser(me);
       } catch {
         if (cancelled) return;
         setAccessToken(null);
+        setStudySessionMode(false);
         setUser(null);
       }
       if (!cancelled) setLoading(false);
@@ -119,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { mfaRequired: true };
     }
+    setStudySessionMode(false);
     setAccessToken(result.access_token);
     await refreshUser();
     return { mfaRequired: false };
@@ -136,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const completeMfaLogin = async (pendingToken: string, code: string) => {
     const tokens = await api.mfaLogin(pendingToken, code);
+    setStudySessionMode(false);
     setAccessToken(tokens.access_token);
     await refreshUser();
   };
@@ -147,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await api.logout();
     }
     setAccessToken(null);
+    setStudySessionMode(false);
     setUser(null);
   };
 
