@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { downloadTaxSummaryPdf } from "@/lib/generatePdf";
 import { money, percent, formatDateTime } from "@/lib/format";
 import { calculateStudyQpd, readStudyEngineManifest, StudyEngineManifest } from "@/lib/studyEngine";
@@ -112,7 +113,7 @@ function SectionCard({
 }: {
   title: string;
   eyebrow?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <section className="rounded-lg border border-line bg-surface p-5 shadow-card sm:p-6">
@@ -257,7 +258,7 @@ export default function StudyPage() {
     );
     if (existing) {
       setError(
-        \`A \${QUARTERS[quarter - 1].label} calculation already exists. Delete that run in the history below before repeating this quarter.\`
+        `A ${QUARTERS[quarter - 1].label} calculation already exists. Delete that run in the history below before repeating this quarter.`
       );
       setSelectedId(existing.id);
       return;
@@ -290,7 +291,7 @@ export default function StudyPage() {
       const now = new Date().toISOString();
       const inputJson: QpdCalculationCreate = {
         tax_year: TAX_YEAR,
-        quarter_label: quarterLabel.trim() || \`\${QUARTERS[quarter - 1].label} \${TAX_YEAR}\`,
+        quarter_label: quarterLabel.trim() || `${QUARTERS[quarter - 1].label} ${TAX_YEAR}`,
         quarter,
         usd_sales: usdSales,
         zig_sales: zigSales,
@@ -389,7 +390,7 @@ export default function StudyPage() {
   }
 
   function deleteCalculation(item: StudyCalculation) {
-    if (!window.confirm(\`Delete the \${item.quarter_label} calculation from this browser?\`)) return;
+    if (!window.confirm(`Delete the ${item.quarter_label} calculation from this browser?`)) return;
     setState((current) => ({
       ...current,
       calculations: current.calculations.filter((calculation) => calculation.id !== item.id),
@@ -502,7 +503,7 @@ export default function StudyPage() {
                     <div className="rounded-md bg-paper/70 p-3">
                       <span className="block text-xs text-ink-faint">Study exchange rate</span>
                       <strong className="mt-1 block font-mono text-sm text-ink">
-                        {fixedRateAvailable ? \`ZiG \${STUDY_EXCHANGE_RATE} / USD\` : "Not configured"}
+                        {fixedRateAvailable ? `ZiG ${STUDY_EXCHANGE_RATE} / USD` : "Not configured"}
                       </strong>
                     </div>
                     <div className="rounded-md bg-paper/70 p-3">
@@ -570,7 +571,7 @@ export default function StudyPage() {
                           value={quarterLabel}
                           onChange={(event) => setQuarterLabel(event.currentTarget.value)}
                           maxLength={64}
-                          placeholder={\`e.g. \${QUARTERS[quarter - 1].label} estimate\`}
+                          placeholder={`e.g. ${QUARTERS[quarter - 1].label} estimate`}
                           className="mt-1.5 w-full rounded-md border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-seal"
                         />
                       </label>
@@ -736,7 +737,7 @@ export default function StudyPage() {
                               <p className="font-mono text-sm text-ink">
                                 {money(item.result_json.net_payable_usd, "USD")} / {money(item.result_json.net_payable_zig, "ZIG")}
                               </p>
-                              <p className={\`mt-1 text-xs \${item.payment_confirmed_at ? "text-usd" : "text-ink-faint"}\`}>
+                              <p className={`mt-1 text-xs ${item.payment_confirmed_at ? "text-usd" : "text-ink-faint"}`}>
                                 {item.payment_confirmed_at ? "Payment confirmed" : "Not yet confirmed"}
                               </p>
                             </div>
