@@ -93,6 +93,24 @@ function AccountContent() {
     }
   }
 
+  if (user?.is_study_guest) {
+    return (
+      <main className="min-h-screen bg-paper">
+        <TopBar />
+        <div className="mx-auto max-w-2xl px-6 py-12">
+          <Eyebrow>Research session</Eyebrow>
+          <h1 className="mt-1 font-display text-3xl text-ink">Account settings are not part of this session</h1>
+          <p className="mt-3 text-sm text-ink-soft">
+            This anonymous session uses the normal Twelve C business and tax features, but it does not have account credentials or security settings.
+          </p>
+          <Button variant="primary" className="mt-5" onClick={() => router.push("/dashboard")}>
+            Return to dashboard
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-paper">
       <TopBar />
