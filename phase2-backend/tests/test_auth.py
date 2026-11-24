@@ -330,3 +330,100 @@ async def test_reset_password_expired_code_rejected(client, db_session):
         "/auth/reset-password", json={"email": email, "code": code, "new_password": "N3wPassw0rd!"}
     )
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Anonymous research study sessions
+# ---------------------------------------------------------------------------
+
+
+async def test_study_session_creates_anonymous_api_identity_and_business(client):
+    started = await client.post("/auth/study-session")
+    assert started.status_code == 200, started.text
+    assert "access_token" in started.json()
+    assert "study_refresh_token" in client.cookies
+    assert "refresh_token" not in client.cookies
+
+    headers = {"Authorization": f"Bearer {started.json()['access_token']}"}
+    me = await client.get("/auth/me", headers=headers)
+    assert me.status_code == 200, me.text
+    assert me.json()["is_study_guest"] is True
+    assert me.json()["email"].endswith("@guest.twelvec.invalid")
+
+    created = await client.post(
+        "/businesses",
+        headers=headers,
+        json={
+            "name": "Khami Timber Enterprises (Pvt) Ltd",
+            "default_exchange_rate": 26.8,
+            "default_tax_rate": 0.25,
+            "default_aids_levy_rate": 0.03,
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    listed = await client.get("/businesses", headers=headers)
+    assert listed.status_code == 200, listed.text
+    assert [business["id"] for business in listed.json()] == [created.json()["id"]]
+
+
+async def test_study_session_resumes_same_guest_and_rotates_refresh_cookie(client):
+    first = await client.post("/auth/study-session")
+    assert first.status_code == 200, first.text
+    first_cookie = client.cookies.get("study_refresh_token")
+    first_me = await client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {first.json()['access_token']}"},
+    )
+    assert first_me.status_code == 200, first_me.text
+    first_id = first_me.json()["id"]
+
+    resumed = await client.post("/auth/study-session")
+    assert resumed.status_code == 200, resumed.text
+    second_cookie = client.cookies.get("study_refresh_token")
+    second_me = await client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {resumed.json()['access_token']}"},
+    )
+
+    assert second_cookie != first_cookie
+    assert second_me.status_code == 200, second_me.text
+    assert second_me.json()["id"] == first_id
+
+
+async def test_study_refresh_and_logout_revoke_guest_refresh_cookie(client):
+    started = await client.post("/auth/study-session")
+    assert started.status_code == 200, started.text
+    original_cookie = client.cookies.get("study_refresh_token")
+
+    refreshed = await client.post("/auth/study-refresh")
+    assert refreshed.status_code == 200, refreshed.text
+    assert client.cookies.get("study_refresh_token") != original_cookie
+
+    ended = await client.post("/auth/study-logout")
+    assert ended.status_code == 204, ended.text
+
+    rejected = await client.post("/auth/study-refresh")
+    assert rejected.status_code == 401
+
+
+async def test_study_guest_cannot_use_account_security_or_delete_account(client):
+    started = await client.post("/auth/study-session")
+    assert started.status_code == 200, started.text
+    headers = {"Authorization": f"Bearer {started.json()['access_token']}"}
+
+    mfa = await client.post("/auth/mfa/setup", headers=headers)
+    assert mfa.status_code == 403
+
+    deleted = await client.request("DELETE", "/auth/me", headers=headers, json={})
+    assert deleted.status_code == 403
+
+
+async def test_normal_login_clears_only_the_study_refresh_cookie(client):
+    await client.post("/auth/study-session")
+    assert "study_refresh_token" in client.cookies
+
+    await _register_and_login(client, email="normal-after-study@example.com")
+
+    assert "refresh_token" in client.cookies
+    assert not client.cookies.get("study_refresh_token")
