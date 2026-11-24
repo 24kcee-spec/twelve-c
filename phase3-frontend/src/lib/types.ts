@@ -5,6 +5,7 @@ export interface UserOut {
   is_verified: boolean;
   mfa_enabled: boolean;
   has_password: boolean;
+  is_study_guest: boolean;
 }
 
 export interface TokenPair {

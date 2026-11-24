@@ -66,6 +66,7 @@ MAX_VERIFICATION_ATTEMPTS = 5
 MAX_RESET_ATTEMPTS = 5
 
 REFRESH_COOKIE_NAME = "refresh_token"
+STUDY_REFRESH_COOKIE_NAME = "study_refresh_token"
 # Cookie only ever needs to travel to /auth/* endpoints - scoping the path
 # keeps it out of every other request the browser makes.
 REFRESH_COOKIE_PATH = "/auth"
@@ -114,11 +115,43 @@ def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(key=REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
 
 
+def _set_study_refresh_cookie(response: Response, raw_token: str) -> None:
+    response.set_cookie(
+        key=STUDY_REFRESH_COOKIE_NAME,
+        value=raw_token,
+        max_age=settings.refresh_token_expire_days * 24 * 3600,
+        path=REFRESH_COOKIE_PATH,
+        httponly=True,
+        secure=REFRESH_COOKIE_SECURE,
+        samesite=REFRESH_COOKIE_SAMESITE,
+    )
+
+
+def _clear_study_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(key=STUDY_REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+
+
 async def _issue_tokens(db: AsyncSession, user: User, response: Response) -> AccessTokenResponse:
+    # A normal sign-in replaces any anonymous research session in this browser.
+    _clear_study_refresh_cookie(response)
     access_token = create_access_token(user.id)
     refresh_token = await issue_refresh_token(db, user.id)
     _set_refresh_cookie(response, refresh_token)
     return AccessTokenResponse(access_token=access_token)
+
+
+async def _issue_study_tokens(db: AsyncSession, user: User, response: Response) -> AccessTokenResponse:
+    access_token = create_access_token(user.id)
+    refresh_token = await issue_refresh_token(db, user.id)
+    _set_study_refresh_cookie(response, refresh_token)
+    return AccessTokenResponse(access_token=access_token)
+
+def _require_registered_account(user: User) -> None:
+    if user.is_study_guest:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account security settings are not available in a research session",
+        )
 
 
 def _decode_or_401(token: str, expected_type: TokenType, detail: str) -> uuid.UUID:
@@ -132,6 +165,90 @@ def _decode_or_401(token: str, expected_type: TokenType, detail: str) -> uuid.UU
         return uuid.UUID(data["sub"])
     except (KeyError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+
+
+# ---------------------------------------------------------------------------
+# Anonymous research sessions
+# ---------------------------------------------------------------------------
+
+
+@router.post("/study-session", response_model=AccessTokenResponse)
+@limiter.limit("10/hour")
+async def create_study_session(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Starts or resumes an anonymous research session.
+
+    A guest gets an internal, non-routable identity so all existing
+    business/calculation/assets/monthly-income/export endpoints can keep
+    using the ordinary ownership and authorization rules. No email,
+    password, registration record, or participant identity is collected.
+    """
+    raw_token = request.cookies.get(STUDY_REFRESH_COOKIE_NAME)
+    if raw_token:
+        record = await get_valid_refresh_token(db, raw_token)
+        if record is not None:
+            user = await db.get(User, record.user_id)
+            if user is not None and user.is_active and user.is_study_guest:
+                await revoke_refresh_token(db, record)
+                return await _issue_study_tokens(db, user, response)
+
+        _clear_study_refresh_cookie(response)
+
+    guest = User(
+        email=f"study-{uuid.uuid4().hex}@example.com",
+        hashed_password=None,
+        google_id=f"twelvec-study-guest:{uuid.uuid4().hex}",
+        is_active=True,
+        is_verified=True,
+    )
+    db.add(guest)
+    await db.commit()
+    await db.refresh(guest)
+    return await _issue_study_tokens(db, guest, response)
+
+
+@router.post("/study-refresh", response_model=AccessTokenResponse)
+async def refresh_study_session(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    raw_token = request.cookies.get(STUDY_REFRESH_COOKIE_NAME)
+    if not raw_token:
+        _clear_study_refresh_cookie(response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Research session expired")
+
+    record = await get_valid_refresh_token(db, raw_token)
+    if record is None:
+        _clear_study_refresh_cookie(response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Research session expired")
+
+    user = await db.get(User, record.user_id)
+    if user is None or not user.is_active or not user.is_study_guest:
+        _clear_study_refresh_cookie(response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Research session expired")
+
+    await revoke_refresh_token(db, record)
+    return await _issue_study_tokens(db, user, response)
+
+
+@router.post("/study-logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_study_session(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    raw_token = request.cookies.get(STUDY_REFRESH_COOKIE_NAME)
+    if raw_token:
+        record = await get_valid_refresh_token(db, raw_token)
+        if record is not None:
+            await revoke_refresh_token(db, record)
+    _clear_study_refresh_cookie(response)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +542,7 @@ async def google_login(request: Request, response: Response, payload: GoogleAuth
 
 @router.post("/mfa/setup", response_model=MfaSetupResponse)
 async def mfa_setup(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    _require_registered_account(user)
     secret = generate_totp_secret()
     user.mfa_secret_pending = encrypt_mfa_secret(secret)
     await db.commit()
@@ -444,6 +562,7 @@ async def mfa_verify(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _require_registered_account(user)
     if not user.mfa_secret_pending:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Start MFA setup first")
 
@@ -463,6 +582,7 @@ async def mfa_disable(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _require_registered_account(user)
     if not user.mfa_enabled or not user.mfa_secret:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA is not enabled")
 
@@ -488,6 +608,7 @@ async def delete_account(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _require_registered_account(user)
     # Password accounts must re-confirm their password before deletion -
     # a valid access token alone isn't enough for something irreversible.
     if user.hashed_password is not None:

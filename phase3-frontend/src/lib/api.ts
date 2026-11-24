@@ -27,9 +27,14 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://twelve-c.onrender.c
 // hard page refresh by itself - AuthProvider calls /auth/refresh on mount
 // (which succeeds off the cookie) to get a fresh one silently.
 let accessToken: string | null = null;
+let studySessionMode = false;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+}
+
+export function setStudySessionMode(active: boolean) {
+  studySessionMode = active;
 }
 
 export function hasAccessToken(): boolean {
@@ -43,7 +48,8 @@ let refreshInFlight: Promise<AccessTokenResponse | null> | null = null;
 
 async function tryRefresh(): Promise<AccessTokenResponse | null> {
   if (!refreshInFlight) {
-    refreshInFlight = rawRequest<AccessTokenResponse>("/auth/refresh", { method: "POST" }, true)
+    const refreshPath = studySessionMode ? "/auth/study-refresh" : "/auth/refresh";
+    refreshInFlight = rawRequest<AccessTokenResponse>(refreshPath, { method: "POST" }, true)
       .then((tokens) => {
         setAccessToken(tokens.access_token);
         return tokens;
@@ -198,6 +204,23 @@ export const api = {
     ),
 
   refresh: () => rawRequest<AccessTokenResponse>("/auth/refresh", { method: "POST" }, true),
+
+  // Anonymous research sessions use a separate httpOnly refresh cookie.
+  // Their business and tax data still use the ordinary authenticated API.
+  createStudySession: () =>
+    rawRequest<AccessTokenResponse>("/auth/study-session", { method: "POST" }, true),
+
+  refreshStudySession: () =>
+    rawRequest<AccessTokenResponse>("/auth/study-refresh", { method: "POST" }, true),
+
+  logoutStudySession: async () => {
+    try {
+      await rawRequest<void>("/auth/study-logout", { method: "POST" }, true);
+    } catch {
+      // Best-effort - clear the in-memory guest token even if the API is offline.
+    }
+    setAccessToken(null);
+  },
 
   logout: async () => {
     try {
