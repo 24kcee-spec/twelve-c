@@ -34,16 +34,16 @@ function worksheetXml(rows: Cell[][]): string {
       const cells = row
         .map((value, colIndex) => {
           if (value === null || value === undefined || value === "") return "";
-          const ref = \`\${columnName(colIndex)}\${rowIndex + 1}\`;
+          const ref = `${columnName(colIndex)}${rowIndex + 1}`;
           if (typeof value === "number" && Number.isFinite(value)) {
-            return \`<c r="\${ref}"><v>\${value}</v></c>\`;
+            return `<c r="${ref}"><v>${value}</v></c>`;
           }
-          return \`<c r="\${ref}" t="inlineStr"><is><t xml:space="preserve">\${xmlEscape(
+          return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEscape(
             String(value)
-          )}</t></is></c>\`;
+          )}</t></is></c>`;
         })
         .join("");
-      return \`<row r="\${rowIndex + 1}">\${cells}</row>\`;
+      return `<row r="${rowIndex + 1}">${cells}</row>`;
     })
     .join("");
 
@@ -51,7 +51,7 @@ function worksheetXml(rows: Cell[][]): string {
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
     '<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>' +
-    \`<sheetData>\${rowXml}</sheetData></worksheet>\`
+    `<sheetData>${rowXml}</sheetData></worksheet>`
   );
 }
 
@@ -177,7 +177,7 @@ export function downloadStudyWorkbook(
     .filter((entry) => entry.tax_year === selected.tax_year)
     .sort((a, b) => a.quarter - b.quarter)) {
     qpdRows.push([
-      \`Q\${item.quarter}\`,
+      `Q${item.quarter}`,
       item.result_json.due_date,
       item.result_json.schedule[item.quarter - 1]?.percentage ?? 0,
       item.result_json.cumulative_percentage,
@@ -279,6 +279,6 @@ export function downloadStudyWorkbook(
     business.name.replace(/[\\/:*?"<>|]/g, "").trim().replace(/\s+/g, "-") || "Study-Business";
   downloadBlob(
     workbook,
-    \`Twelve-C-\${safeName}-QPD-Working-Papers-\${selected.tax_year}.xlsx\`
+    `Twelve-C-${safeName}-QPD-Working-Papers-${selected.tax_year}.xlsx`
   );
 }
