@@ -348,7 +348,7 @@ async def test_study_session_creates_anonymous_api_identity_and_business(client)
     me = await client.get("/auth/me", headers=headers)
     assert me.status_code == 200, me.text
     assert me.json()["is_study_guest"] is True
-    assert me.json()["email"].endswith("@guest.twelvec.invalid")
+    assert me.json()["email"].endswith("@example.com")
 
     created = await client.post(
         "/businesses",
