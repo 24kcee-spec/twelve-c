@@ -168,6 +168,7 @@ function LogoutIcon() {
 
 export function TopBar() {
   const { user, logout } = useAuth();
+  const isStudyGuest = user?.is_study_guest === true;
   const router = useRouter();
   const pathname = usePathname();
 
@@ -192,8 +193,9 @@ export function TopBar() {
   const currentBusiness = businesses?.find((b) => b.id === currentBusinessId) ?? null;
 
   async function onLogout() {
+    const wasStudyGuest = user?.is_study_guest === true;
     await logout();
-    router.push("/login");
+    router.push(wasStudyGuest ? "/" : "/login");
   }
 
   return (
@@ -247,27 +249,33 @@ export function TopBar() {
                 open ? "ring-2 ring-usd ring-offset-2 ring-offset-surface" : ""
               }`}
             >
-              {user ? initials(user.email) : "?"}
+              {isStudyGuest ? "ST" : user ? initials(user.email) : "?"}
             </span>
           )}
         >
           {user && (
             <div className="mb-1 flex items-center gap-3 bg-paper/50 px-3.5 py-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
-                {initials(user.email)}
+                {isStudyGuest ? "ST" : initials(user.email)}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">{user.email}</p>
-                <p className="text-xs text-ink-faint">Signed in</p>
+                <p className="truncate text-sm font-medium text-ink">
+                  {isStudyGuest ? "Anonymous research session" : user.email}
+                </p>
+                <p className="text-xs text-ink-faint">
+                  {isStudyGuest ? "Entries saved to the Twelve C API" : "Signed in"}
+                </p>
               </div>
             </div>
           )}
-          <DropdownItem href="/account">
-            <span className="flex items-center gap-2.5">
-              <GearIcon />
-              Account &amp; security
-            </span>
-          </DropdownItem>
+          {!isStudyGuest && (
+            <DropdownItem href="/account">
+              <span className="flex items-center gap-2.5">
+                <GearIcon />
+                Account &amp; security
+              </span>
+            </DropdownItem>
+          )}
           <DropdownItem href="/tutorial">
             <span className="flex items-center gap-2.5">
               <HelpIcon />
@@ -287,11 +295,20 @@ export function TopBar() {
           <DropdownItem onClick={onLogout} danger>
             <span className="flex items-center gap-2.5">
               <LogoutIcon />
-              Log out
+              {isStudyGuest ? "End research session" : "Log out"}
             </span>
           </DropdownItem>
         </Dropdown>
       </div>
+      {isStudyGuest && (
+        <div className="border-t border-line bg-seal-soft px-6 py-2.5">
+          <div className="mx-auto max-w-6xl text-xs leading-relaxed text-ink-soft">
+            <span className="font-semibold text-ink">Research study session.</span>{" "}
+            No account is required. Entries you make in Twelve C are saved through the API.
+            Use only the fictional study data supplied by the researcher.
+          </div>
+        </div>
+      )}
     </header>
   );
 }
