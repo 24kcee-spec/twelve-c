@@ -74,7 +74,7 @@ export function PublicHeader() {
           <Logo />
         </Link>
 
-        <nav aria-label="Main navigation" className="hidden items-center gap-1 md:flex">
+        <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
           {LINKS.map((item) => (
             <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined} className={linkClass(isActive(item.href))}>
               {item.label}
@@ -82,13 +82,18 @@ export function PublicHeader() {
           ))}
           <div className="ml-2 h-5 w-px bg-line" />
           {LEGAL_LINKS.map((item) => (
-            <Link key={item.href} href={item.href} className={linkClass(isActive(item.href))}>
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={isActive(item.href) ? "page" : undefined}
+              className={linkClass(isActive(item.href))}
+            >
               {item.label}
             </Link>
           ))}
         </nav>
 
-        <div className="hidden shrink-0 items-center gap-2 md:flex">
+        <div className="hidden shrink-0 items-center gap-2 lg:flex">
           <Link
             href="/study"
             className="rounded-md px-3 py-2 text-sm font-semibold text-usd transition hover:bg-usd-soft hover:text-ink"
@@ -115,7 +120,7 @@ export function PublicHeader() {
           aria-expanded={menuOpen}
           aria-controls="public-mobile-navigation"
           onClick={() => setMenuOpen((open) => !open)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line text-ink transition hover:bg-paper md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line text-ink transition hover:bg-paper lg:hidden"
         >
           <MenuIcon open={menuOpen} />
         </button>
@@ -125,7 +130,7 @@ export function PublicHeader() {
         <nav
           id="public-mobile-navigation"
           aria-label="Mobile navigation"
-          className="border-t border-line bg-surface px-4 py-3 shadow-card md:hidden"
+          className="border-t border-line bg-surface px-4 py-3 shadow-card lg:hidden"
         >
           <div className="mx-auto flex max-w-7xl flex-col gap-1">
             {LINKS.map((item) => (
