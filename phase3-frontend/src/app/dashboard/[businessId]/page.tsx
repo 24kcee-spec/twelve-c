@@ -198,6 +198,8 @@ function BusinessContent({ businessId }: { businessId: string }) {
                 <button
                   key={t.id}
                   type="button"
+                  role="tab"
+                  aria-selected={tab === t.id}
                   onClick={() => setTab(t.id)}
                   className={`-mb-px border-b-2 pb-2.5 text-sm font-medium transition duration-150 ${
                     tab === t.id
