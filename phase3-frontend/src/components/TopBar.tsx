@@ -228,8 +228,7 @@ export function TopBar() {
               <Logo />
             </Link>
             <div className="hidden min-w-0 sm:block">
-              <Dropdown align="left" ariaLabel="Switch business">
-                {({ open }) => (
+              <Dropdown align="left" ariaLabel="Switch business" trigger={({ open }) => (
                   <span className={`flex max-w-[15rem] items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition duration-150 ${
                     open ? "bg-paper/60 text-ink" : "text-ink-soft hover:text-usd"
                   }`}>
@@ -238,7 +237,7 @@ export function TopBar() {
                     </span>
                     <ChevronDown open={open} />
                   </span>
-                )}
+                )}>
                 <DropdownLabel>Your businesses</DropdownLabel>
                 {businesses === null && (
                   <div className="px-3 py-2 text-xs text-ink-faint">Loading businesses…</div>
@@ -349,12 +348,11 @@ export function TopBar() {
                 </svg>
               )}
             </button>
-            <Dropdown align="right" ariaLabel="Account and preferences">
-              {() => (
+            <Dropdown align="right" ariaLabel="Account and preferences" trigger={() => (
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
                   {isStudyGuest ? "ST" : user ? initials(user.email) : "?"}
                 </span>
-              )}
+              )}>
               {user && (
                 <div className="mb-1 flex items-center gap-3 bg-paper/50 px-3.5 py-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
