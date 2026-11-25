@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/types";
-import { Button, Card, ErrorNote, Field, Logo } from "@/components/ui";
+import { Button, Card, ErrorNote, Field } from "@/components/ui";
+import { AuthBrand } from "@/components/AuthBrand";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function RegisterPage() {
@@ -61,7 +62,7 @@ export default function RegisterPage() {
     <main className="flex min-h-screen items-center justify-center bg-paper px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
-          <Logo />
+          <AuthBrand />
         </div>
         <Card>
           <h1 className="font-display text-2xl text-ink">Create your account</h1>
