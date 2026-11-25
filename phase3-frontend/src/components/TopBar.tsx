@@ -235,7 +235,7 @@ export function TopBar() {
             <Link href="/dashboard" aria-label="Twelve C dashboard" className="shrink-0">
               <Logo />
             </Link>
-            <div className="hidden min-w-0 sm:block">
+            <div className="hidden min-w-0 lg:block">
               <Dropdown align="left" ariaLabel="Switch business" trigger={({ open }) => (
                   <span className={`flex max-w-[15rem] items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition duration-150 ${
                     open ? "bg-paper/60 text-ink" : "text-ink-soft hover:text-usd"
