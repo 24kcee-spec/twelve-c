@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/types";
-import { Button, Card, ErrorNote, Field, Logo } from "@/components/ui";
+import { Button, Card, ErrorNote, Field } from "@/components/ui";
+import { AuthBrand } from "@/components/AuthBrand";
 
 export default function MfaChallengePage() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function MfaChallengePage() {
     <main className="flex min-h-screen items-center justify-center bg-paper px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
-          <Logo />
+          <AuthBrand />
         </div>
         <Card>
           <h1 className="font-display text-2xl text-ink">Enter your code</h1>
