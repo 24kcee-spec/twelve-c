@@ -6,6 +6,7 @@ import {
   ButtonHTMLAttributes,
   ReactNode,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -228,39 +229,55 @@ export function Dropdown({
   trigger,
   children,
   align = "left",
+  ariaLabel,
 }: {
   trigger: (state: { open: boolean }) => ReactNode;
   children: ReactNode;
   align?: "left" | "right";
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const menuId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    function onPointerDown(e: MouseEvent) {
+    function onPointerDown(e: PointerEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     }
-    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
 
   return (
     <div className="relative" ref={containerRef}>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls={menuId}
+        onClick={() => setOpen((o) => !o)}
+      >
         {trigger({ open })}
       </button>
       {open && (
         <div
+          id={menuId}
           onClick={() => setOpen(false)}
           className={`fade-in-up absolute z-50 mt-2 min-w-[15.5rem] overflow-hidden rounded-xl border border-line bg-surface py-1.5 shadow-card-raised ${
             align === "right" ? "right-0" : "left-0"

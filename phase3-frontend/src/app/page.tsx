@@ -7,6 +7,7 @@ import { AnimatedScheduleReveal } from "@/components/AnimatedScheduleReveal";
 import { QuarterlyRhythm } from "@/components/QuarterlyRhythm";
 import { Button, Card, Eyebrow, Logo } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
+import { PublicHeader } from "@/components/PublicHeader";
 
 const FEATURES: { title: string; body: string }[] = [
   {
@@ -32,35 +33,6 @@ const STEPS = [
   { n: "02", title: "Enter this quarter", body: "USD and ZiG sales and expenses. Twelve C works out the cumulative instalment ZIMRA expects." },
   { n: "03", title: "Confirm and file", body: "Download the PDF summary, pay ZIMRA, then confirm what actually went through so next quarter nets correctly." },
 ];
-
-function LandingHeader() {
-  return (
-    <header className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-        <Logo />
-        <nav className="hidden items-center gap-6 md:flex">
-          <Link href="/learn" className="text-sm text-ink-soft transition duration-150 hover:text-usd">
-            Know your taxes
-          </Link>
-          <Link href="/tutorial" className="text-sm text-ink-soft transition duration-150 hover:text-usd">
-            How it works
-          </Link>
-        </nav>
-        <div className="flex items-center gap-3">
-          <Link href="/study" className="hidden text-sm font-medium text-usd transition duration-150 hover:text-ink sm:inline">
-            Try without an account
-          </Link>
-          <Link href="/login" className="text-sm font-medium text-ink-soft transition duration-150 hover:text-ink">
-            Log in
-          </Link>
-          <Link href="/register">
-            <Button variant="primary">Get started</Button>
-          </Link>
-        </div>
-      </div>
-    </header>
-  );
-}
 
 function LandingFooter() {
   return (
@@ -110,7 +82,7 @@ export default function LandingPage() {
 
   return (
     <main className="min-h-screen bg-paper">
-      <LandingHeader />
+      <PublicHeader />
 
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 pb-16 pt-16 md:pb-24 md:pt-24">

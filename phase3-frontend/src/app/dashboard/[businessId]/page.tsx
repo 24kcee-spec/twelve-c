@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AuthGuard } from "@/components/AuthGuard";
 import { TopBar } from "@/components/TopBar";
 import { ResultsPanel } from "@/components/ResultsPanel";
@@ -26,7 +26,20 @@ function BusinessContent({ businessId }: { businessId: string }) {
   const [calculations, setCalculations] = useState<QpdCalculationOut[]>([]);
   const [selected, setSelected] = useState<QpdCalculationOut | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"overview" | "reconciliation" | "history">("overview");
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedView = searchParams.get("view");
+  const tab: "overview" | "reconciliation" | "history" =
+    requestedView === "reconciliation" || requestedView === "history" ? requestedView : "overview";
+
+  function setTab(nextTab: "overview" | "reconciliation" | "history") {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextTab === "overview") params.delete("view");
+    else params.set("view", nextTab);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
 
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const yearsInitialized = useRef(false);
@@ -58,7 +71,6 @@ function BusinessContent({ businessId }: { businessId: string }) {
     setDeletingCalcId(null);
     setSelected(null);
     setError("");
-    setTab("overview");
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId]);
@@ -175,7 +187,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
 
         {selected ? (
           <>
-            <div className="mt-8 flex gap-5 border-b border-line">
+            <div className="mt-8 flex gap-5 border-b border-line lg:hidden">
               {(
                 [
                   { id: "overview", label: "Overview" },
@@ -186,6 +198,8 @@ function BusinessContent({ businessId }: { businessId: string }) {
                 <button
                   key={t.id}
                   type="button"
+                  role="tab"
+                  aria-selected={tab === t.id}
                   onClick={() => setTab(t.id)}
                   className={`-mb-px border-b-2 pb-2.5 text-sm font-medium transition duration-150 ${
                     tab === t.id

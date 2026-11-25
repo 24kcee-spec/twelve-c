@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme, Theme } from "@/lib/theme-context";
@@ -171,6 +171,10 @@ export function TopBar() {
   const isStudyGuest = user?.is_study_guest === true;
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeBusinessView = searchParams.get("view");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
 
   const [businesses, setBusinesses] = useState<Business[] | null>(null);
 
@@ -191,6 +195,10 @@ export function TopBar() {
 
   const currentBusinessId = pathname?.match(/^\/dashboard\/([^/]+)/)?.[1];
   const currentBusiness = businesses?.find((b) => b.id === currentBusinessId) ?? null;
+  const isNewCalculation = Boolean(pathname?.endsWith("/new"));
+  const overviewHref = currentBusinessId ? `/dashboard/${currentBusinessId}` : "/dashboard";
+  const reconciliationHref = currentBusinessId ? `/dashboard/${currentBusinessId}?view=reconciliation` : "/dashboard";
+  const historyHref = currentBusinessId ? `/dashboard/${currentBusinessId}?view=history` : "/dashboard";
 
   async function onLogout() {
     const wasStudyGuest = user?.is_study_guest === true;
@@ -198,111 +206,311 @@ export function TopBar() {
     router.push(wasStudyGuest ? "/" : "/login");
   }
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname, searchParams]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!headerRef.current?.contains(event.target as Node)) setMobileMenuOpen(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
   return (
-    <header className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95">
+    <header ref={headerRef} className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95 backdrop-blur">
       <div className="h-[3px] bg-gradient-to-r from-seal via-[#9EC494] to-seal" />
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard" className="mr-4">
-            <Logo />
-          </Link>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="flex min-h-16 items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/dashboard" aria-label="Twelve C dashboard" className="shrink-0">
+              <Logo />
+            </Link>
+            <div className="hidden min-w-0 lg:block">
+              <Dropdown align="left" ariaLabel="Switch business" trigger={({ open }) => (
+                  <span className={`flex max-w-[15rem] items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition duration-150 ${
+                    open ? "bg-paper/60 text-ink" : "text-ink-soft hover:text-usd"
+                  }`}>
+                    <span className="max-w-[11rem] truncate">
+                      {currentBusiness ? currentBusiness.name : "Businesses"}
+                    </span>
+                    <ChevronDown open={open} />
+                  </span>
+                )}>
+                <DropdownLabel>Your businesses</DropdownLabel>
+                {businesses === null && (
+                  <div className="px-3 py-2 text-xs text-ink-faint">Loading businesses…</div>
+                )}
+                {businesses?.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-ink-faint">
+                    No businesses yet. Add one from the dashboard.
+                  </div>
+                )}
+                {businesses?.map((business) => (
+                  <DropdownItem
+                    key={business.id}
+                    href={`/dashboard/${business.id}`}
+                    active={business.id === currentBusinessId}
+                  >
+                    {business.name}
+                  </DropdownItem>
+                ))}
+                <DropdownDivider />
+                <DropdownItem href="/dashboard">All businesses</DropdownItem>
+              </Dropdown>
+            </div>
+          </div>
 
-          <Dropdown
-            align="left"
-            trigger={({ open }) => (
-              <span
-                className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition duration-150 ${
-                  open ? "bg-paper/60 text-ink" : "text-ink-soft hover:text-usd"
-                }`}
-              >
-                <span className="max-w-[10rem] truncate">
-                  {currentBusiness ? currentBusiness.name : "Businesses"}
-                </span>
-                <ChevronDown open={open} />
-              </span>
-            )}
-          >
-            <DropdownLabel>Your businesses</DropdownLabel>
-            {businesses === null && (
-              <div className="px-3 py-2 text-xs text-ink-faint">Loading...</div>
-            )}
-            {businesses?.length === 0 && (
-              <div className="px-3 py-2 text-xs text-ink-faint">
-                No businesses yet - add one from the dashboard.
-              </div>
-            )}
-            {businesses?.map((b) => (
-              <DropdownItem key={b.id} href={`/dashboard/${b.id}`} active={b.id === currentBusinessId}>
-                {b.name}
-              </DropdownItem>
-            ))}
-            <DropdownDivider />
-            <DropdownItem href="/dashboard">All businesses</DropdownItem>
-          </Dropdown>
-        </div>
-
-        <Dropdown
-          align="right"
-          trigger={({ open }) => (
-            <span
-              className={`flex h-8 w-8 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink transition ${
-                open ? "ring-2 ring-usd ring-offset-2 ring-offset-surface" : ""
+          <nav aria-label="Primary navigation" className="hidden items-center gap-1 lg:flex">
+            <Link
+              href="/dashboard"
+              aria-current={pathname === "/dashboard" ? "page" : undefined}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                pathname === "/dashboard" ? "bg-seal-soft text-ink" : "text-ink-soft hover:bg-paper hover:text-ink"
               }`}
             >
-              {isStudyGuest ? "ST" : user ? initials(user.email) : "?"}
-            </span>
-          )}
-        >
-          {user && (
-            <div className="mb-1 flex items-center gap-3 bg-paper/50 px-3.5 py-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
-                {isStudyGuest ? "ST" : initials(user.email)}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">
-                  {isStudyGuest ? "Anonymous research session" : user.email}
-                </p>
-                <p className="text-xs text-ink-faint">
-                  {isStudyGuest ? "Entries saved to the Twelve C API" : "Signed in"}
-                </p>
-              </div>
-            </div>
-          )}
-          {!isStudyGuest && (
-            <DropdownItem href="/account">
-              <span className="flex items-center gap-2.5">
-                <GearIcon />
-                Account &amp; security
-              </span>
-            </DropdownItem>
-          )}
-          <DropdownItem href="/tutorial">
-            <span className="flex items-center gap-2.5">
-              <HelpIcon />
-              How Twelve C works
-            </span>
-          </DropdownItem>
-          <DropdownItem href="/learn">
-            <span className="flex items-center gap-2.5">
-              <BookIcon />
-              Know your taxes
-            </span>
-          </DropdownItem>
-          <ThemeToggle />
-          <DropdownDivider />
-          <LegalSubmenu />
-          <DropdownDivider />
-          <DropdownItem onClick={onLogout} danger>
-            <span className="flex items-center gap-2.5">
-              <LogoutIcon />
-              {isStudyGuest ? "End research session" : "Log out"}
-            </span>
-          </DropdownItem>
-        </Dropdown>
+              Dashboard
+            </Link>
+            {currentBusinessId && (
+              <>
+                {isNewCalculation ? (
+                  <Link
+                    href={overviewHref}
+                    className="rounded-md px-3 py-2 text-sm font-medium text-ink-soft transition hover:bg-paper hover:text-ink"
+                  >
+                    Business overview
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      href={overviewHref}
+                      aria-current={!activeBusinessView || activeBusinessView === "overview" ? "page" : undefined}
+                      className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                        !activeBusinessView || activeBusinessView === "overview"
+                          ? "bg-seal-soft text-ink"
+                          : "text-ink-soft hover:bg-paper hover:text-ink"
+                      }`}
+                    >
+                      Overview
+                    </Link>
+                    <Link
+                      href={reconciliationHref}
+                      aria-current={activeBusinessView === "reconciliation" ? "page" : undefined}
+                      className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                        activeBusinessView === "reconciliation"
+                          ? "bg-seal-soft text-ink"
+                          : "text-ink-soft hover:bg-paper hover:text-ink"
+                      }`}
+                    >
+                      Reconciliation
+                    </Link>
+                    <Link
+                      href={historyHref}
+                      aria-current={activeBusinessView === "history" ? "page" : undefined}
+                      className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                        activeBusinessView === "history"
+                          ? "bg-seal-soft text-ink"
+                          : "text-ink-soft hover:bg-paper hover:text-ink"
+                      }`}
+                    >
+                      History
+                    </Link>
+                  </>
+                )}
+              </>
+            )}
+            <span className="mx-1 h-5 w-px bg-line" />
+            <Link href="/tutorial" className="rounded-md px-3 py-2 text-sm text-ink-soft transition hover:bg-paper hover:text-ink">
+              How it works
+            </Link>
+            <Link href="/learn" className="rounded-md px-3 py-2 text-sm text-ink-soft transition hover:bg-paper hover:text-ink">
+              Tax guide
+            </Link>
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              aria-label={mobileMenuOpen ? "Close main navigation" : "Open main navigation"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-app-navigation"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line text-ink-soft transition hover:bg-paper hover:text-ink lg:hidden"
+            >
+              {mobileMenuOpen ? (
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" aria-hidden="true">
+                  <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" aria-hidden="true">
+                  <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+            <Dropdown align="right" ariaLabel="Account and preferences" trigger={() => (
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
+                  {isStudyGuest ? "ST" : user ? initials(user.email) : "?"}
+                </span>
+              )}>
+              {user && (
+                <div className="mb-1 flex items-center gap-3 bg-paper/50 px-3.5 py-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-seal font-mono text-xs font-semibold text-ink">
+                    {isStudyGuest ? "ST" : initials(user.email)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">
+                      {isStudyGuest ? "Anonymous research session" : user.email}
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      {isStudyGuest ? "Entries saved to the Twelve C API" : "Signed in"}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {!isStudyGuest && (
+                <DropdownItem href="/account">
+                  <span className="flex items-center gap-2.5">
+                    <GearIcon />
+                    Account &amp; security
+                  </span>
+                </DropdownItem>
+              )}
+              <DropdownItem href="/tutorial">
+                <span className="flex items-center gap-2.5">
+                  <HelpIcon />
+                  How Twelve C works
+                </span>
+              </DropdownItem>
+              <DropdownItem href="/learn">
+                <span className="flex items-center gap-2.5">
+                  <BookIcon />
+                  Know your taxes
+                </span>
+              </DropdownItem>
+              <ThemeToggle />
+              <DropdownDivider />
+              <LegalSubmenu />
+              <DropdownDivider />
+              <DropdownItem onClick={onLogout} danger>
+                <span className="flex items-center gap-2.5">
+                  <LogoutIcon />
+                  {isStudyGuest ? "End research session" : "Log out"}
+                </span>
+              </DropdownItem>
+            </Dropdown>
+          </div>
+        </div>
       </div>
+
+      {mobileMenuOpen && (
+        <nav id="mobile-app-navigation" aria-label="Mobile main navigation" className="border-t border-line bg-surface px-4 py-3 shadow-card lg:hidden">
+          <div className="mx-auto flex max-w-7xl flex-col gap-1">
+            <Link
+              href="/dashboard"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-current={pathname === "/dashboard" ? "page" : undefined}
+              className="rounded-md px-3 py-2.5 text-sm font-medium text-ink-soft transition hover:bg-paper hover:text-ink"
+            >
+              All businesses
+            </Link>
+            {currentBusinessId && (
+              <>
+                <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+                  {currentBusiness?.name ?? "Current business"}
+                </p>
+                <Link
+                  href={overviewHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-current={!activeBusinessView || activeBusinessView === "overview" ? "page" : undefined}
+                  className={`rounded-md px-3 py-2.5 text-sm transition ${
+                    !activeBusinessView || activeBusinessView === "overview"
+                      ? "bg-seal-soft font-medium text-ink"
+                      : "text-ink-soft hover:bg-paper hover:text-ink"
+                  }`}
+                >
+                  Overview
+                </Link>
+                <Link
+                  href={reconciliationHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-current={activeBusinessView === "reconciliation" ? "page" : undefined}
+                  className={`rounded-md px-3 py-2.5 text-sm transition ${
+                    activeBusinessView === "reconciliation"
+                      ? "bg-seal-soft font-medium text-ink"
+                      : "text-ink-soft hover:bg-paper hover:text-ink"
+                  }`}
+                >
+                  Reconciliation
+                </Link>
+                <Link
+                  href={historyHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-current={activeBusinessView === "history" ? "page" : undefined}
+                  className={`rounded-md px-3 py-2.5 text-sm transition ${
+                    activeBusinessView === "history"
+                      ? "bg-seal-soft font-medium text-ink"
+                      : "text-ink-soft hover:bg-paper hover:text-ink"
+                  }`}
+                >
+                  History
+                </Link>
+                {isNewCalculation && (
+                  <span className="rounded-md bg-seal-soft px-3 py-2.5 text-sm font-medium text-ink">
+                    New QPD calculation
+                  </span>
+                )}
+              </>
+            )}
+            <div className="my-2 border-t border-line" />
+            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+              Your businesses
+            </p>
+            {businesses === null && <p className="px-3 py-2 text-xs text-ink-faint">Loading businesses…</p>}
+            {businesses?.length === 0 && <p className="px-3 py-2 text-xs text-ink-faint">No businesses yet.</p>}
+            {businesses?.filter((business) => business.id !== currentBusinessId).map((business) => (
+              <Link
+                key={business.id}
+                href={`/dashboard/${business.id}`}
+                onClick={() => setMobileMenuOpen(false)}
+                className="truncate rounded-md px-3 py-2.5 text-sm text-ink-soft transition hover:bg-paper hover:text-ink"
+              >
+                {business.name}
+              </Link>
+            ))}
+            {businesses && businesses.filter((business) => business.id !== currentBusinessId).length === 0 && (
+              <p className="px-3 py-2 text-xs text-ink-faint">No other businesses.</p>
+            )}
+            <div className="my-2 border-t border-line" />
+            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+              Resources
+            </p>
+            <Link href="/tutorial" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm text-ink-soft transition hover:bg-paper hover:text-ink">
+              How Twelve C works
+            </Link>
+            <Link href="/learn" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm text-ink-soft transition hover:bg-paper hover:text-ink">
+              Know your taxes
+            </Link>
+            {!isStudyGuest && (
+              <Link href="/account" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm text-ink-soft transition hover:bg-paper hover:text-ink">
+                Account &amp; security
+              </Link>
+            )}
+          </div>
+        </nav>
+      )}
+
       {isStudyGuest && (
-        <div className="border-t border-line bg-seal-soft px-6 py-2.5">
-          <div className="mx-auto max-w-6xl text-xs leading-relaxed text-ink-soft">
+        <div className="border-t border-line bg-seal-soft px-4 py-2.5 sm:px-6">
+          <div className="mx-auto max-w-7xl text-xs leading-relaxed text-ink-soft">
             <span className="font-semibold text-ink">Research study session.</span>{" "}
             No account is required. Entries you make in Twelve C are saved through the API.
             Use only the fictional study data supplied by the researcher.

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/types";
-import { Button, Card, ErrorNote, Field, Logo } from "@/components/ui";
+import { Button, Card, ErrorNote, Field } from "@/components/ui";
+import { AuthBrand } from "@/components/AuthBrand";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -63,7 +64,7 @@ function ResetPasswordForm() {
     <main className="flex min-h-screen items-center justify-center bg-paper px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
-          <Logo />
+          <AuthBrand />
         </div>
         <Card>
           <h1 className="font-display text-2xl text-ink">Reset your password</h1>
