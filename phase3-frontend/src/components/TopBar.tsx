@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -174,6 +174,7 @@ export function TopBar() {
   const searchParams = useSearchParams();
   const activeBusinessView = searchParams.get("view");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
 
   const [businesses, setBusinesses] = useState<Business[] | null>(null);
 
@@ -211,15 +212,22 @@ export function TopBar() {
 
   useEffect(() => {
     if (!mobileMenuOpen) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!headerRef.current?.contains(event.target as Node)) setMobileMenuOpen(false);
+    }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setMobileMenuOpen(false);
     }
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [mobileMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95 backdrop-blur">
+    <header ref={headerRef} className="sticky top-0 z-40 border-x-0 border-t-0 border-b border-line bg-surface/95 backdrop-blur">
       <div className="h-[3px] bg-gradient-to-r from-seal via-[#9EC494] to-seal" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="flex min-h-16 items-center justify-between gap-3">
@@ -419,13 +427,40 @@ export function TopBar() {
                 <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
                   {currentBusiness?.name ?? "Current business"}
                 </p>
-                <Link href={overviewHref} onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm text-ink-soft transition hover:bg-paper hover:text-ink">
+                <Link
+                  href={overviewHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-current={!activeBusinessView || activeBusinessView === "overview" ? "page" : undefined}
+                  className={`rounded-md px-3 py-2.5 text-sm transition ${
+                    !activeBusinessView || activeBusinessView === "overview"
+                      ? "bg-seal-soft font-medium text-ink"
+                      : "text-ink-soft hover:bg-paper hover:text-ink"
+                  }`}
+                >
                   Overview
                 </Link>
-                <Link href={reconciliationHref} onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm text-ink-soft transition hover:bg-paper hover:text-ink">
+                <Link
+                  href={reconciliationHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-current={activeBusinessView === "reconciliation" ? "page" : undefined}
+                  className={`rounded-md px-3 py-2.5 text-sm transition ${
+                    activeBusinessView === "reconciliation"
+                      ? "bg-seal-soft font-medium text-ink"
+                      : "text-ink-soft hover:bg-paper hover:text-ink"
+                  }`}
+                >
                   Reconciliation
                 </Link>
-                <Link href={historyHref} onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-sm text-ink-soft transition hover:bg-paper hover:text-ink">
+                <Link
+                  href={historyHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-current={activeBusinessView === "history" ? "page" : undefined}
+                  className={`rounded-md px-3 py-2.5 text-sm transition ${
+                    activeBusinessView === "history"
+                      ? "bg-seal-soft font-medium text-ink"
+                      : "text-ink-soft hover:bg-paper hover:text-ink"
+                  }`}
+                >
                   History
                 </Link>
                 {isNewCalculation && (
@@ -441,17 +476,19 @@ export function TopBar() {
             </p>
             {businesses === null && <p className="px-3 py-2 text-xs text-ink-faint">Loading businesses…</p>}
             {businesses?.length === 0 && <p className="px-3 py-2 text-xs text-ink-faint">No businesses yet.</p>}
-            {businesses?.map((business) => (
+            {businesses?.filter((business) => business.id !== currentBusinessId).map((business) => (
               <Link
                 key={business.id}
                 href={`/dashboard/${business.id}`}
                 onClick={() => setMobileMenuOpen(false)}
-                aria-current={business.id === currentBusinessId ? "page" : undefined}
                 className="truncate rounded-md px-3 py-2.5 text-sm text-ink-soft transition hover:bg-paper hover:text-ink"
               >
                 {business.name}
               </Link>
             ))}
+            {businesses && businesses.filter((business) => business.id !== currentBusinessId).length === 0 && (
+              <p className="px-3 py-2 text-xs text-ink-faint">No other businesses.</p>
+            )}
             <div className="my-2 border-t border-line" />
             <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
               Resources
