@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Button, Card, Eyebrow, Logo, SectionHeading } from "@/components/ui";
+import { Button, Card, Eyebrow, SectionHeading } from "@/components/ui";
+import { PublicHeader } from "@/components/PublicHeader";
 
 export const metadata = { title: "Know Your Taxes | Twelve C" };
 
@@ -91,14 +92,7 @@ const SECTIONS: { id: string; label: string }[] = [
 export default function LearnPage() {
   return (
     <main className="min-h-screen bg-paper">
-      <header className="mx-auto flex max-w-3xl items-center justify-between px-6 py-6">
-        <Link href="/">
-          <Logo />
-        </Link>
-        <Link href="/dashboard" className="text-sm text-ink-soft hover:text-ink">
-          Back to dashboard
-        </Link>
-      </header>
+      <PublicHeader />
 
       <div className="mx-auto max-w-3xl px-6 pb-24">
         <Eyebrow>Know your taxes</Eyebrow>
