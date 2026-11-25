@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Logo } from "@/components/ui";
+import { PublicHeader } from "@/components/PublicHeader";
 
 export function LegalLayout({
   title,
@@ -12,14 +11,7 @@ export function LegalLayout({
 }) {
   return (
     <main className="min-h-screen bg-paper">
-      <header className="mx-auto flex max-w-3xl items-center justify-between px-6 py-6">
-        <Link href="/">
-          <Logo />
-        </Link>
-        <Link href="/" className="text-sm text-ink-soft hover:text-ink">
-          Back to home
-        </Link>
-      </header>
+      <PublicHeader />
 
       <div className="mx-auto max-w-3xl px-6 pb-24">
         <h1 className="font-display text-3xl text-ink">{title}</h1>
