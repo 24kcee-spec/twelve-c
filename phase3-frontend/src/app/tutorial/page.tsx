@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Badge, Button, Card, Disclosure, Eyebrow, Logo, SectionHeading } from "@/components/ui";
+import { Badge, Button, Card, Disclosure, Eyebrow, SectionHeading } from "@/components/ui";
+import { PublicHeader } from "@/components/PublicHeader";
 
 export const metadata = { title: "Documentation | Twelve C" };
 
@@ -135,14 +136,7 @@ const FAQ = [
 export default function TutorialPage() {
   return (
     <main className="min-h-screen bg-paper">
-      <header className="mx-auto flex max-w-4xl items-center justify-between px-4 py-6 sm:px-6">
-        <Link href="/">
-          <Logo />
-        </Link>
-        <Link href="/dashboard" className="text-sm text-ink-soft hover:text-ink">
-          Back to dashboard
-        </Link>
-      </header>
+      <PublicHeader />
 
       <div className="mx-auto max-w-4xl px-4 pb-24 sm:px-6">
         <Eyebrow>Documentation</Eyebrow>
