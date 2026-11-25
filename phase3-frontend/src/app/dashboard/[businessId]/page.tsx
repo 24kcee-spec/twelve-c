@@ -187,7 +187,7 @@ function BusinessContent({ businessId }: { businessId: string }) {
 
         {selected ? (
           <>
-            <div className="mt-8 flex gap-5 border-b border-line">
+            <div className="mt-8 flex gap-5 border-b border-line lg:hidden">
               {(
                 [
                   { id: "overview", label: "Overview" },
