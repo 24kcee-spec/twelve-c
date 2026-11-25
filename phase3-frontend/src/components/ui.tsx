@@ -228,10 +228,12 @@ export function Dropdown({
   trigger,
   children,
   align = "left",
+  ariaLabel,
 }: {
   trigger: (state: { open: boolean }) => ReactNode;
   children: ReactNode;
   align?: "left" | "right";
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
