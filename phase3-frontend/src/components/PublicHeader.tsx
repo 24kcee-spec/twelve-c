@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/ui";
 
 const LINKS = [
@@ -42,6 +42,7 @@ function MenuIcon({ open }: { open: boolean }) {
 export function PublicHeader() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -49,18 +50,25 @@ export function PublicHeader() {
 
   useEffect(() => {
     if (!menuOpen) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!headerRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setMenuOpen(false);
     }
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [menuOpen]);
 
   const isActive = (href: string) =>
     pathname === href || (href !== "/" && Boolean(pathname?.startsWith(`${href}/`)));
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
+    <header ref={headerRef} className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
       <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" aria-label="Twelve C home" className="shrink-0">
           <Logo />
@@ -68,7 +76,7 @@ export function PublicHeader() {
 
         <nav aria-label="Main navigation" className="hidden items-center gap-1 md:flex">
           {LINKS.map((item) => (
-            <Link key={item.href} href={item.href} className={linkClass(isActive(item.href))}>
+            <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined} className={linkClass(isActive(item.href))}>
               {item.label}
             </Link>
           ))}
